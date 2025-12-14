@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '18.x'
+  NODE_VERSION: '22.x'
   RESOURCE_GROUP: Shree-Ram-Physio
   WEBAPP_NAME: shree-ram-physio-backend
   DOCKER_IMAGE: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/shree-ram-physio
