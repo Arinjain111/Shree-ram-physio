@@ -1,14 +1,26 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as dotenv from 'dotenv';
+import { autoUpdater } from 'electron-updater';
 import { getPrismaClient, disconnectPrisma } from './lib/prisma';
 import { initializeDatabase } from './lib/initDatabase';
 import { PrismaSyncEngine } from './sync/prismaSyncEngine';
 import { PrismaClient } from '@prisma/client';
 import { logError, logWarning, logSuccess, logInfo } from './utils/errorLogger';
+import { getBackendUrl } from './config/backend';
 
 // Suppress Node.js warnings
 process.removeAllListeners('warning');
+
+dotenv.config();
+
+function setupAutoUpdates() {
+  autoUpdater.autoDownload = true;
+  autoUpdater.checkForUpdatesAndNotify().catch(() => {
+    // ignore update errors to keep app running
+  });
+}
 
 let mainWindow: BrowserWindow | null = null;
 let prisma: PrismaClient | null = null;
@@ -50,6 +62,8 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  setupAutoUpdates();
+
   // Initialize database tables (create if not exists)
   try {
     await initializeDatabase();
@@ -70,7 +84,7 @@ app.whenReady().then(async () => {
   }
   
   // Initialize sync engine
-  const backendUrl = process.env.AZURE_BACKEND_URL || 'http://localhost:3000';
+  const backendUrl = getBackendUrl();
   syncEngine = new PrismaSyncEngine(backendUrl);
   
   // Start auto-sync (every 5 minutes)

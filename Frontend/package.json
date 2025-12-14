@@ -49,6 +49,7 @@
     "axios": "^1.13.2",
     "better-sqlite3": "^12.5.0",
     "googleapis": "^128.0.0",
+    "electron-updater": "^6.3.9",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.0",
@@ -67,6 +68,13 @@
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Arinjain111",
+        "repo": "Shri-ram-physio"
+      }
+    ]
   }
 }

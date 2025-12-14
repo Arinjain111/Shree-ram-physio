@@ -1,12 +1,24 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as dotenv from 'dotenv';
+import { autoUpdater } from 'electron-updater';
 import { LocalDatabase } from './database/schema';
 import { SyncEngine } from './sync/syncEngine';
+import { getBackendUrl } from './config/backend';
 
 let mainWindow: BrowserWindow | null = null;
 let database: LocalDatabase | null = null;
 let syncEngine: SyncEngine | null = null;
+
+dotenv.config();
+
+function setupAutoUpdates() {
+  autoUpdater.autoDownload = true;
+  autoUpdater.checkForUpdatesAndNotify().catch(() => {
+    // ignore update errors to avoid crashing the app
+  });
+}
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
@@ -34,12 +46,14 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  setupAutoUpdates();
+
   // Initialize database
   const dbPath = path.join(app.getPath('userData'), 'shri-ram-physio.db');
   database = new LocalDatabase(dbPath);
   
   // Initialize sync engine (update with your Azure backend URL)
-  const backendUrl = process.env.AZURE_BACKEND_URL || 'http://localhost:3000';
+  const backendUrl = getBackendUrl();
   syncEngine = new SyncEngine(database, backendUrl);
   
   // Start auto-sync (every 5 minutes)
