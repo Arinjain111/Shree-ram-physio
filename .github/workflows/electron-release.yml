@@ -15,7 +15,8 @@ jobs:
     env:
       VITE_API_BASE_URL: https://shree-ram-physio-backend.azurewebsites.net
       AZURE_BACKEND_URL: https://shree-ram-physio-backend.azurewebsites.net
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Use a PAT with repo scope stored as GH_PAT to avoid release 404s
+      GH_TOKEN: ${{ secrets.GH_PAT }}
     defaults:
       run:
         working-directory: Frontend
