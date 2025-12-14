@@ -106,9 +106,15 @@ jobs:
           cd Backend
           npm ci
 
-      - name: Run Prisma migrations
+      - name: Apply Prisma schema (migrations or push)
         run: |
           cd Backend
-          npx prisma migrate deploy
+          if [ -d "prisma/migrations" ] && [ "$(ls -A prisma/migrations)" ]; then
+            echo "Migrations found; running prisma migrate deploy"
+            npx prisma migrate deploy
+          else
+            echo "No migrations found; running prisma db push to sync schema"
+            npx prisma db push
+          fi
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
