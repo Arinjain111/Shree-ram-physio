@@ -1,0 +1,118 @@
+// Prisma Schema for Azure SQL Database (Backend)
+// This is the production cloud database schema
+// Driver adapters are now stable in Prisma 7 (no preview feature needed)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+}
+
+// Patient model with sync tracking
+model Patient {
+  id        Int       @id @default(autoincrement())
+  firstName String    @map("first_name")
+  lastName  String    @map("last_name")
+  age       Int
+  gender    String
+  phone     String
+  uhid      String    @unique
+  
+  // Timestamps for sync
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  invoices  Invoice[]
+  
+  @@map("patients")
+}
+
+// Invoice model with sync tracking
+model Invoice {
+  id             Int       @id @default(autoincrement())
+  invoiceNumber  String    @unique @map("invoice_number")
+  patientId      Int       @map("patient_id")
+  date           String
+  diagnosis      String    @default("")
+  notes          String    @default("")
+  paymentMethod  String    @default("Cash") @map("payment_method")
+  total          Float
+  
+  // Timestamps for sync
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  patient        Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  treatments     Treatment[]
+  
+  @@map("invoices")
+  @@index([patientId])
+}
+
+// Treatment model with sync tracking
+model Treatment {
+  id         Int       @id @default(autoincrement())
+  invoiceId  Int       @map("invoice_id")
+  name       String
+  duration   String    @default("")
+  sessions   Int
+  startDate  String    @map("start_date")
+  endDate    String    @map("end_date")
+  amount     Float
+  
+  // Timestamps for sync
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  invoice    Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  @@map("treatments")
+  @@index([invoiceId])
+}
+
+// Treatment presets for autocomplete
+model TreatmentPreset {
+  id               Int      @id @default(autoincrement())
+  name             String
+  defaultSessions  Int      @map("default_sessions")
+  pricePerSession  Float    @map("price_per_session")
+  
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  
+  @@map("treatment_presets")
+}
+
+// Sync logs for tracking sync operations
+model SyncLog {
+  id            Int       @id @default(autoincrement())
+  tableName     String    @map("table_name")
+  recordId      Int       @map("record_id")
+  operation     String    // CREATE, UPDATE, DELETE
+  status        String    // pending, success, failed
+  errorMessage  String?   @map("error_message")
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  syncedAt      DateTime? @map("synced_at")
+  
+  @@map("sync_logs")
+  @@index([tableName, recordId])
+}
+
+// Sync metadata for tracking sync operations
+model SyncMetadata {
+  id            Int       @id @default(autoincrement())
+  tableName     String    @map("table_name")
+  recordId      Int       @map("record_id")
+  operation     String    // CREATE, UPDATE, DELETE
+  syncedAt      DateTime  @default(now()) @map("synced_at")
+  clientId      String?   @map("client_id") // To identify which device synced
+  
+  @@map("sync_metadata")
+  @@index([tableName, recordId])
+}

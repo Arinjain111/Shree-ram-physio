@@ -1,0 +1,39 @@
+# Ignore node modules
+node_modules/
+
+# Ignore build output
+dist/
+
+# Ignore env files (use env variables in container)
+.env
+.env.local
+.env*.local
+
+# Ignore git
+.git/
+.gitignore
+
+# Ignore documentation
+*.md
+!README.md
+
+# Ignore test files
+*.test.ts
+*.spec.ts
+__tests__/
+
+# Ignore IDE files
+.vscode/
+.idea/
+
+# Ignore logs
+*.log
+npm-debug.log*
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore temporary files
+*.tmp
+*.temp
