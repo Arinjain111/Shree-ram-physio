@@ -11,7 +11,7 @@ on:
 
 env:
   NODE_VERSION: '18.x'
-  RESOURCE_GROUP: Shree-Ram-Physio
+  RESOURCE_GROUP: shree-ram-physio
   WEBAPP_NAME: shree-ram-physio-backend
   DOCKER_IMAGE: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/shree-ram-physio
 
