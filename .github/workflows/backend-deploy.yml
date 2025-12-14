@@ -11,7 +11,7 @@ on:
 
 env:
   NODE_VERSION: '18.x'
-  RESOURCE_GROUP: Shree-Ram-Physio
+  RESOURCE_GROUP: shree-ram-physio
   WEBAPP_NAME: shree-ram-physio-backend
   DOCKER_IMAGE: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/shree-ram-physio
 
@@ -50,6 +50,11 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Verify Azure context and Web App
+        run: |
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          az webapp show --resource-group $RESOURCE_GROUP --name $WEBAPP_NAME
 
       - name: Configure App Service settings
         run: |
