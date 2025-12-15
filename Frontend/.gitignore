@@ -5,5 +5,8 @@ release/
 .DS_Store
 credentials.json
 token.json
+.env
+.env.development
+.env.production
 
 /generated/prisma
