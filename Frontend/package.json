@@ -21,11 +21,11 @@
     "react",
     "tailwindcss"
   ],
-  "author": "Shri Ram Physio",
+  "author": "Shree Ram Physiotherapy & Rehabilitation Centre",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Arinjain111/Shri-ram-physio.git"
+    "url": "https://github.com/Arinjain111/Shree-ram-physio.git"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0-alpha.25",
@@ -60,8 +60,8 @@
     "zod": "^4.1.13"
   },
   "build": {
-    "appId": "com.shrirampphysio.invoicing",
-    "productName": "Shri Ram Physio",
+    "appId": "com.shreeRampPhysio.invoicing",
+    "productName": "shree ram physio invoicing",
     "directories": {
       "output": "release"
     },
@@ -77,7 +77,7 @@
       {
         "provider": "github",
         "owner": "Arinjain111",
-        "repo": "Shri-ram-physio"
+        "repo": "Shree-ram-physio"
       }
     ]
   }
