@@ -28,8 +28,10 @@ const config: mssql.config = {
   user: params.get('user') || 'sa',
   password: params.get('password') || 'YourStrong@Passw0rd',
   options: {
-    encrypt: params.get('encrypt') === 'true',
-    trustServerCertificate: params.get('trustservercertificate') === 'true',
+    // Always enable encryption for Azure SQL, default to true if not explicitly set to false
+    encrypt: params.get('encrypt') !== 'false',
+    // Trust server certificate for local dev, false for Azure
+    trustServerCertificate: params.get('trustservercertificate') === 'true' || host === 'localhost',
   },
 };
 
