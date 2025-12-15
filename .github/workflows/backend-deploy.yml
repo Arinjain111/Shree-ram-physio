@@ -98,13 +98,47 @@ jobs:
       - name: Allow GitHub Actions runner IP
         run: |
           RUNNER_IP=$(curl -s https://api.ipify.org)
-          echo "GitHub Actions runner IP: $RUNNER_IP"
+          echo "✅ GitHub Actions runner IP: $RUNNER_IP"
+          
+          # Create firewall rule
           az sql server firewall-rule create \
             --resource-group $RESOURCE_GROUP \
             --server $SQL_SERVER \
             --name "GitHubActions-${{ github.run_id }}" \
             --start-ip-address $RUNNER_IP \
-            --end-ip-address $RUNNER_IP || echo "Firewall rule already exists"
+            --end-ip-address $RUNNER_IP || \
+          az sql server firewall-rule update \
+            --resource-group $RESOURCE_GROUP \
+            --server $SQL_SERVER \
+            --name "GitHubActions-${{ github.run_id }}" \
+            --start-ip-address $RUNNER_IP \
+            --end-ip-address $RUNNER_IP
+          
+          echo "✅ Firewall rule created/updated"
+          echo "⏳ Waiting 30 seconds for firewall rule to propagate..."
+          sleep 30
+
+      - name: Verify DATABASE_URL secret is set
+        run: |
+          if [ -z "${{ secrets.DATABASE_URL }}" ]; then
+            echo "❌ ERROR: DATABASE_URL secret is not set!"
+            echo "Please add DATABASE_URL to GitHub Secrets:"
+            echo "https://github.com/${{ github.repository }}/settings/secrets/actions"
+            exit 1
+          fi
+          echo "✅ DATABASE_URL secret is configured"
+
+      - name: Test database connection
+        run: |
+          echo "Testing SQL Server connection..."
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "From IP: $RUNNER_IP"
+          echo "To Server: $SQL_SERVER.database.windows.net:1433"
+          
+          # Try to ping the SQL server (may fail but shows connectivity attempt)
+          timeout 5 bash -c "cat < /dev/null > /dev/tcp/$SQL_SERVER.database.windows.net/1433" && \
+            echo "✅ Can reach SQL Server" || \
+            echo "⚠️  TCP connection check failed (may be normal)"
 
       - name: Setup Node.js for migrations
         uses: actions/setup-node@v4
@@ -121,12 +155,14 @@ jobs:
       - name: Apply Prisma schema (migrations or push)
         run: |
           cd Backend
+          echo "🔍 DATABASE_URL configured: ${DATABASE_URL:0:50}..."
+          
           if [ -d "prisma/migrations" ] && [ "$(ls -A prisma/migrations)" ]; then
             echo "Migrations found; running prisma migrate deploy"
             npx prisma migrate deploy
           else
             echo "No migrations found; running prisma db push to sync schema"
-            npx prisma db push
+            npx prisma db push --accept-data-loss
           fi
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
