@@ -7,6 +7,7 @@ import syncRoutes from './routes/syncPrisma';
 import patientRoutes from './routes/patient';
 import invoiceRoutes from './routes/invoice';
 import treatmentPresetRoutes from './routes/treatmentPreset';
+import resetRoutes from './routes/reset';
 import prisma from './lib/prisma';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -66,6 +67,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/presets', treatmentPresetRoutes);
+app.use('/api/database', resetRoutes);
 
 // Centralized error handler (must be after routes)
 app.use(errorHandler);
