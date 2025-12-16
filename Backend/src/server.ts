@@ -16,7 +16,8 @@ const app: Express = express();
 const PORT = process.env.PORT || 3000;
 
 // Trust proxy - Required for Azure App Service
-app.set('trust proxy', true);
+// Set to 1 to trust the first hop (Azure App Service)
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet());
@@ -27,11 +28,31 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
+// Rate limiting with custom key generator for Azure App Service
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
+  // Custom key generator to handle Azure's X-Forwarded-For format
+  keyGenerator: (req: Request): string => {
+    // Get the leftmost IP from X-Forwarded-For header (the real client IP)
+    const forwardedFor = req.headers['x-forwarded-for'];
+    if (forwardedFor) {
+      const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+      // Extract first IP and remove port if present
+      const clientIp = ips?.split(',')[0]?.trim()?.split(':')[0];
+      if (clientIp) return clientIp;
+    }
+    // Fallback to req.ip, removing port if present
+    const ip = req.ip || 'unknown';
+    const cleanIp = ip.includes(':') ? ip.split(':')[0] : ip;
+    return cleanIp || 'unknown';
+  },
+  // Skip validation warnings for production environment
+  validate: {
+    trustProxy: false,
+    xForwardedForHeader: false,
+  },
 });
 app.use('/api/', limiter);
 
