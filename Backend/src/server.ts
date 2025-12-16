@@ -15,6 +15,9 @@ dotenv.config();
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy - Required for Azure App Service
+app.set('trust proxy', true);
+
 // Middleware
 app.use(helmet());
 app.use(cors({
@@ -56,7 +59,9 @@ async function startServer() {
 
   try {
     // Test Prisma connection in background
+    const dbUrl = process.env.DATABASE_URL || 'NOT_SET';
     console.log('🔄 Attempting to connect to Azure SQL...');
+    console.log('📊 DATABASE_URL configured:', dbUrl.substring(0, 50) + '...');
     await prisma.$connect();
     console.log('✅ Prisma connected to Azure SQL');
   } catch (error) {
