@@ -1,7 +1,9 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import syncRoutes from './routes/syncPrisma';
 import patientRoutes from './routes/patient';
@@ -10,8 +12,6 @@ import treatmentPresetRoutes from './routes/treatmentPreset';
 import resetRoutes from './routes/reset';
 import prisma from './lib/prisma';
 import { errorHandler } from './middleware/errorHandler';
-
-dotenv.config();
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;

@@ -25,7 +25,7 @@ export const syncData = async (req: Request, res: Response) => {
   const patientIdMap = new Map<number, number>();
   const invoiceIdMap = new Map<number, number>();
 
-    // === SYNC PATIENTS ===
+  // === SYNC PATIENTS ===
   if (patients && patients.length > 0) {
     for (const patient of patients) {
       let cloudPatient;
@@ -79,7 +79,7 @@ export const syncData = async (req: Request, res: Response) => {
     }
   }
 
-    // === SYNC INVOICES ===
+  // === SYNC INVOICES ===
   if (invoices && invoices.length > 0) {
     for (const invoice of invoices) {
       // Resolve patient ID (use cloud ID or map from local ID)
@@ -206,7 +206,7 @@ export const syncData = async (req: Request, res: Response) => {
     }
   }
 
-    // === SYNC TREATMENTS ===
+  // === SYNC TREATMENTS ===
   if (treatments && treatments.length > 0) {
     for (const treatment of treatments) {
       // Resolve invoice ID (use cloud ID or map from local ID)
@@ -268,15 +268,15 @@ export const syncData = async (req: Request, res: Response) => {
     }
   }
 
-    // === FETCH UPDATES FROM CLOUD ===
-    // On first sync (no lastSyncTime), fetch ALL records
-    // On subsequent syncs, only fetch records updated since last sync
+  // === FETCH UPDATES FROM CLOUD ===
+  // On first sync (no lastSyncTime), fetch ALL records
+  // On subsequent syncs, only fetch records updated since last sync
   const whereClause = lastSyncTime
     ? {
-        updatedAt: {
-          gte: new Date(lastSyncTime),
-        },
-      }
+      updatedAt: {
+        gte: new Date(lastSyncTime),
+      },
+    }
     : {}; // Empty where clause = fetch all
 
   console.log(
@@ -315,4 +315,55 @@ export const syncData = async (req: Request, res: Response) => {
     success: true,
     ...result,
   });
+};
+
+export const getSyncStatus = async (req: Request, res: Response) => {
+  // Use cacheStrategy with Prisma Accelerate to reduce DB load
+  // TTL: 60 seconds (results cached for 1 min)
+  // SWR: 60 seconds (serve stale result for another 1 min while fetching new)
+  const cacheStrategy = { ttl: 60, swr: 60 };
+
+  try {
+    const [lastPatient, lastInvoice, lastTreatment] = await Promise.all([
+      prisma.patient.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+        // @ts-ignore
+        cacheStrategy,
+      }),
+      prisma.invoice.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+        // @ts-ignore
+        cacheStrategy,
+      }),
+      prisma.treatment.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+        // @ts-ignore
+        cacheStrategy,
+      }),
+    ]);
+
+    const timestamps = [
+      lastPatient?.updatedAt,
+      lastInvoice?.updatedAt,
+      lastTreatment?.updatedAt
+    ].filter((d): d is Date => !!d);
+
+    const lastModified = timestamps.length > 0
+      ? new Date(Math.max(...timestamps.map(d => d.getTime())))
+      : new Date(0);
+
+    res.json({
+      success: true,
+      lastModified: lastModified.toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching sync status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch sync status'
+    });
+  }
 };

@@ -17,7 +17,8 @@ COPY . .
 
 # Generate Prisma Client (needs DATABASE_URL for Prisma 7)
 # Use dummy URL for build - real one provided at runtime
-ENV DATABASE_URL="sqlserver://localhost:1433;database=dummy;user=sa;password=dummy;encrypt=true"
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+ENV DIRECT_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN npx prisma generate
 
 # Build TypeScript
