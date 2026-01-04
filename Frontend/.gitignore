@@ -14,3 +14,10 @@ dev.db
 /generated/prisma
 
 out/
+
+release/
+release_v6/
+
+# Local build outputs created when release/ is locked
+release-local/
+release-local-*/

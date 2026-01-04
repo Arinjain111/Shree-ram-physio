@@ -1,18 +1,21 @@
 {
   "name": "shri-ram-physio-invoicing",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "description": "Physiotherapy clinic invoicing and patient management system",
-  "main": ".vite/build/main.js",
+  "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "electron-forge start",
-    "build:vite": "npm run prisma:generate && npm run build:electron && vite build",
+    "dev": "vite",
+    "build": "npm run build:vite && npm run build:electron",
+    "build:vite": "npm run prisma:generate && vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "postinstall": "prisma generate",
+    "clean:win": "node scripts/prebuild-win.js",
+    "build:win": "node scripts/build-win.js",
+    "postinstall": "prisma generate && electron-builder install-app-deps",
     "preview": "vite preview",
-    "start": "electron-forge start",
-    "package": "npm run build:vite && electron-forge package",
-    "make": "npm run build:vite && electron-forge make",
-    "publish": "npm run build:vite && electron-forge publish",
+    "start": "electron .",
+    "package": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
@@ -31,17 +34,6 @@
     "url": "https://github.com/Arinjain111/Shree-ram-physio.git"
   },
   "devDependencies": {
-    "@electron-forge/cli": "^7.8.3",
-    "@electron-forge/maker-deb": "^7.10.2",
-    "@electron-forge/maker-rpm": "^7.10.2",
-    "@electron-forge/maker-squirrel": "^7.10.2",
-    "@electron-forge/maker-wix": "^7.10.2",
-    "@electron-forge/maker-zip": "^7.10.2",
-    "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
-    "@electron-forge/plugin-fuses": "^7.10.2",
-    "@electron-forge/plugin-vite": "^7.10.2",
-    "@electron-forge/publisher-github": "^7.10.2",
-    "@electron/fuses": "^1.8.0",
     "@tailwindcss/vite": "^4.0.0-alpha.25",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.10.0",
@@ -50,7 +42,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "electron": "^39.2.7",
-    "electron-builder": "^26.0.12",
+    "electron-builder": "^24.13.3",
     "electron-rebuild": "^3.2.9",
     "postcss": "^8.4.32",
     "prisma": "^7.1.0",
@@ -68,65 +60,11 @@
     "axios": "^1.13.2",
     "better-sqlite3": "^12.5.0",
     "dotenv": "^17.2.3",
-    "electron-squirrel-startup": "^1.0.1",
     "electron-updater": "^6.3.9",
     "googleapis": "^128.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.0",
-    "update-electron-app": "^3.1.2",
     "zod": "^4.1.13"
-  },
-  "build": {
-    "npmRebuild": false,
-    "appId": "com.shreeRampPhysio.invoicing",
-    "productName": "Shri Ram Physio",
-    "directories": {
-      "output": "release_v6"
-    },
-    "files": [
-      "dist/**/*",
-      "dist-electron/**/*",
-      "node_modules/**/*",
-      "node_modules/.prisma/**/*",
-      "!node_modules/@types",
-      "!node_modules/typescript",
-      "!node_modules/vite",
-      "!node_modules/electron",
-      "!node_modules/electron-builder",
-      "!node_modules/tailwindcss"
-    ],
-    "asarUnpack": [
-      "**/*.node",
-      "node_modules/.prisma/**/*",
-      "node_modules/@prisma/client/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "prisma",
-        "to": "prisma",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "node_modules/.prisma",
-        "to": "prisma-client",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "assets/icon.png"
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "Arinjain111",
-        "repo": "Shree-ram-physio"
-      }
-    ]
   }
 }

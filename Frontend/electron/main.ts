@@ -9,55 +9,12 @@ import { registerIpcHandlers } from './ipc/index';
 import { logError, logSuccess } from './utils/errorLogger';
 import { getBackendUrl } from './config/backend';
 
-// Forge Vite plugin provides these globals - declare them for TS
+// Vite plugin provides these globals - declare them for TS
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 // Early diagnostics
 console.log('[Main] starting process', { pid: process.pid, argv: process.argv, cwd: process.cwd() });
-
-// Handle Squirrel events for Windows installer (MUST BE EARLY)
-// Manually handle Squirrel startup events to avoid bundling issues
-if (process.platform === 'win32') {
-  const squirrelCommand = process.argv[1];
-  if (squirrelCommand && squirrelCommand.startsWith('--squirrel')) {
-    console.log('[Main] Handling Squirrel event:', squirrelCommand);
-    
-    const cp = require('child_process');
-    const path = require('path');
-    const appFolder = path.resolve(process.execPath, '..');
-    const rootFolder = path.resolve(appFolder, '..');
-    const updateExe = path.resolve(path.join(rootFolder, 'Update.exe'));
-    const exeName = path.basename(process.execPath);
-    
-    const spawnUpdate = (args: string[]) => {
-      try {
-        cp.spawn(updateExe, args, { detached: true }).unref();
-      } catch (error) {
-        console.error('[Main] Failed to spawn Update.exe:', error);
-      }
-    };
-    
-    switch (squirrelCommand) {
-      case '--squirrel-install':
-      case '--squirrel-updated':
-        // Create shortcuts on install/update
-        spawnUpdate(['--createShortcut', exeName]);
-        setTimeout(() => app.quit(), 1000);
-        break;
-      case '--squirrel-uninstall':
-        // Remove shortcuts on uninstall
-        spawnUpdate(['--removeShortcut', exeName]);
-        setTimeout(() => app.quit(), 1000);
-        break;
-      case '--squirrel-obsolete':
-        app.quit();
-        break;
-      default:
-        break;
-    }
-  }
-}
 
 // Suppress Node.js warnings
 process.removeAllListeners('warning');
@@ -97,6 +54,7 @@ if (!gotTheLock) {
 }
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const shouldOpenDevTools = isDev && process.env.ELECTRON_OPEN_DEVTOOLS !== '0';
 
 function createWindow() {
   console.log('[Main] Creating main window. isDev=', isDev);
@@ -109,7 +67,6 @@ function createWindow() {
       contextIsolation: false,
       webSecurity: false, // Allow ES modules from file:// protocol
     },
-    icon: path.join(__dirname, '../assets/icon.png')
   });
 
   // Suppress unnecessary DevTools warnings
@@ -122,9 +79,14 @@ function createWindow() {
     }
   });
 
-  // Access directly (Vite replaces these identifiers at build time)
-  const devServerUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL;
-  let viteName = MAIN_WINDOW_VITE_NAME;
+  // In Forge, these globals are injected. In Electron Builder they may be undefined.
+  const devServerUrl = (typeof MAIN_WINDOW_VITE_DEV_SERVER_URL !== 'undefined')
+    ? MAIN_WINDOW_VITE_DEV_SERVER_URL
+    : process.env.VITE_DEV_SERVER_URL;
+
+  let viteName = (typeof MAIN_WINDOW_VITE_NAME !== 'undefined')
+    ? MAIN_WINDOW_VITE_NAME
+    : 'main_window';
 
   // Fix for undefined viteName in packaged app
   if (!viteName || viteName === 'undefined') {
@@ -136,14 +98,38 @@ function createWindow() {
     // Development mode - load from Vite dev server
     console.log('[Main] Loading dev URL:', devServerUrl);
     mainWindow.loadURL(devServerUrl);
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    if (shouldOpenDevTools) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
   } else {
     // Production mode - load from built files
-    const indexPath = path.join(__dirname, `../renderer/${viteName}/index.html`);
+    // Electron Builder/Vite build outputs to `dist/index.html`
+    const candidates = [
+      path.join(__dirname, `../renderer/${viteName}/index.html`), // legacy Forge layout
+      path.join(__dirname, '../dist/index.html'),                 // current Vite layout
+    ];
+
+    const fs = require('fs');
+    const indexPath = candidates.find((p: string) => {
+      try {
+        return fs.existsSync(p);
+      } catch {
+        return false;
+      }
+    });
+
+    console.log('[Main] Production index candidates:', candidates);
     console.log('[Main] Loading production index.html from:', indexPath);
+
+    if (!indexPath) {
+      throw new Error(`Cannot find renderer index.html. Tried:\n${candidates.join('\n')}`);
+    }
+
     mainWindow.loadFile(indexPath);
-    // Keep DevTools open for debugging
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // Do not auto-open DevTools in packaged builds
+    if (shouldOpenDevTools) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
   }
 
   mainWindow.on('ready-to-show', () => {

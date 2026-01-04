@@ -52,9 +52,27 @@ function getPrismaClientConstructor() {
         if (app.isPackaged) {
             logToFile(`Running in PACKAGED mode. resourcesPath: ${process.resourcesPath}`);
 
+            // Prefer normal Node resolution first (Electron Builder packs node_modules into app.asar)
+            try {
+                const m = require('@prisma/client');
+                if (m?.PrismaClient) {
+                    logToFile('Loaded PrismaClient via require(@prisma/client)');
+                    return m.PrismaClient;
+                }
+                logToFile('require(@prisma/client) succeeded but PrismaClient export missing');
+            } catch (e: any) {
+                logToFile(`require(@prisma/client) failed: ${e.message}`);
+            }
+
             // We expect the client to be at resources/.prisma/client/index.js
             // This is because we manually copy '.prisma' folder to 'resources/.prisma'
             possiblePaths.push(path.join(process.resourcesPath, '.prisma', 'client', 'index.js'));
+
+            // Electron Builder common locations
+            possiblePaths.push(path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', '.prisma', 'client', 'index.js'));
+            possiblePaths.push(path.join(process.resourcesPath, 'app.asar', 'node_modules', '.prisma', 'client', 'index.js'));
+            possiblePaths.push(path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', '@prisma', 'client', 'index.js'));
+            possiblePaths.push(path.join(process.resourcesPath, 'app.asar', 'node_modules', '@prisma', 'client', 'index.js'));
 
             // Fallback: standard node_modules location if structure differs
             possiblePaths.push(path.join(process.resourcesPath, 'node_modules', '.prisma', 'client', 'index.js'));
