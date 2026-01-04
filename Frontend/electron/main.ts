@@ -16,6 +16,49 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 // Early diagnostics
 console.log('[Main] starting process', { pid: process.pid, argv: process.argv, cwd: process.cwd() });
 
+// Handle Squirrel events for Windows installer (MUST BE EARLY)
+// Manually handle Squirrel startup events to avoid bundling issues
+if (process.platform === 'win32') {
+  const squirrelCommand = process.argv[1];
+  if (squirrelCommand && squirrelCommand.startsWith('--squirrel')) {
+    console.log('[Main] Handling Squirrel event:', squirrelCommand);
+    
+    const cp = require('child_process');
+    const path = require('path');
+    const appFolder = path.resolve(process.execPath, '..');
+    const rootFolder = path.resolve(appFolder, '..');
+    const updateExe = path.resolve(path.join(rootFolder, 'Update.exe'));
+    const exeName = path.basename(process.execPath);
+    
+    const spawnUpdate = (args: string[]) => {
+      try {
+        cp.spawn(updateExe, args, { detached: true }).unref();
+      } catch (error) {
+        console.error('[Main] Failed to spawn Update.exe:', error);
+      }
+    };
+    
+    switch (squirrelCommand) {
+      case '--squirrel-install':
+      case '--squirrel-updated':
+        // Create shortcuts on install/update
+        spawnUpdate(['--createShortcut', exeName]);
+        setTimeout(() => app.quit(), 1000);
+        break;
+      case '--squirrel-uninstall':
+        // Remove shortcuts on uninstall
+        spawnUpdate(['--removeShortcut', exeName]);
+        setTimeout(() => app.quit(), 1000);
+        break;
+      case '--squirrel-obsolete':
+        app.quit();
+        break;
+      default:
+        break;
+    }
+  }
+}
+
 // Suppress Node.js warnings
 process.removeAllListeners('warning');
 

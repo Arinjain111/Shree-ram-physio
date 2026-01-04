@@ -36,6 +36,8 @@ exports.PatientSchema = zod_1.z.object({
  * Patient Form Schema - For user input validation
  */
 exports.PatientFormSchema = zod_1.z.object({
+    id: zod_1.z.number().int().optional(),
+    cloudId: zod_1.z.number().int().optional(),
     firstName: zod_1.z.string()
         .min(1, 'First name is required')
         .max(100, 'First name must be less than 100 characters')

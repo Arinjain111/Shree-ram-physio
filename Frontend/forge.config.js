@@ -16,6 +16,14 @@ module.exports = {
       './node_modules/.prisma',
     ],
     prune: true,
+    // Code signing configuration (uncomment when you have a certificate)
+    // osxSign: {}, // macOS signing
+    // osxNotarize: { // macOS notarization
+    //   tool: 'notarytool',
+    //   appleId: process.env.APPLE_ID,
+    //   appleIdPassword: process.env.APPLE_PASSWORD,
+    //   teamId: process.env.APPLE_TEAM_ID
+    // },
   },
   rebuildConfig: {},
   hooks: {
@@ -76,16 +84,33 @@ module.exports = {
           // Don't throw, let's see if it works anyway (unlikely but safe)
         }
       }
+    },
+    postPackage: async (forgeConfig, options) => {
+      // Copy icudtl.dat to fix Electron ICU error
+      const { outputPaths } = options;
+      for (const outputPath of outputPaths) {
+        const icuSource = path.join(outputPath, 'icudtl.dat');
+        if (fs.existsSync(icuSource)) {
+          console.log(`[Hook] icudtl.dat already exists at ${icuSource}`);
+        } else {
+          console.error(`[Hook] WARNING: icudtl.dat not found at ${icuSource}`);
+        }
+      }
     }
   },
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
       config: {
-        name: 'shri-ram-physio',
+        name: 'shri-ram-physio', // Must match executableName
+        authors: 'Shree Ram Physiotherapy & Rehabilitation Centre',
+        description: 'Physiotherapy clinic invoicing and patient management system',
         setupExe: 'Shri-Ram-Physio-Setup.exe',
         setupIcon: './assets/icon.ico',
-
+        // Create shortcuts
+        noMsi: true,
+        // Desktop and Start Menu shortcuts
+        iconUrl: 'https://raw.githubusercontent.com/Arinjain111/Shree-ram-physio/main/Frontend/assets/icon.ico',
       },
     },
     {

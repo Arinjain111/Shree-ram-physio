@@ -7,12 +7,23 @@ export function setupAutoUpdates() {
         return;
     }
 
+    // TODO: Re-enable auto-updates after packaging issue is resolved
+    // The update-electron-app module is not being bundled correctly in the asar package
+    console.log('[AutoUpdate] Auto-updates temporarily disabled');
+    return;
+
     // Use free update.electronjs.org service for open source apps
     // Using require() because update-electron-app is CommonJS
-    const updateElectronApp = require('update-electron-app');
-    updateElectronApp({
-        repo: 'Arinjain111/Shree-ram-physio',
-        updateInterval: '1 hour',
-        logger: console,
-    });
+    // try {
+    //     const updateElectronApp = require('update-electron-app');
+    //     updateElectronApp({
+    //         repo: 'Arinjain111/Shree-ram-physio',
+    //         updateInterval: '1 hour',
+    //         logger: console,
+    //     });
+    //     console.log('[AutoUpdate] Configured successfully');
+    // } catch (error) {
+    //     console.error('[AutoUpdate] Failed to setup:', error);
+    //     // App will continue without auto-update functionality
+    // }
 }

@@ -134,11 +134,6 @@ class PrismaSyncEngine {
             }
             console.log(`⬇️ Proceeding to sync: ${check.message}`);
             console.log('🔄 Starting full sync...');
-            // Get last sync time
-            const lastSync = await this.prisma.syncLog.findFirst({
-                where: { status: 'success' },
-                orderBy: { createdAt: 'desc' }
-            });
             // === FETCH PENDING DATA ===
             // We query full objects immediately for upload
             const pendingPatients = await this.prisma.patient.findMany({ where: { syncStatus: 'PENDING' } });
@@ -151,13 +146,11 @@ class PrismaSyncEngine {
                 include: { invoice: true }
             });
             console.log(`🔎 Found pending items: ${pendingPatients.length} patients, ${pendingInvoices.length} invoices, ${pendingTreatments.length} treatments`);
-            if (pendingPatients.length === 0 && pendingInvoices.length === 0 && pendingTreatments.length === 0 && !force) {
-                // Double check if force is false, maybe we can skip upload if truly nothing
-                // But if force is true, we proceed to check server updates even if local is empty
-            }
+            console.log(`📊 Local DB empty: ${pendingPatients.length === 0 && pendingInvoices.length === 0 && pendingTreatments.length === 0 ? 'YES - should fetch ALL from cloud' : 'NO'}`);
             // === PREPARE DATA FOR UPLOAD ===
+            // ALWAYS use lastSyncTime: null to fetch ALL cloud data (cloud is source of truth)
             const syncPayload = {
-                lastSyncTime: lastSync ? lastSync.createdAt.toISOString() : null,
+                lastSyncTime: null, // Always fetch ALL from cloud, not just recent updates
                 patients: pendingPatients.map(p => ({
                     id: p.id,
                     cloudId: p.cloudId,
@@ -197,11 +190,29 @@ class PrismaSyncEngine {
                 }))
             };
             console.log(`📤 Uploading: ${pendingPatients.length} patients, ${pendingInvoices.length} invoices, ${pendingTreatments.length} treatments`);
+            console.log(`📡 Sync URL: ${this.backendUrl}/api/sync`);
+            console.log(`📅 Full sync mode: Fetching ALL cloud data + uploading pending local changes`);
             const response = await axios_1.default.post(`${this.backendUrl}/api/sync`, syncPayload, {
                 timeout: 30000,
                 headers: { 'Content-Type': 'application/json' }
             });
+            console.log('📥 Backend response received:', {
+                syncedCount: response.data.synced?.patients?.length + response.data.synced?.invoices?.length + response.data.synced?.treatments?.length || 0,
+                updatesCount: (response.data.updates?.patients?.length || 0) + (response.data.updates?.invoices?.length || 0) + (response.data.updates?.treatments?.length || 0)
+            });
             const { synced, updates } = response.data;
+            console.log('📦 Raw backend response:', JSON.stringify({
+                synced: {
+                    patients: synced?.patients?.length || 0,
+                    invoices: synced?.invoices?.length || 0,
+                    treatments: synced?.treatments?.length || 0
+                },
+                updates: {
+                    patients: updates?.patients?.length || 0,
+                    invoices: updates?.invoices?.length || 0,
+                    treatments: updates?.treatments?.length || 0
+                }
+            }, null, 2));
             // === UPDATE LOCAL DB WITH CLOUD IDs ===
             // Update patients with cloud IDs
             for (const patient of synced.patients) {
@@ -224,14 +235,21 @@ class PrismaSyncEngine {
                         syncStatus: 'SYNCED',
                         lastSyncAt: new Date()
                     };
-                    // If invoice number was changed due to conflict, update it
+                    // ⚠️ CRITICAL: NEVER change invoice numbers after generation/printing!
+                    // Invoice numbers are immutable and sacred - user already printed them
+                    // If a conflict exists, backend keeps it as PENDING and returns conflict info
+                    // but we NEVER update the invoice number locally
                     if (invoice.newNumber && invoice.newNumber !== invoice.originalNumber) {
-                        updateData.invoiceNumber = invoice.newNumber;
-                        console.warn(`⚠️ Invoice number conflict resolved: ${invoice.originalNumber} → ${invoice.newNumber}`);
+                        console.error(`❌ INVOICE NUMBER CHANGED - THIS SHOULD NOT HAPPEN!`);
+                        console.error(`   Original: ${invoice.originalNumber}, New: ${invoice.newNumber}`);
+                        console.error(`   User's printed invoice has ${invoice.originalNumber} but system shows ${invoice.newNumber}`);
+                        // Don't apply the change - keep original number
+                        // This is a safety guard in case backend tries to change numbers
                     }
                     await this.prisma.invoice.update({
                         where: { id: invoice.localId },
                         data: updateData
+                        // NOTE: invoiceNumber is NOT updated - it's immutable!
                     });
                 }
             }
@@ -250,6 +268,16 @@ class PrismaSyncEngine {
             }
             // === APPLY CLOUD UPDATES ===
             console.log(`📥 Downloading updates: ${updates.patients?.length || 0} patients, ${updates.invoices?.length || 0} invoices, ${updates.treatments?.length || 0} treatments`);
+            if ((updates.patients?.length || 0) === 0 && (updates.invoices?.length || 0) === 0 && (updates.treatments?.length || 0) === 0) {
+                console.warn('⚠️ Backend returned ZERO updates - cloud database may be empty or sync endpoint not working');
+            }
+            else {
+                console.log('📦 Update details:', {
+                    patients: updates.patients?.map((p) => `${p.firstName} ${p.lastName} (ID: ${p.id})`),
+                    invoices: updates.invoices?.map((i) => `Invoice ${i.invoiceNumber} (ID: ${i.id})`),
+                    treatments: updates.treatments?.map((t) => `${t.name} (ID: ${t.id})`)
+                });
+            }
             // Apply patient updates from cloud
             for (const cloudPatient of updates.patients || []) {
                 const localPatient = await this.prisma.patient.findFirst({
@@ -273,6 +301,7 @@ class PrismaSyncEngine {
                 }
                 else {
                     // Create new from cloud
+                    console.log(`   ➕ Creating patient from cloud: ${cloudPatient.firstName} ${cloudPatient.lastName} (Cloud ID: ${cloudPatient.id})`);
                     await this.prisma.patient.create({
                         data: {
                             cloudId: cloudPatient.id,
@@ -318,6 +347,7 @@ class PrismaSyncEngine {
                 }
                 else {
                     // Create new from cloud
+                    console.log(`   ➕ Creating invoice from cloud: ${cloudInvoice.invoiceNumber} (Cloud ID: ${cloudInvoice.id})`);
                     await this.prisma.invoice.create({
                         data: {
                             cloudId: cloudInvoice.id,
@@ -363,6 +393,7 @@ class PrismaSyncEngine {
                 }
                 else {
                     // Create new from cloud
+                    console.log(`   ➕ Creating treatment from cloud: ${cloudTreatment.name} (Cloud ID: ${cloudTreatment.id})`);
                     await this.prisma.treatment.create({
                         data: {
                             cloudId: cloudTreatment.id,
@@ -378,15 +409,71 @@ class PrismaSyncEngine {
                     });
                 }
             }
+            // === CLEANUP: Remove local records not in cloud (cloud is source of truth) ===
+            // ONLY cleanup if we successfully uploaded all pending changes
+            // This prevents deleting local data that hasn't been synced yet
+            const remainingPending = await this.prisma.$transaction([
+                this.prisma.patient.count({ where: { syncStatus: 'PENDING' } }),
+                this.prisma.invoice.count({ where: { syncStatus: 'PENDING' } }),
+                this.prisma.treatment.count({ where: { syncStatus: 'PENDING' } })
+            ]);
+            const hasPendingData = remainingPending.some(count => count > 0);
+            if (hasPendingData) {
+                console.log('⚠️ Skipping cleanup: Still have pending local changes that need to be synced');
+                console.log(`   Pending: ${remainingPending[0]} patients, ${remainingPending[1]} invoices, ${remainingPending[2]} treatments`);
+            }
+            else {
+                // Safe to cleanup - all local changes have been synced
+                const cloudPatientIds = (updates.patients || []).map((p) => p.id);
+                const cloudInvoiceIds = (updates.invoices || []).map((i) => i.id);
+                const cloudTreatmentIds = (updates.treatments || []).map((t) => t.id);
+                // Delete local records that don't exist in cloud anymore
+                // Only delete SYNCED records with cloudId (never delete pending or local-only)
+                if (cloudPatientIds.length > 0) {
+                    const deletedPatients = await this.prisma.patient.deleteMany({
+                        where: {
+                            cloudId: { not: null, notIn: cloudPatientIds },
+                            syncStatus: 'SYNCED'
+                        }
+                    });
+                    if (deletedPatients.count > 0) {
+                        console.log(`   🗑️ Removed ${deletedPatients.count} patients that no longer exist in cloud`);
+                    }
+                }
+                if (cloudInvoiceIds.length > 0) {
+                    const deletedInvoices = await this.prisma.invoice.deleteMany({
+                        where: {
+                            cloudId: { not: null, notIn: cloudInvoiceIds },
+                            syncStatus: 'SYNCED'
+                        }
+                    });
+                    if (deletedInvoices.count > 0) {
+                        console.log(`   🗑️ Removed ${deletedInvoices.count} invoices that no longer exist in cloud`);
+                    }
+                }
+                if (cloudTreatmentIds.length > 0) {
+                    const deletedTreatments = await this.prisma.treatment.deleteMany({
+                        where: {
+                            cloudId: { not: null, notIn: cloudTreatmentIds },
+                            syncStatus: 'SYNCED'
+                        }
+                    });
+                    if (deletedTreatments.count > 0) {
+                        console.log(`   🗑️ Removed ${deletedTreatments.count} treatments that no longer exist in cloud`);
+                    }
+                }
+            }
             // === SYNC TREATMENT PRESETS ===
             let presetStats = { fetched: 0, created: 0, updated: 0, unchanged: 0 };
             try {
+                console.log(`📋 Fetching treatment presets from ${this.backendUrl}/api/presets`);
                 const presetsResponse = await axios_1.default.get(`${this.backendUrl}/api/presets`, {
                     timeout: 10000
                 });
                 if (presetsResponse.data.success && Array.isArray(presetsResponse.data.presets)) {
                     const cloudPresets = presetsResponse.data.presets;
                     presetStats.fetched = cloudPresets.length;
+                    console.log(`📋 Received ${cloudPresets.length} presets from cloud`);
                     for (const cloudPreset of cloudPresets) {
                         const localPreset = await this.prisma.treatmentPreset.findFirst({
                             where: { name: cloudPreset.name }
@@ -437,7 +524,11 @@ class PrismaSyncEngine {
                 }
             });
             const syncTime = new Date().toISOString();
+            const totalDownloaded = (updates.patients?.length || 0) + (updates.invoices?.length || 0) + (updates.treatments?.length || 0);
+            const totalUploaded = synced.patients.length + synced.invoices.length + synced.treatments.length;
             console.log('✅ Sync completed successfully');
+            console.log(`   📤 Uploaded: ${totalUploaded} records (${synced.patients.length} patients, ${synced.invoices.length} invoices, ${synced.treatments.length} treatments)`);
+            console.log(`   📥 Downloaded: ${totalDownloaded} records (${updates.patients?.length || 0} patients, ${updates.invoices?.length || 0} invoices, ${updates.treatments?.length || 0} treatments)`);
             // Notify renderer process about sync completion
             this.notifyRenderer('sync-completed', {
                 timestamp: syncTime,
@@ -451,8 +542,17 @@ class PrismaSyncEngine {
             });
             return {
                 success: true,
-                message: `Synced: ${synced.patients.length + synced.invoices.length + synced.treatments.length} records${presetStats.error ? ` (Presets failed: ${presetStats.error})` : ''}`,
+                message: totalDownloaded > 0
+                    ? `Downloaded ${totalDownloaded} records from cloud`
+                    : totalUploaded > 0
+                        ? `Uploaded ${totalUploaded} records to cloud`
+                        : 'All data is up to date',
                 lastSyncTime: syncTime,
+                stats: {
+                    uploaded: totalUploaded,
+                    downloaded: totalDownloaded,
+                    presets: presetStats
+                },
                 errors: presetStats.error ? [presetStats.error] : []
             };
         }
@@ -508,6 +608,13 @@ class PrismaSyncEngine {
             lastSyncStatus: lastSync?.status || 'never',
             isSyncing: this.isSyncing
         };
+    }
+    /**
+     * Reset sync timestamp to force a full sync from cloud
+     */
+    resetSyncTimestamp() {
+        // Delete all sync logs to reset lastSyncTime to null
+        return this.prisma.syncLog.deleteMany();
     }
 }
 exports.PrismaSyncEngine = PrismaSyncEngine;

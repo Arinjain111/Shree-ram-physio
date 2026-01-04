@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shree Ram Physiotherapy and Rehabilitation Center</title>
+    <script>
+      // Early Error Handler
+      window.onerror = function(message, source, lineno, colno, error) {
+        var errDiv = document.createElement('div');
+        errDiv.style.position = 'fixed';
+        errDiv.style.top = '0';
+        errDiv.style.left = '0';
+        errDiv.style.width = '100%';
+        errDiv.style.backgroundColor = 'darkred';
+        errDiv.style.color = 'white';
+        errDiv.style.padding = '20px';
+        errDiv.style.zIndex = '99999';
+        errDiv.style.whiteSpace = 'pre-wrap';
+        errDiv.style.fontFamily = 'monospace';
+        errDiv.innerHTML = '<h3>CRITICAL STARTUP ERROR</h3>' + 
+          '<strong>' + message + '</strong><br>' +
+          (source ? source + ':' + lineno + ':' + colno + '<br>' : '') +
+          (error && error.stack ? error.stack : '');
+        document.body.appendChild(errDiv);
+      };
+
+      // Check Environment
+      window.addEventListener('DOMContentLoaded', () => {
+        if (typeof window.require !== 'function') {
+          console.error('window.require is missing!');
+          document.body.innerHTML += '<div style="color:red; font-size: 24px;">FATAL: window.require is NOT defined. Electron integration failed.</div>';
+        } else {
+          console.log('window.require is available.');
+        }
+      });
+    </script>
+    <script type="module" crossorigin src="./assets/index-jTDAKJRg.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Dj63qaaI.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
