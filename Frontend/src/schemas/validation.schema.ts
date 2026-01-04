@@ -20,8 +20,8 @@ export const PatientSchema = z.object({
   name: z.string().optional(), // Deprecated - for backward compatibility
   age: z.number().int().min(0, 'Age must be positive').max(150, 'Invalid age'),
   gender: z.enum(['Male', 'Female', 'Other']),
-  phone: z.string().min(10, 'Phone must be at least 10 digits').max(15),
-  uhid: z.string().min(1, 'UHID is required').max(50),
+  phone: z.literal('').or(z.string().min(10, 'Phone must be at least 10 digits').max(15)),
+  uhid: z.literal('').or(z.string().max(50)),
   // Sync fields
   cloudId: z.number().int().positive().optional(),
   syncStatus: z.enum(['PENDING', 'SYNCED', 'CONFLICT']).default('PENDING'),
@@ -57,13 +57,16 @@ export const PatientFormSchema = z.object({
     .max(100, 'Age cannot exceed 100 years')
     .refine(val => val.toString().length <= 3, 'Age must be maximum 3 digits'),
   gender: z.string().min(1, 'Gender is required'), // Keep as string to match old PatientInfo type
-  phone: z.string()
-    .length(10, 'Phone number must be exactly 10 digits')
-    .regex(/^\d{10}$/, 'Phone number must contain only 10 digits'),
-  uhid: z.string()
-    .min(1, 'UHID is required')
-    .max(50, 'UHID must be less than 50 characters')
-    .regex(/^[a-zA-Z0-9]+$/, 'UHID can only contain letters and numbers'),
+  phone: z.literal('').or(
+    z.string()
+      .length(10, 'Phone number must be exactly 10 digits')
+      .regex(/^\d{10}$/, 'Phone number must contain only 10 digits'),
+  ),
+  uhid: z.literal('').or(
+    z.string()
+      .max(50, 'UHID must be less than 50 characters')
+      .regex(/^[a-zA-Z0-9]+$/, 'UHID can only contain letters and numbers'),
+  ),
 });
 
 export type PatientForm = z.infer<typeof PatientFormSchema>;

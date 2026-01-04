@@ -229,7 +229,6 @@ const PatientForm = ({ patient, setPatient }: PatientFormProps) => {
   ];
 
   const uhidValidationChecks = [
-    'Required field',
     'Maximum 50 characters',
     'Only letters and numbers',
   ];
@@ -364,12 +363,11 @@ const PatientForm = ({ patient, setPatient }: PatientFormProps) => {
         </div>
         <div className="relative">
           <label className="block text-sm font-medium text-gray-600 mb-1">
-            UHID No. <span className="text-red-500">*</span>
+            UHID No.
           </label>
           <div className="relative">
             <input
               type="text"
-              required
               value={patient.uhid}
               onChange={(e) => handleUhidChange(e.target.value)}
               className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 ${
@@ -400,12 +398,11 @@ const PatientForm = ({ patient, setPatient }: PatientFormProps) => {
         </div>
         <div className="relative">
           <label className="block text-sm font-medium text-gray-600 mb-1">
-            Contact Number <span className="text-red-500">*</span>
+            Contact Number
           </label>
           <div className="relative">
             <input
               type="tel"
-              required
               maxLength={10}
               value={patient.phone}
               onChange={(e) => handlePhoneChange(e.target.value)}
