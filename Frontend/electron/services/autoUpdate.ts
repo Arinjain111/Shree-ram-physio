@@ -1,4 +1,3 @@
-import updateElectronApp from 'update-electron-app';
 import { app } from 'electron';
 
 export function setupAutoUpdates() {
@@ -9,6 +8,8 @@ export function setupAutoUpdates() {
     }
 
     // Use free update.electronjs.org service for open source apps
+    // Using require() because update-electron-app is CommonJS
+    const updateElectronApp = require('update-electron-app');
     updateElectronApp({
         repo: 'Arinjain111/Shree-ram-physio',
         updateInterval: '1 hour',
