@@ -143,7 +143,7 @@ export type TreatmentSync = z.infer<typeof TreatmentSyncSchema>;
  * Sync Request Schema - Validates incoming sync requests
  */
 export const SyncRequestSchema = z.object({
-  lastSyncTime: z.iso.datetime().optional(),
+  lastSyncTime: z.union([z.iso.datetime(), z.null()]).optional(),
   patients: z.array(PatientSyncSchema).optional(),
   invoices: z.array(InvoiceSyncSchema).optional(),
   treatments: z.array(TreatmentSyncSchema).optional(),
