@@ -6,6 +6,7 @@ const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 
 interface AppSettings {
     invoiceSaveLocation: string;
+    autoSaveInvoicePdf: boolean;
 }
 
 function getSettings(): AppSettings {
@@ -20,7 +21,8 @@ function getSettings(): AppSettings {
 
     // Default settings
     return {
-        invoiceSaveLocation: path.join(app.getPath('downloads'), 'Invoices')
+        invoiceSaveLocation: path.join(app.getPath('downloads'), 'Invoices'),
+        autoSaveInvoicePdf: true
     };
 }
 
@@ -35,6 +37,26 @@ function saveSettings(settings: AppSettings): void {
 export { getSettings };
 
 export function registerSettingsHandlers() {
+    ipcMain.handle('get-invoice-settings', async () => {
+        const settings = getSettings();
+        return {
+            success: true,
+            invoiceSaveLocation: settings.invoiceSaveLocation,
+            autoSaveInvoicePdf: settings.autoSaveInvoicePdf
+        };
+    });
+
+    ipcMain.handle('set-auto-save-invoice-pdf', async (_event, enabled: boolean) => {
+        try {
+            const settings = getSettings();
+            settings.autoSaveInvoicePdf = Boolean(enabled);
+            saveSettings(settings);
+            return { success: true, autoSaveInvoicePdf: settings.autoSaveInvoicePdf };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.handle('get-save-location', async () => {
         const settings = getSettings();
         return { success: true, location: settings.invoiceSaveLocation };

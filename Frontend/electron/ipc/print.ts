@@ -1,9 +1,12 @@
 import { ipcMain, BrowserWindow } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
 import { logError } from '../utils/errorLogger';
+import { getSettings } from './settings';
 
 export function registerPrintHandlers() {
 
-    ipcMain.handle('print-invoice', async (_event, htmlContent: string, invoiceData: any) => {
+    ipcMain.handle('print-invoice', async (_event, htmlContent: string) => {
         try {
             const printWindow = new BrowserWindow({
                 show: false,
@@ -44,7 +47,7 @@ export function registerPrintHandlers() {
         }
     });
 
-    ipcMain.handle('print-invoice-and-preview', async (_event, htmlContent: string, invoiceData: any) => {
+    ipcMain.handle('print-invoice-and-preview', async (_event, htmlContent: string) => {
         try {
             const printWindow = new BrowserWindow({
                 show: false,
@@ -98,7 +101,8 @@ export function registerPrintHandlers() {
             await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            return new Promise((resolve, reject) => {
+            // 1) Always show OS print dialog
+            await new Promise<void>((resolve, reject) => {
                 printWindow.webContents.print({
                     silent: false,
                     printBackground: true,
@@ -107,14 +111,41 @@ export function registerPrintHandlers() {
                         marginType: 'printableArea'
                     }
                 }, (success: boolean, failureReason: string) => {
-                    printWindow.close();
-                    if (success) {
-                        resolve({ success: true, saved: false });
-                    } else {
-                        reject({ success: false, error: failureReason, saved: false });
-                    }
+                    if (success) return resolve();
+                    return reject(new Error(failureReason || 'Print failed'));
                 });
             });
+
+            // 2) Optionally auto-save PDF to selected folder
+            let saved = false;
+            let savedPath: string | undefined;
+            try {
+                const settings = getSettings();
+                if (settings.autoSaveInvoicePdf) {
+                    const saveDir = settings.invoiceSaveLocation;
+                    fs.mkdirSync(saveDir, { recursive: true });
+
+                    const rawNumber = String(invoiceData?.invoiceNumber ?? '').replace(/\D/g, '') || '0000';
+                    const rawDate = String(invoiceData?.date ?? '').slice(0, 10) || new Date().toISOString().slice(0, 10);
+                    const fileName = `Invoice_${rawNumber}_${rawDate}.pdf`;
+                    const filePath = path.join(saveDir, fileName);
+
+                    const pdfBuffer = await printWindow.webContents.printToPDF({
+                        printBackground: true,
+                        preferCSSPageSize: true
+                    });
+                    fs.writeFileSync(filePath, pdfBuffer);
+                    saved = true;
+                    savedPath = filePath;
+                }
+            } catch (e) {
+                // Do not fail printing if saving fails
+                logError('Auto-save invoice PDF', e);
+            } finally {
+                printWindow.close();
+            }
+
+            return { success: true, saved, savedPath };
         } catch (error: any) {
             logError('Print and save invoice', error);
             return { success: false, saved: false, error: error.message };

@@ -18,7 +18,7 @@ export const useInvoicePrinter = () => {
             const printContent = generateInvoiceHTML(invoiceData, layout);
 
             // 2. Invoke Electron Print
-            const result = await ipcRenderer.invoke('print-invoice-and-preview', printContent, invoiceData);
+            const result = await ipcRenderer.invoke('print-invoice-save-and-preview', printContent, invoiceData);
 
             if (!result.success) {
                 throw new Error(result.error || 'Print failed');

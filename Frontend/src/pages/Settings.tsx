@@ -8,6 +8,7 @@ const { ipcRenderer } = window.require('electron');
 const Settings = () => {
   const { showToast } = useUI();
   const [saveLocation, setSaveLocation] = useState('');
+  const [autoSaveInvoicePdf, setAutoSaveInvoicePdf] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,14 +17,36 @@ const Settings = () => {
 
   const loadSettings = async () => {
     try {
+      const settingsResult = await ipcRenderer.invoke('get-invoice-settings');
+      if (settingsResult?.success) {
+        setSaveLocation(settingsResult.invoiceSaveLocation);
+        setAutoSaveInvoicePdf(Boolean(settingsResult.autoSaveInvoicePdf));
+        return;
+      }
+
+      // Back-compat fallback
       const result = await ipcRenderer.invoke('get-save-location');
-      if (result.success) {
+      if (result?.success) {
         setSaveLocation(result.location);
       }
     } catch (error) {
       handleFrontendError(error, showToast, 'Failed to load settings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleAutoSave = async (enabled: boolean) => {
+    try {
+      const result = await ipcRenderer.invoke('set-auto-save-invoice-pdf', enabled);
+      if (result?.success) {
+        setAutoSaveInvoicePdf(Boolean(result.autoSaveInvoicePdf));
+        showToast('success', enabled ? 'Auto-save enabled' : 'Auto-save disabled');
+      } else {
+        showToast('error', 'Failed to update auto-save setting');
+      }
+    } catch (error) {
+      handleFrontendError(error, showToast, 'Failed to update auto-save setting');
     }
   };
 
@@ -79,6 +102,33 @@ const Settings = () => {
           </div>
 
           <div className="space-y-6">
+            {/* Auto Save Toggle */}
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700">
+                  Auto-save invoice PDF to PC
+                </label>
+                <p className="text-xs text-slate-500 mt-1">
+                  When disabled, printing will not save a PDF file to the selected folder.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleToggleAutoSave(!autoSaveInvoicePdf)}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                  autoSaveInvoicePdf ? 'bg-indigo-600' : 'bg-slate-300'
+                }`}
+                aria-pressed={autoSaveInvoicePdf}
+                aria-label="Toggle auto-save invoice PDF"
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                    autoSaveInvoicePdf ? 'translate-x-7' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
             {/* Save Location */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -89,12 +139,21 @@ const Settings = () => {
               </p>
               
               <div className="flex items-center gap-3">
-                <div className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 font-mono break-all">
+                <div className={`flex-1 px-4 py-3 border rounded-lg text-sm font-mono break-all ${
+                  autoSaveInvoicePdf
+                    ? 'bg-slate-50 border-slate-200 text-slate-700'
+                    : 'bg-slate-100 border-slate-200 text-slate-400'
+                }`}>
                   {saveLocation || 'Not set'}
                 </div>
                 <button
                   onClick={handleChooseLocation}
-                  className="px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors flex items-center gap-2 shrink-0"
+                  disabled={!autoSaveInvoicePdf}
+                  className={`px-5 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 shrink-0 ${
+                    autoSaveInvoicePdf
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      : 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                  }`}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -105,17 +164,27 @@ const Settings = () => {
             </div>
 
             {/* Info Box */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className={`border rounded-lg p-4 ${
+              autoSaveInvoicePdf ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'
+            }`}>
               <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-5 h-5 mt-0.5 shrink-0 ${autoSaveInvoicePdf ? 'text-blue-600' : 'text-slate-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-blue-900 mb-1">Auto-Save Feature</h4>
-                  <p className="text-xs text-blue-700">
-                    When you print an invoice, it will be automatically saved as a PDF to this location with the filename format: 
-                    <span className="font-mono bg-blue-100 px-1.5 py-0.5 rounded ml-1">Invoice_[Number]_[Date].pdf</span>
-                  </p>
+                  <h4 className={`text-sm font-semibold mb-1 ${autoSaveInvoicePdf ? 'text-blue-900' : 'text-slate-800'}`}>
+                    Auto-Save Feature
+                  </h4>
+                  {autoSaveInvoicePdf ? (
+                    <p className="text-xs text-blue-700">
+                      When you print an invoice, it will be automatically saved as a PDF to this location with the filename format:
+                      <span className="font-mono bg-blue-100 px-1.5 py-0.5 rounded ml-1">Invoice_[Number]_[Date].pdf</span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-600">
+                      Auto-save is disabled. Printing will not create a PDF file on this PC.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
