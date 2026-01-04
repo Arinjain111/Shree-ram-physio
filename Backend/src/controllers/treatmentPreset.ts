@@ -161,7 +161,7 @@ export const deletePreset = async (req: Request, res: Response) => {
   });
 };
 
-// Bulk sync presets (for initial sync from client)
+// Bulk sync presets (for initial sync from client and upserts)
 export const syncPresets = async (req: Request, res: Response) => {
   const { presets } = req.body;
 
@@ -177,35 +177,23 @@ export const syncPresets = async (req: Request, res: Response) => {
 
   for (const preset of presets) {
     try {
-      if (preset.id) {
-        // Try to update existing preset
-        const existing = await prisma.treatmentPreset.findUnique({
-          where: { id: preset.id },
-        });
+      // Find existing by NAME since IDs don't match between client (SQLite) and server (Postgres)
+      const existing = await prisma.treatmentPreset.findFirst({
+        where: { name: preset.name },
+      });
 
-        if (existing) {
-          await prisma.treatmentPreset.update({
-            where: { id: preset.id },
-            data: {
-              name: preset.name,
-              defaultSessions: preset.defaultSessions,
-              pricePerSession: preset.pricePerSession,
-            },
-          });
-          results.updated++;
-        } else {
-          // Create if not exists
-          await prisma.treatmentPreset.create({
-            data: {
-              name: preset.name,
-              defaultSessions: preset.defaultSessions,
-              pricePerSession: preset.pricePerSession,
-            },
-          });
-          results.created++;
-        }
+      if (existing) {
+        await prisma.treatmentPreset.update({
+          where: { id: existing.id },
+          data: {
+            // Keep name same (it's the key)
+            defaultSessions: preset.defaultSessions,
+            pricePerSession: preset.pricePerSession,
+          },
+        });
+        results.updated++;
       } else {
-        // Create new preset
+        // Create if not exists
         await prisma.treatmentPreset.create({
           data: {
             name: preset.name,

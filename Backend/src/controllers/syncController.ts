@@ -3,25 +3,31 @@ import prisma from '../lib/prisma';
 import { SyncRequestSchema, validateOrThrow, type SyncRequest } from '../schemas/validation.schema';
 
 export const syncData = async (req: Request, res: Response) => {
-  // Validate incoming sync request at schema level
-  const { lastSyncTime, patients, invoices, treatments } = validateOrThrow<SyncRequest>(
-    SyncRequestSchema,
-    req.body
-  );
+  console.log('🔄 [SYNC START] /api/sync endpoint called');
+  console.log(`📥 Request received at ${new Date().toISOString()}`);
+  
+  try {
+    // Validate incoming sync request at schema level
+    const { lastSyncTime, patients, invoices, treatments } = validateOrThrow<SyncRequest>(
+      SyncRequestSchema,
+      req.body
+    );
 
-  const result = {
-    synced: {
-      patients: [] as Array<{ localId?: number; cloudId: number }>,
-      invoices: [] as Array<{ localId?: number; cloudId: number; originalNumber?: string; newNumber?: string }>,
-      treatments: [] as Array<{ localId?: number; cloudId: number }>
-    },
-    updates: {
-      patients: [] as any[],
-      invoices: [] as any[],
-      treatments: [] as any[]
-    },
-    conflicts: [] as Array<{ localId?: number; originalNumber: string; newNumber: string; reason: string }>
-  };    // Map to track local ID -> cloud ID
+    console.log(`📋 Received ${patients?.length || 0} patients, ${invoices?.length || 0} invoices, ${treatments?.length || 0} treatments to sync`);
+
+    const result = {
+      synced: {
+        patients: [] as Array<{ localId?: number; cloudId: number }>,
+        invoices: [] as Array<{ localId?: number; cloudId: number; originalNumber?: string; newNumber?: string }>,
+        treatments: [] as Array<{ localId?: number; cloudId: number }>
+      },
+      updates: {
+        patients: [] as any[],
+        invoices: [] as any[],
+        treatments: [] as any[]
+      },
+      conflicts: [] as Array<{ localId?: number; originalNumber: string; newNumber: string; reason: string }>
+    };    // Map to track local ID -> cloud ID
   const patientIdMap = new Map<number, number>();
   const invoiceIdMap = new Map<number, number>();
 
@@ -291,6 +297,8 @@ export const syncData = async (req: Request, res: Response) => {
     },
   });
 
+  console.log(`📊 Fetched ${result.updates.patients.length} patients from database`);
+
   // Get updated invoices with relations
   result.updates.invoices = await prisma.invoice.findMany({
     where: whereClause,
@@ -303,6 +311,8 @@ export const syncData = async (req: Request, res: Response) => {
     },
   });
 
+  console.log(`📊 Fetched ${result.updates.invoices.length} invoices from database`);
+
   // Get updated treatments
   result.updates.treatments = await prisma.treatment.findMany({
     where: whereClause,
@@ -311,10 +321,24 @@ export const syncData = async (req: Request, res: Response) => {
     },
   });
 
+  console.log(`📊 Fetched ${result.updates.treatments.length} treatments from database`);
+  console.log(`📤 Sending response with synced: ${result.synced.patients.length}/${result.synced.invoices.length}/${result.synced.treatments.length}, updates: ${result.updates.patients.length}/${result.updates.invoices.length}/${result.updates.treatments.length}`);
+
   res.json({
     success: true,
     ...result,
   });
+  } catch (error) {
+    console.error('❌ [SYNC ERROR]', error);
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error during sync'
+    });
+  }
 };
 
 export const getSyncStatus = async (req: Request, res: Response) => {

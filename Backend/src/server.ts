@@ -83,10 +83,10 @@ async function startServer() {
   try {
     // Test Prisma connection in background
     const dbUrl = process.env.DATABASE_URL || 'NOT_SET';
-    console.log('🔄 Attempting to connect to Azure SQL...');
+    console.log('🔄 Attempting to connect to Supabase through Prisma accelerate...');
     console.log('📊 DATABASE_URL configured:', dbUrl.substring(0, 50) + '...');
     await prisma.$connect();
-    console.log('✅ Prisma connected to Azure SQL');
+    console.log('✅ Prisma connected to Supabase');
   } catch (error) {
     console.error('⚠️  Database connection failed at startup (Server is still running):');
     console.error(error instanceof Error ? error.message : error);
