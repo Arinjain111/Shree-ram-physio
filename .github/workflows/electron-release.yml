@@ -15,7 +15,6 @@ jobs:
     env:
       VITE_API_BASE_URL: https://shree-ram-physio-backend.azurewebsites.net
       AZURE_BACKEND_URL: https://shree-ram-physio-backend.azurewebsites.net
-      # Use a PAT with repo scope stored as GH_PAT to avoid release 404s
       GH_TOKEN: ${{ secrets.GH_PAT }}
     defaults:
       run:
@@ -27,14 +26,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: Frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and publish (electron-builder)
+      - name: Build and publish
+        # "npm run build" in package.json runs: npm run prisma:generate && npm run build:electron && vite build && electron-builder
+        # We pass --publish always to electron-builder via the script arguments if possible, or we rely on GH_TOKEN being present which electron-builder picks up
         run: npm run build -- --publish always
 
       - name: Upload artifacts (installer)
