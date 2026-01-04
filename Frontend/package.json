@@ -1,6 +1,6 @@
 {
   "name": "shri-ram-physio-invoicing",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Physiotherapy clinic invoicing and patient management system",
   "main": ".vite/build/main.js",
   "scripts": {
@@ -72,6 +72,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.0",
+    "update-electron-app": "^3.1.2",
     "zod": "^4.1.13"
   },
   "build": {

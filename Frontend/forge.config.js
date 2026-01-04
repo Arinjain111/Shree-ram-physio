@@ -83,7 +83,9 @@ module.exports = {
       name: '@electron-forge/maker-squirrel',
       config: {
         name: 'shri-ram-physio',
-        setupExe: 'Shri Ram Physio Setup.exe',
+        setupExe: 'Shri-Ram-Physio-Setup.exe',
+        setupIcon: './assets/icon.ico', // Optional: Add your icon
+        loadingGif: './assets/install-spinner.gif', // Optional: Custom loading animation
       },
     },
     {
@@ -100,7 +102,7 @@ module.exports = {
           name: 'Shree-ram-physio',
         },
         prerelease: false,
-        draft: true,
+        draft: false, // Changed to false so releases are public for update.electronjs.org
       },
     },
   ],
