@@ -123,87 +123,53 @@ export const syncData = async (req: Request, res: Response) => {
           },
         });
       } else {
-        // Check for duplicate invoice number before creating
-        const existingInvoice = await prisma.invoice.findUnique({
-          where: { invoiceNumber: invoice.invoiceNumber },
+        // Check for duplicate invoice number FOR THIS PATIENT
+        // Invoice numbers are unique per patient, not globally
+        const existingInvoice = await prisma.invoice.findFirst({
+          where: {
+            invoiceNumber: invoice.invoiceNumber,
+            patientId: resolvedPatientId
+          },
         });
 
         if (existingInvoice) {
-          // CONFLICT: Invoice number already exists, generate new number
-          console.warn(`Conflict detected: Invoice ${invoice.invoiceNumber} already exists`);
-
-          // Get next available invoice number
-          const lastInvoice = await prisma.invoice.findFirst({
-            orderBy: { invoiceNumber: 'desc' },
-            select: { invoiceNumber: true },
-          });
-
-          let maxNum = 0;
-          if (lastInvoice && lastInvoice.invoiceNumber) {
-            const match = lastInvoice.invoiceNumber.match(/^\d+$/);
-            if (match) {
-              maxNum = parseInt(match[0], 10);
-            }
-          }
-
-          const newInvoiceNumber = (maxNum + 1).toString().padStart(4, '0');
-
-          // Create invoice with new number
-          cloudInvoice = await prisma.invoice.create({
-            data: {
-              invoiceNumber: newInvoiceNumber,
-              patientId: resolvedPatientId,
-              date: invoice.date,
-              diagnosis: invoice.diagnosis || '',
-              notes: invoice.notes || '',
-              paymentMethod: invoice.paymentMethod || 'Cash',
-              total: invoice.total,
-            },
-          });
-
-          // Record conflict
-          const conflict: { localId?: number; originalNumber: string; newNumber: string; reason: string } = {
+          // CONFLICT: This patient already has an invoice with this number
+          // This should never happen in normal operation (user generates unique numbers per patient)
+          // But if it does, keep the existing one and log as unresolvable conflict
+          console.warn(`⚠️ CONFLICT: Patient ${resolvedPatientId} already has Invoice #${invoice.invoiceNumber}`);
+          
+          result.conflicts.push({
+            reason: 'DUPLICATE_INVOICE_FOR_PATIENT',
             originalNumber: invoice.invoiceNumber,
-            newNumber: newInvoiceNumber,
-            reason: 'DUPLICATE_INVOICE_NUMBER',
-          };
-          if (invoice.id !== undefined) {
-            conflict.localId = invoice.id;
-          }
-          result.conflicts.push(conflict);
-
-          // Add to synced with both numbers for frontend update
-          const syncedInvoice: { localId?: number; cloudId: number; originalNumber?: string; newNumber?: string } = {
-            cloudId: cloudInvoice.id,
-            originalNumber: invoice.invoiceNumber,
-            newNumber: newInvoiceNumber,
-          };
-          if (invoice.id !== undefined) {
-            syncedInvoice.localId = invoice.id;
-          }
-          result.synced.invoices.push(syncedInvoice);
-        } else {
-          // Create new invoice with original number
-          cloudInvoice = await prisma.invoice.create({
-            data: {
-              invoiceNumber: invoice.invoiceNumber,
-              patientId: resolvedPatientId,
-              date: invoice.date,
-              diagnosis: invoice.diagnosis || '',
-              notes: invoice.notes || '',
-              paymentMethod: invoice.paymentMethod || 'Cash',
-              total: invoice.total,
-            },
+            newNumber: invoice.invoiceNumber,  // Invoice number NEVER changes
+            localId: invoice.id
           });
-
-          const syncedInvoice: { localId?: number; cloudId: number } = {
-            cloudId: cloudInvoice.id,
-          };
-          if (invoice.id !== undefined) {
-            syncedInvoice.localId = invoice.id;
-          }
-          result.synced.invoices.push(syncedInvoice);
+          
+          // DON'T create a new invoice, just skip this one
+          // Invoice numbers are immutable and sacred (user printed it!)
+          continue;
         }
+
+        // Safe to create: This invoice number is unique for this patient
+        const cloudInvoice = await prisma.invoice.create({
+          data: {
+            invoiceNumber: invoice.invoiceNumber,
+            patientId: resolvedPatientId,
+            date: invoice.date,
+            diagnosis: invoice.diagnosis || '',
+            notes: invoice.notes || '',
+            paymentMethod: invoice.paymentMethod || 'Cash',
+            total: invoice.total,
+          },
+        });
+
+        const syncedInvoice: { localId?: number; cloudId: number } = {
+          cloudId: cloudInvoice.id,
+        };
+        if (invoice.id !== undefined) {
+          syncedInvoice.localId = invoice.id;
+        }
+        result.synced.invoices.push(syncedInvoice);
       }
 
       if (invoice.id && cloudInvoice) {

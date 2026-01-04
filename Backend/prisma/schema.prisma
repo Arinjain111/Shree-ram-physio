@@ -33,7 +33,7 @@ model Patient {
 // Invoice model with sync tracking
 model Invoice {
   id             Int       @id @default(autoincrement())
-  invoiceNumber  String    @unique @map("invoice_number")
+  invoiceNumber  String    @map("invoice_number")
   patientId      Int       @map("patient_id")
   date           String
   diagnosis      String    @default("")
@@ -49,6 +49,8 @@ model Invoice {
   patient        Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
   treatments     Treatment[]
   
+  // Unique constraint: Each patient can only have one invoice with the same number
+  @@unique([patientId, invoiceNumber])
   @@map("invoices")
   @@index([patientId])
 }
