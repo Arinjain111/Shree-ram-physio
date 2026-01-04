@@ -34,13 +34,11 @@ jobs:
         run: npm ci
 
       - name: Build and publish
-        # "npm run build" in package.json runs: npm run prisma:generate && npm run build:electron && vite build && electron-builder
-        # We pass --publish always to electron-builder via the script arguments if possible, or we rely on GH_TOKEN being present which electron-builder picks up
-        run: npm run build -- --publish always
+        run: npm run publish
 
       - name: Upload artifacts (installer)
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: electron-release
-          path: Frontend/release/**/*
+          path: Frontend/out/make/**/*

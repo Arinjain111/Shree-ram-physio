@@ -84,8 +84,6 @@ module.exports = {
       config: {
         name: 'shri-ram-physio',
         setupExe: 'Shri-Ram-Physio-Setup.exe',
-        setupIcon: './assets/icon.ico', // Optional: Add your icon
-        loadingGif: './assets/install-spinner.gif', // Optional: Custom loading animation
       },
     },
     {
