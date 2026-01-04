@@ -158,6 +158,7 @@ export function registerInvoiceHandlers() {
 
   ipcMain.handle('get-next-invoice-number', async (_event, patientData?: { id?: number; cloudId?: number }) => {
     try {
+      const minimumInvoiceNumber = 401;
       let backendNextNumber = 0;
 
       // 1. Try to fetch from backend with patient context
@@ -215,7 +216,7 @@ export function registerInvoiceHandlers() {
       }
 
       // 3. Determine actual next number
-      const nextNumVal = Math.max(backendNextNumber, localMax + 1);
+      const nextNumVal = Math.max(backendNextNumber, localMax + 1, minimumInvoiceNumber);
       const nextNumber = nextNumVal.toString().padStart(4, '0');
 
       return {
@@ -231,7 +232,7 @@ export function registerInvoiceHandlers() {
       return {
         success: false,
         error: String(error),
-        invoiceNumber: '0001',
+        invoiceNumber: '0401',
         source: 'fallback'
       };
     }

@@ -11,8 +11,10 @@ import type { InvoiceData } from '@/schemas/validation.schema';
  * @returns Next invoice number in format 0001, 0002, etc.
  */
 export function generateNextInvoiceNumber(invoices: InvoiceData[]): string {
+  const minimumInvoiceNumber = 401;
+
   if (invoices.length === 0) {
-    return '0001';
+    return minimumInvoiceNumber.toString().padStart(4, '0');
   }
   
   // Extract numeric parts from invoice numbers - only consider 4-digit or smaller numbers
@@ -25,7 +27,7 @@ export function generateNextInvoiceNumber(invoices: InvoiceData[]): string {
     .filter(num => !isNaN(num) && num > 0);
   
   const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
-  const nextNumber = maxNumber + 1;
+  const nextNumber = Math.max(maxNumber + 1, minimumInvoiceNumber);
   
   // Pad with zeros to make it 4 digits
   return nextNumber.toString().padStart(4, '0');

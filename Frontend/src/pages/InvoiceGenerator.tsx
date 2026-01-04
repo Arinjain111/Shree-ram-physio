@@ -37,13 +37,18 @@ const InvoiceGenerator = () => {
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [notes, setNotes] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [invoiceNumberEdited, setInvoiceNumberEdited] = useState(false);
   
   // Data State
   const [existingInvoices, setExistingInvoices] = useState<InvoiceData[]>([]);
   const [previewInvoiceData, setPreviewInvoiceData] = useState<InvoiceData | null>(null);
 
   // Helper to fetch invoice number (Logic refactored to be cleaner)
-  const fetchInvoiceNumber = async () => {
+  const fetchInvoiceNumber = async (force = false) => {
+    if (!force && invoiceNumberEdited) {
+      return;
+    }
+
     try {
       // Pass patient data (local and cloud IDs) to get per-patient invoice number
       const result = await ipcRenderer.invoke('get-next-invoice-number', {
@@ -52,14 +57,17 @@ const InvoiceGenerator = () => {
       });
       if (result.success && result.invoiceNumber) {
         setInvoiceNumber(result.invoiceNumber);
+        setInvoiceNumberEdited(false);
         console.log(`📋 Next invoice number for patient ${patient?.firstName}: ${result.invoiceNumber} (source: ${result.source})`);
       } else {
         // Fallback
         setInvoiceNumber(generateNextInvoiceNumber(existingInvoices));
+        setInvoiceNumberEdited(false);
       }
     } catch (error) {
        console.error('Failed to fetch invoice number', error);
        setInvoiceNumber(generateNextInvoiceNumber(existingInvoices));
+       setInvoiceNumberEdited(false);
     }
   };
 
@@ -73,7 +81,7 @@ const InvoiceGenerator = () => {
         setExistingInvoices(loadedInvoices);
 
         // 2. Fetch Initial Number
-        await fetchInvoiceNumber();
+        await fetchInvoiceNumber(true);
 
         // 3. Trigger Sync (Background)
         // We use the central syncNow to ensure global state is updated
@@ -97,7 +105,7 @@ const InvoiceGenerator = () => {
             const result = await ipcRenderer.invoke('load-invoices');
             if (result?.invoices) {
                 setExistingInvoices(result.invoices);
-                fetchInvoiceNumber(); // Update number as well
+                fetchInvoiceNumber(true); // Update number as well
             }
         } catch (e) { console.error(e); }
       };
@@ -117,6 +125,14 @@ const InvoiceGenerator = () => {
 
   
   // Helpers
+  const displayInvoiceNumber = (value: string) => (value || '').replace(/^0+/, '');
+
+  const toPaddedInvoiceNumber = (value: string) => {
+    const digitsOnly = value.replace(/\D/g, '').slice(0, 4);
+    if (!digitsOnly) return '';
+    return digitsOnly.padStart(4, '0');
+  };
+
   const getCurrentInvoiceData = (): InvoiceData => ({
     invoiceNumber,
     date: invoiceDate,
@@ -166,7 +182,7 @@ const InvoiceGenerator = () => {
         setExistingInvoices(prev => [...prev, data]);
         
         // Prepare next invoice
-        await fetchInvoiceNumber(); 
+        await fetchInvoiceNumber(true);
 
         // Print
         const result = await printInvoice(data);
@@ -195,7 +211,7 @@ const InvoiceGenerator = () => {
 
           // Update State
           setExistingInvoices(prev => [...prev, data]);
-          await fetchInvoiceNumber();
+          await fetchInvoiceNumber(true);
           resetForm();
 
           // Print via OS dialog (no local PDF save)
@@ -270,17 +286,22 @@ const InvoiceGenerator = () => {
                 <h3 className="text-lg font-semibold text-[#5F3794]">Invoice Number <span className="text-red-500">*</span></h3>
                 <div>
                   <p className="mb-2 text-xs text-gray-500">
-                    🔒 Auto-generated sequential number synced with backend database
+                    Auto-suggested sequential number (editable)
                     {isSyncing && <span className="ml-2 text-blue-600 font-semibold animate-pulse">⟳ Syncing...</span>}
                   </p>
                   <div className="relative">
                     <input
                       type="text"
                       required
-                      value={invoiceNumber}
-                      readOnly
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 font-semibold cursor-not-allowed"
-                      placeholder={isSyncing ? "Syncing with backend..." : "Loading..."}
+                      inputMode="numeric"
+                      maxLength={4}
+                      value={displayInvoiceNumber(invoiceNumber)}
+                      onChange={(e) => {
+                        setInvoiceNumberEdited(true);
+                        setInvoiceNumber(toPaddedInvoiceNumber(e.target.value));
+                      }}
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg bg-white text-gray-700 font-semibold"
+                      placeholder={isSyncing ? "Syncing..." : "401"}
                     />
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                       {isSyncing ? (
@@ -290,7 +311,7 @@ const InvoiceGenerator = () => {
                          </svg>
                       ) : (
                          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                          </svg>
                       )}
                     </div>
