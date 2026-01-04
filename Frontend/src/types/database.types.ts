@@ -25,6 +25,7 @@ export interface DatabaseInvoice {
   invoiceNumber: string;
   date: string;
   patient: {
+    id?: number;
     firstName: string;
     lastName: string;
     age: number;

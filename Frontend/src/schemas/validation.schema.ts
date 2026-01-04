@@ -36,6 +36,8 @@ export type Patient = z.infer<typeof PatientSchema>;
  * Patient Form Schema - For user input validation
  */
 export const PatientFormSchema = z.object({
+  id: z.number().int().optional(),
+  cloudId: z.number().int().optional(),
   firstName: z.string()
     .min(1, 'First name is required')
     .max(100, 'First name must be less than 100 characters')

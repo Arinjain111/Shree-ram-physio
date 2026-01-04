@@ -32,6 +32,13 @@ const Home = () => {
       description: 'All the predefined presets can be added here',
       path: '/treatment-settings',
       color: 'from-orange-500 to-orange-600'
+    },
+    {
+      title: 'Settings',
+      icon: '⚙️',
+      description: 'Configure app settings and invoice save location',
+      path: '/settings',
+      color: 'from-slate-500 to-slate-600'
     }
   ];
 
@@ -51,7 +58,7 @@ const Home = () => {
         </div>
       </header>
 
-      <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
         {cards.map((card) => (
           <div
             key={card.path}

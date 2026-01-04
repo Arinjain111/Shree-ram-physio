@@ -4,6 +4,7 @@ import InvoiceGenerator from './pages/InvoiceGenerator';
 import DatabaseFind from './pages/DatabaseFind';
 import InvoiceCustomizer from './pages/InvoiceCustomizer';
 import TreatmentSettings from './pages/TreatmentSettings';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="/invoice-customizer" element={<InvoiceCustomizer />} />
           <Route path="/database-find" element={<DatabaseFind />} />
           <Route path="/treatment-settings" element={<TreatmentSettings />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </div>
     </div>

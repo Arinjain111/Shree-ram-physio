@@ -6,7 +6,7 @@ import path from 'path';
 
 export default defineConfig(async (): Promise<UserConfig> => {
   const tailwindcss = await import('@tailwindcss/vite').then((m) => m.default);
-  
+
   return {
     plugins: [
       react(),
@@ -40,15 +40,15 @@ export default defineConfig(async (): Promise<UserConfig> => {
       }
     },
     server: {
-      port: 8080,         // Use common port that's less restricted
-      strictPort: false   // Try next port if busy
+      port: 8080,         // Dev server port used by Electron mainPrisma.ts
+      strictPort: true    // Fail fast if 8080 is taken instead of switching ports
     },
     base: './',
     build: {
       outDir: 'dist',
-      emptyOutDir: true
+      emptyOutDir: true,
+      target: 'esnext',
     },
-    // Reduce error verbosity
     logLevel: 'warn',
     clearScreen: false
   };

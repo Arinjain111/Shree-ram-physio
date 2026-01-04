@@ -20,8 +20,9 @@
       "@/*": ["./src/*"]
     },
     "pretty": true,
-    "noErrorTruncation": false
+    "noErrorTruncation": false,
+    "typeRoots": ["./node_modules/@types", "./src/types"]
   },
-  "include": ["src"],
+  "include": ["src", "electron", "types"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

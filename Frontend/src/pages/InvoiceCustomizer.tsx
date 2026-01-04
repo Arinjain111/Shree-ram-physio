@@ -41,7 +41,7 @@ const InvoiceCustomizer = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-8">
-      <div className="max-w-[1600px] mx-auto">
+      <div className="max-w-400 mx-auto">
         {/* Header Section */}
         <PageHeader 
           title="Invoice Customizer"
@@ -103,7 +103,7 @@ const InvoiceCustomizer = () => {
 
           {/* Preview Panel */}
           <div className="xl:col-span-5 xl:sticky xl:top-6">
-            <div className="bg-slate-200/50 rounded-xl border border-slate-200 p-4 backdrop-blur-sm">
+            <div className="bg-slate-200 rounded-xl border border-slate-200 p-4">
               <PreviewPanel formData={formData} />
             </div>
           </div>

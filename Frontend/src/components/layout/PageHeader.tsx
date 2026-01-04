@@ -6,7 +6,7 @@ const PageHeader = ({ title, icon, actions, description, backUrl = '/', classNam
   const navigate = useNavigate();
 
   return (
-    <div className={`sticky top-0 z-30 -mx-6 -mt-6 px-6 py-4 mb-8 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm rounded-lg ${className}`}>
+    <div className={`sticky top-0 z-30 -mx-6 -mt-6 px-6 py-4 mb-8 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm rounded-lg ${className}`}>
       <div className="flex items-center gap-4">
         <button 
           onClick={() => navigate(backUrl)}

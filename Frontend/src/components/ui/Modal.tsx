@@ -74,28 +74,37 @@ const Modal = ({
   };
 
   const formatMessage = (msg: string) => {
-    if (!msg.includes('\n')) return <p className="text-sm text-slate-500">{msg}</p>;
+    if (!msg.includes('\n')) return <p className="text-sm text-slate-500 wrap-break-words">{msg}</p>;
 
     const lines = msg.split('\n').filter(line => line.trim().length > 0);
     
     return (
       <div className="text-sm text-slate-500 space-y-2">
         {lines.map((line, i) => {
-          // If it's the first line and ends with a colon, treat as header
-          if (i === 0 && line.trim().endsWith(':')) { 
+          const trimmed = line.trim();
+          
+          // Header check (ends with :)
+          if (i === 0 && trimmed.endsWith(':')) { 
              return <p key={i} className="font-medium text-slate-700 mb-1">{line}</p>
           }
 
-          // Clean up validation messages by removing field names
-          // e.g. "patient.name: Name is required" -> "Name is required"
-          const cleanLine = line.includes(': ') ? line.substring(line.indexOf(': ') + 2) : line;
+          // Bullet point check (starts with - or *)
+          const isBullet = trimmed.startsWith('- ') || trimmed.startsWith('* ');
+          const content = isBullet ? trimmed.substring(2) : trimmed;
+          
+          // Legacy check: validation messages often had "field: message" format
+          const cleanLine = content.includes(': ') && !isBullet ? content.substring(content.indexOf(': ') + 2) : content;
 
-          return (
-            <div key={i} className="flex items-start gap-2">
-              <span className="mt-2 w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-              <span className="whitespace-nowrap">{cleanLine}</span>
-            </div>
-          );
+          if (isBullet) {
+            return (
+              <div key={i} className="flex items-start gap-2">
+                <span className="mt-2 w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                <span className="wrap-break-words">{cleanLine}</span>
+              </div>
+            );
+          }
+
+          return <p key={i} className="wrap-break-words">{cleanLine}</p>;
         })}
       </div>
     );

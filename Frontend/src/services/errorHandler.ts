@@ -91,7 +91,11 @@ export function handleFrontendError(
 ): NormalizedApiError {
   const normalized = normalizeException(error);
   const message = buildErrorMessage(normalized, fallbackMessage);
-  const type: ToastType = normalized.isValidationError ? 'warning' : 'error';
+  const type: ToastType = normalized.isValidationError
+    ? 'warning'
+    : (normalized as any).status && (normalized as any).status < 500
+      ? 'warning'
+      : 'error';
 
   showToast(type, message);
   return normalized;

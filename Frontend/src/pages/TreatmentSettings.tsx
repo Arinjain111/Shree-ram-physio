@@ -50,19 +50,24 @@ const TreatmentSettings = () => {
         console.log('✅ Presets synced from cloud:', result.stats);
         // Reload presets after sync
         await loadPresets();
-        const { created, updated } = result.stats;
-        if (created > 0 || updated > 0) {
+        const { created, updated, fetched } = result.stats;
+        if (fetched === 0) {
+          showToast('warning', 'No presets received from cloud — check backend URL or network');
+        } else if (created > 0 || updated > 0) {
           showToast('success', `Synced: ${created} new, ${updated} updated`);
         } else {
-          showToast('success', 'All presets are up to date');
+          showToast('info', 'All presets are up to date');
         }
       } else {
-        console.warn('⚠️ Preset sync failed:', result.error);
-        showToast('error', 'Failed to sync from cloud: ' + result.error);
+        const errorMsg = result.error?.split('\n')[0] || 'Sync failed'; // Get first line only
+        console.warn('⚠️ Preset sync failed:', errorMsg);
+        showToast('error', errorMsg);
       }
     } catch (error) {
-      console.error('Error syncing presets from cloud:', error);
-      handleFrontendError(error, showToast, 'Error syncing from cloud');
+      const msg = error instanceof Error ? error.message : String(error);
+      const shortMsg = msg.split('\n')[0] || msg.substring(0, 100); // First line or first 100 chars
+      console.error('❌ Sync error:', shortMsg);
+      showToast('error', shortMsg);
     }
   };
 

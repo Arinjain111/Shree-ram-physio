@@ -1,7 +1,6 @@
 // Prisma config for Electron SQLite database
 // Database path is set dynamically in electron/main.ts based on app.getPath('userData')
 import { defineConfig } from "prisma/config";
-import * as path from 'path';
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

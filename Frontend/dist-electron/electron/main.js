@@ -35,390 +35,161 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path = __importStar(require("path"));
-const fs = __importStar(require("fs"));
-const schema_1 = require("./database/schema");
-const syncEngine_1 = require("./sync/syncEngine");
+const dotenv = __importStar(require("dotenv"));
+const autoUpdate_1 = require("./services/autoUpdate");
+const prisma_1 = require("./database/prisma");
+const initDatabase_1 = require("./database/initDatabase");
+const prismaSyncEngine_1 = require("./sync/prismaSyncEngine");
+const index_1 = require("./ipc/index");
+const errorLogger_1 = require("./utils/errorLogger");
+const backend_1 = require("./config/backend");
+// Early diagnostics
+console.log('[Main] starting process', { pid: process.pid, argv: process.argv, cwd: process.cwd() });
+// Suppress Node.js warnings
+process.removeAllListeners('warning');
+// Disable GPU acceleration to avoid driver issues (especially on some AMD GPUs)
+electron_1.app.disableHardwareAcceleration();
+electron_1.app.commandLine.appendSwitch('disable-gpu');
+electron_1.app.commandLine.appendSwitch('disable-gpu-compositing');
+// Global error handlers to avoid silent exits in dev
+process.on('uncaughtException', (err) => {
+    console.error('[Main] uncaughtException', err);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[Main] unhandledRejection', reason);
+});
+dotenv.config();
+// Global references
 let mainWindow = null;
-let database = null;
 let syncEngine = null;
+// Ensure single instance
+const gotTheLock = electron_1.app.requestSingleInstanceLock();
+if (!gotTheLock) {
+    electron_1.app.quit();
+}
+else {
+    electron_1.app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized())
+                mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+}
 const isDev = process.env.NODE_ENV === 'development' || !electron_1.app.isPackaged;
 function createWindow() {
+    console.log('[Main] Creating main window. isDev=', isDev);
     mainWindow = new electron_1.BrowserWindow({
         width: 1200,
         height: 800,
+        show: false,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
+            webSecurity: false, // Allow ES modules from file:// protocol
         },
         icon: path.join(__dirname, '../assets/icon.png')
     });
-    if (isDev) {
-        mainWindow.loadURL('http://localhost:8080');
-        mainWindow.webContents.openDevTools();
+    // Suppress unnecessary DevTools warnings
+    mainWindow.webContents.on('console-message', (event, ...args) => {
+        // Handle both old and new Electron versions
+        const message = typeof args[0] === 'object' ? args[0].message : args[1];
+        if (typeof message === 'string' && (message.includes('Autofill') || message.includes("wasn't found"))) {
+            event.preventDefault();
+        }
+    });
+    // Access directly (Vite replaces these identifiers at build time)
+    const devServerUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL;
+    let viteName = MAIN_WINDOW_VITE_NAME;
+    // Fix for undefined viteName in packaged app
+    if (!viteName || viteName === 'undefined') {
+        console.log('[Main] viteName was undefined, enforcing "main_window"');
+        viteName = 'main_window';
+    }
+    if (devServerUrl) {
+        // Development mode - load from Vite dev server
+        console.log('[Main] Loading dev URL:', devServerUrl);
+        mainWindow.loadURL(devServerUrl);
+        mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
     else {
-        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+        // Production mode - load from built files
+        const indexPath = path.join(__dirname, `../renderer/${viteName}/index.html`);
+        console.log('[Main] Loading production index.html from:', indexPath);
+        mainWindow.loadFile(indexPath);
+        // Keep DevTools open for debugging
+        mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
+    mainWindow.on('ready-to-show', () => {
+        console.log('[Main] ready-to-show, showing window');
+        mainWindow?.show();
+    });
+    mainWindow.webContents.on('did-finish-load', () => {
+        console.log('[Main] did-finish-load');
+    });
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+        console.error('[Main] did-fail-load', { errorCode, errorDescription, validatedURL });
+    });
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
 }
-electron_1.app.whenReady().then(() => {
-    // Initialize database
-    const dbPath = path.join(electron_1.app.getPath('userData'), 'shri-ram-physio.db');
-    database = new schema_1.LocalDatabase(dbPath);
-    // Initialize sync engine (update with your Azure backend URL)
-    const backendUrl = process.env.AZURE_BACKEND_URL || 'http://localhost:3000';
-    syncEngine = new syncEngine_1.SyncEngine(database, backendUrl);
+electron_1.app.whenReady().then(async () => {
+    (0, autoUpdate_1.setupAutoUpdates)();
+    // Initialize database tables (create if not exists)
+    try {
+        await (0, initDatabase_1.initializeDatabase)();
+    }
+    catch (error) {
+        (0, errorLogger_1.logError)('Database initialization', error);
+        electron_1.dialog.showErrorBox('Database Error', `Failed to initialize database: ${error.message}\n${error.stack || ''}`);
+    }
+    // Initialize Prisma Client (do not crash app on failure)
+    let prisma = null;
+    try {
+        prisma = (0, prisma_1.getPrismaClient)();
+        // Verify foreign keys are enabled
+        await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON');
+        (0, errorLogger_1.logSuccess)('Prisma', 'Client initialized');
+    }
+    catch (error) {
+        prisma = null;
+        (0, errorLogger_1.logError)('Prisma initialization', error);
+        electron_1.dialog.showErrorBox('Database Error', `Failed to initialize Prisma: ${error.message}\n${error.stack || ''}`);
+    }
+    // Initialize sync engine
+    const backendUrl = (0, backend_1.getBackendUrl)();
+    syncEngine = new prismaSyncEngine_1.PrismaSyncEngine(backendUrl);
     // Start auto-sync (every 5 minutes)
     syncEngine.startAutoSync();
+    // Register IPC handlers
+    (0, index_1.registerIpcHandlers)(syncEngine);
     createWindow();
 });
-electron_1.app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        // Stop sync engine before quit
+electron_1.app.on('before-quit', async (event) => {
+    // Prevent default quit to do cleanup first
+    // We check for syncEngine existence, but also just cleanup regardless to be safe
+    if (syncEngine || (0, prisma_1.getPrismaClient)()) {
+        event.preventDefault();
+        // Stop sync engine
         if (syncEngine) {
             syncEngine.stopAutoSync();
+            syncEngine = null;
         }
+        // Disconnect Prisma
+        await (0, prisma_1.disconnectPrisma)();
+        // Force quit after cleanup
+        setImmediate(() => electron_1.app.exit(0));
+    }
+});
+electron_1.app.on('window-all-closed', () => {
+    // On macOS, apps stay open until explicitly quit
+    if (process.platform !== 'darwin') {
         electron_1.app.quit();
     }
 });
 electron_1.app.on('activate', () => {
     if (electron_1.BrowserWindow.getAllWindows().length === 0) {
         createWindow();
-    }
-});
-// Handle print request
-electron_1.ipcMain.handle('print-invoice', async (_event, htmlContent) => {
-    try {
-        const printWindow = new electron_1.BrowserWindow({
-            show: false,
-            webPreferences: {
-                nodeIntegration: true,
-                contextIsolation: false
-            }
-        });
-        await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
-        return new Promise((resolve, reject) => {
-            printWindow.webContents.print({
-                silent: false,
-                printBackground: true,
-                color: true,
-                margins: {
-                    marginType: 'printableArea'
-                }
-            }, (success, failureReason) => {
-                printWindow.close();
-                if (success) {
-                    resolve({ success: true });
-                }
-                else {
-                    reject({ success: false, error: failureReason });
-                }
-            });
-        });
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// Handle save invoice
-electron_1.ipcMain.handle('save-invoice', async (_event, invoiceData) => {
-    try {
-        if (!database) {
-            throw new Error('Database not initialized');
-        }
-        // Check if patient exists or create new
-        let patientId;
-        const existingPatient = database.getPatientByUHID(invoiceData.patient.uhid);
-        if (existingPatient && existingPatient.id) {
-            patientId = existingPatient.id;
-            // Update patient info if changed
-            database.updatePatient(patientId, {
-                name: invoiceData.patient.name,
-                age: invoiceData.patient.age,
-                gender: invoiceData.patient.gender,
-                phone: invoiceData.patient.phone,
-                uhid: invoiceData.patient.uhid
-            });
-        }
-        else {
-            patientId = database.createPatient({
-                name: invoiceData.patient.name,
-                age: invoiceData.patient.age,
-                gender: invoiceData.patient.gender,
-                phone: invoiceData.patient.phone,
-                uhid: invoiceData.patient.uhid
-            });
-        }
-        // Create invoice
-        const invoiceId = database.createInvoice({
-            patient_id: patientId,
-            invoice_number: invoiceData.invoiceNumber,
-            date: invoiceData.date,
-            diagnosis: invoiceData.diagnosis,
-            total: invoiceData.total
-        });
-        // Create treatments
-        for (const treatment of invoiceData.treatments) {
-            database.createTreatment({
-                invoice_id: invoiceId,
-                name: treatment.name,
-                sessions: treatment.sessions,
-                start_date: treatment.startDate,
-                end_date: treatment.endDate,
-                amount: treatment.amount
-            });
-        }
-        return { success: true, invoiceId };
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// Handle load invoices
-electron_1.ipcMain.handle('load-invoices', async () => {
-    try {
-        if (!database) {
-            throw new Error('Database not initialized');
-        }
-        const invoices = database.getAllInvoices().map(invoice => {
-            if (!database) {
-                throw new Error('Database not initialized');
-            }
-            const patient = database.getPatient(invoice.patient_id);
-            if (!patient) {
-                throw new Error(`Patient ${invoice.patient_id} not found`);
-            }
-            const treatments = invoice.id ? database.getTreatmentsByInvoice(invoice.id) : [];
-            return {
-                invoiceNumber: invoice.invoice_number,
-                date: invoice.date,
-                patient: {
-                    name: patient.name,
-                    age: patient.age,
-                    gender: patient.gender,
-                    phone: patient.phone,
-                    uhid: patient.uhid
-                },
-                diagnosis: invoice.diagnosis,
-                treatments: treatments.map(t => ({
-                    name: t.name,
-                    sessions: t.sessions,
-                    startDate: t.start_date,
-                    endDate: t.end_date,
-                    amount: t.amount
-                })),
-                total: invoice.total
-            };
-        });
-        return { success: true, invoices };
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// Handle save layout configuration
-electron_1.ipcMain.handle('save-layout', async (_event, layoutConfig) => {
-    try {
-        const configDir = path.join(electron_1.app.getPath('userData'), 'config');
-        if (!fs.existsSync(configDir)) {
-            fs.mkdirSync(configDir, { recursive: true });
-        }
-        const filePath = path.join(configDir, 'invoice-layout.json');
-        fs.writeFileSync(filePath, JSON.stringify(layoutConfig, null, 2));
-        return { success: true };
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// Handle load layout configuration
-electron_1.ipcMain.handle('load-layout', async () => {
-    try {
-        const configDir = path.join(electron_1.app.getPath('userData'), 'config');
-        const filePath = path.join(configDir, 'invoice-layout.json');
-        if (fs.existsSync(filePath)) {
-            const content = fs.readFileSync(filePath, 'utf-8');
-            return { success: true, layout: JSON.parse(content) };
-        }
-        else {
-            return { success: true, layout: null };
-        }
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// Handle file dialog for logo upload
-electron_1.ipcMain.handle('select-logo', async () => {
-    try {
-        const result = await electron_1.dialog.showOpenDialog({
-            properties: ['openFile'],
-            filters: [
-                { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp'] }
-            ]
-        });
-        if (!result.canceled && result.filePaths.length > 0) {
-            const filePath = result.filePaths[0];
-            const fileContent = fs.readFileSync(filePath);
-            const base64 = fileContent.toString('base64');
-            const ext = path.extname(filePath).slice(1);
-            return {
-                success: true,
-                dataUrl: `data:image/${ext};base64,${base64}`
-            };
-        }
-        return { success: false, cancelled: true };
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// ============ SYNC HANDLERS ============
-// Handle manual sync trigger
-electron_1.ipcMain.handle('sync-now', async () => {
-    try {
-        if (!syncEngine) {
-            throw new Error('Sync engine not initialized');
-        }
-        const result = await syncEngine.performSync();
-        return { success: true, result };
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// Get sync status
-electron_1.ipcMain.handle('get-sync-status', async () => {
-    try {
-        if (!database) {
-            throw new Error('Database not initialized');
-        }
-        const pendingCount = database.getPendingRecords('patients').length +
-            database.getPendingRecords('invoices').length +
-            database.getPendingRecords('treatments').length;
-        const lastSyncLog = database.getLastSyncLog();
-        return {
-            success: true,
-            status: {
-                pendingChanges: pendingCount,
-                lastSync: lastSyncLog?.sync_date || null,
-                lastSyncStatus: lastSyncLog?.sync_status || 'never'
-            }
-        };
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// Backend & database status for renderer (Home page indicator)
-electron_1.ipcMain.handle('get-backend-status', async () => {
-    try {
-        const backendUrl = process.env.AZURE_BACKEND_URL || 'http://localhost:3000';
-        const axios = require('axios');
-        const response = await axios.get(`${backendUrl}/health`, { timeout: 5000 });
-        const data = response.data || {};
-        const backendStatus = 'up';
-        const databaseStatus = data?.database?.status === 'down' ? 'down' : 'up';
-        return {
-            success: true,
-            status: {
-                backend: backendStatus,
-                database: databaseStatus,
-                raw: data,
-            },
-        };
-    }
-    catch (error) {
-        return {
-            success: true,
-            status: {
-                backend: 'down',
-                database: 'unknown',
-                error: error instanceof Error ? error.message : String(error),
-            },
-        };
-    }
-});
-// ============ PATIENT HANDLERS ============
-// Create patient
-electron_1.ipcMain.handle('create-patient', async (_event, patientData) => {
-    try {
-        if (!database) {
-            throw new Error('Database not initialized');
-        }
-        const patientId = database.createPatient({
-            name: patientData.name,
-            age: patientData.age,
-            gender: patientData.gender,
-            phone: patientData.phone,
-            uhid: patientData.uhid
-        });
-        return { success: true, patientId };
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// Get all patients
-electron_1.ipcMain.handle('get-patients', async () => {
-    try {
-        if (!database) {
-            throw new Error('Database not initialized');
-        }
-        const patients = database.getAllPatients();
-        return { success: true, patients };
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// Get patient by ID
-electron_1.ipcMain.handle('get-patient', async (_event, patientId) => {
-    try {
-        if (!database) {
-            throw new Error('Database not initialized');
-        }
-        const patient = database.getPatient(patientId);
-        if (!patient) {
-            throw new Error('Patient not found');
-        }
-        return { success: true, patient };
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// Search patients by name or UHID
-electron_1.ipcMain.handle('search-patients', async (_event, query) => {
-    try {
-        if (!database) {
-            throw new Error('Database not initialized');
-        }
-        const patients = database.searchPatients(query);
-        return { success: true, patients };
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
-    }
-});
-// Update patient
-electron_1.ipcMain.handle('update-patient', async (_event, patientId, patientData) => {
-    try {
-        if (!database) {
-            throw new Error('Database not initialized');
-        }
-        database.updatePatient(patientId, {
-            name: patientData.name,
-            age: patientData.age,
-            gender: patientData.gender,
-            phone: patientData.phone,
-            uhid: patientData.uhid
-        });
-        return { success: true };
-    }
-    catch (error) {
-        return { success: false, error: String(error) };
     }
 });

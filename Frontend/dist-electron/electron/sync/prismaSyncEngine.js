@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PrismaSyncEngine = void 0;
 const axios_1 = __importDefault(require("axios"));
-const prisma_1 = require("../lib/prisma");
+const prisma_1 = require("../database/prisma");
 const electron_1 = require("electron");
 class PrismaSyncEngine {
     constructor(backendUrl) {
@@ -26,7 +26,10 @@ class PrismaSyncEngine {
     /**
      * Start automatic sync every 30 minutes (default)
      */
-    startAutoSync(intervalMs = 30 * 60 * 1000) {
+    /**
+     * Start automatic sync every 5 minutes (default)
+     */
+    startAutoSync(intervalMs = 5 * 60 * 1000) {
         if (this.syncInterval) {
             console.log('Auto-sync already running');
             return;
@@ -52,15 +55,60 @@ class PrismaSyncEngine {
     /**
      * Reset auto-sync timer (useful after manual sync)
      */
-    resetAutoSyncTimer(intervalMs = 30 * 60 * 1000) {
+    resetAutoSyncTimer(intervalMs = 5 * 60 * 1000) {
         console.log('Resetting auto-sync timer...');
         this.stopAutoSync();
         this.startAutoSync(intervalMs);
     }
     /**
+     * Smart Polling: Check if sync is needed
+     */
+    async shouldSync() {
+        try {
+            // Check for local pending changes
+            const pendingCount = await this.prisma.$transaction([
+                this.prisma.patient.count({ where: { syncStatus: 'PENDING' } }),
+                this.prisma.invoice.count({ where: { syncStatus: 'PENDING' } }),
+                this.prisma.treatment.count({ where: { syncStatus: 'PENDING' } })
+            ]);
+            const hasLocalChanges = pendingCount.some(count => count > 0);
+            if (hasLocalChanges) {
+                return { shouldSync: true, message: 'Local changes detected' };
+            }
+            // No local changes, check server status
+            const lastSync = await this.prisma.syncLog.findFirst({
+                where: { status: 'success' },
+                orderBy: { createdAt: 'desc' }
+            });
+            if (!lastSync) {
+                return { shouldSync: true, message: 'No previous sync found' };
+            }
+            // Start fetching server status
+            const statusResponse = await axios_1.default.get(`${this.backendUrl}/api/sync/status`, { timeout: 5000 });
+            if (statusResponse.data.success) {
+                const serverLastModified = new Date(statusResponse.data.lastModified).getTime();
+                const localLastSync = new Date(lastSync.createdAt).getTime();
+                if (serverLastModified <= localLastSync) {
+                    return {
+                        shouldSync: false,
+                        message: 'Skipped (No updates)',
+                        lastSyncTime: lastSync.createdAt.toISOString()
+                    };
+                }
+                return { shouldSync: true, message: 'Server updates detected' };
+            }
+            // If status check fails but didn't throw, assume sync needed to be safe
+            return { shouldSync: true, message: 'Status check inconclusive' };
+        }
+        catch (error) {
+            console.warn('⚠️ Status check failed, falling back to safe full sync:', error);
+            return { shouldSync: true, message: 'Status check failed' };
+        }
+    }
+    /**
      * Perform a full bidirectional sync
      */
-    async performSync() {
+    async performSync(force = false) {
         if (this.isSyncing) {
             return { success: false, message: 'Sync already in progress' };
         }
@@ -70,17 +118,30 @@ class PrismaSyncEngine {
             if (!await this.checkConnectivity()) {
                 return { success: false, message: 'No internet connection' };
             }
-            console.log('🔄 Starting sync...');
+            console.log('🔄 Checking sync status...');
+            // Run Smart Polling Check (Skip if forced)
+            let check = { shouldSync: true, message: 'Forced sync' };
+            if (!force) {
+                check = await this.shouldSync();
+            }
+            if (!check.shouldSync) {
+                console.log(`✅ ${check.message}`);
+                return {
+                    success: true,
+                    message: check.message || 'Skipped',
+                    lastSyncTime: check.lastSyncTime
+                };
+            }
+            console.log(`⬇️ Proceeding to sync: ${check.message}`);
+            console.log('🔄 Starting full sync...');
             // Get last sync time
             const lastSync = await this.prisma.syncLog.findFirst({
                 where: { status: 'success' },
                 orderBy: { createdAt: 'desc' }
             });
-            const lastSyncTime = lastSync?.createdAt.toISOString();
-            // === COLLECT PENDING CHANGES ===
-            const pendingPatients = await this.prisma.patient.findMany({
-                where: { syncStatus: 'PENDING' }
-            });
+            // === FETCH PENDING DATA ===
+            // We query full objects immediately for upload
+            const pendingPatients = await this.prisma.patient.findMany({ where: { syncStatus: 'PENDING' } });
             const pendingInvoices = await this.prisma.invoice.findMany({
                 where: { syncStatus: 'PENDING' },
                 include: { patient: true }
@@ -89,9 +150,14 @@ class PrismaSyncEngine {
                 where: { syncStatus: 'PENDING' },
                 include: { invoice: true }
             });
-            // === SEND TO CLOUD ===
+            console.log(`🔎 Found pending items: ${pendingPatients.length} patients, ${pendingInvoices.length} invoices, ${pendingTreatments.length} treatments`);
+            if (pendingPatients.length === 0 && pendingInvoices.length === 0 && pendingTreatments.length === 0 && !force) {
+                // Double check if force is false, maybe we can skip upload if truly nothing
+                // But if force is true, we proceed to check server updates even if local is empty
+            }
+            // === PREPARE DATA FOR UPLOAD ===
             const syncPayload = {
-                lastSyncTime,
+                lastSyncTime: lastSync ? lastSync.createdAt.toISOString() : null,
                 patients: pendingPatients.map(p => ({
                     id: p.id,
                     cloudId: p.cloudId,
@@ -358,6 +424,7 @@ class PrismaSyncEngine {
             }
             catch (presetError) {
                 console.warn('⚠️ Failed to sync presets:', presetError);
+                presetStats.error = presetError instanceof Error ? presetError.message : String(presetError);
             }
             // Log successful sync
             await this.prisma.syncLog.create({
@@ -384,8 +451,9 @@ class PrismaSyncEngine {
             });
             return {
                 success: true,
-                message: `Synced: ${synced.patients.length + synced.invoices.length + synced.treatments.length} records`,
-                lastSyncTime: syncTime
+                message: `Synced: ${synced.patients.length + synced.invoices.length + synced.treatments.length} records${presetStats.error ? ` (Presets failed: ${presetStats.error})` : ''}`,
+                lastSyncTime: syncTime,
+                errors: presetStats.error ? [presetStats.error] : []
             };
         }
         catch (error) {

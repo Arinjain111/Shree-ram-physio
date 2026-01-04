@@ -1,75 +1,43 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPrismaClient = getPrismaClient;
-exports.disconnectPrisma = disconnectPrisma;
-const electron_1 = require("electron");
-const path = __importStar(require("path"));
-const fs = __importStar(require("fs"));
-const nativeLoader_1 = require("./nativeLoader");
+import type { PrismaClient as PrismaClientType } from '@prisma/client';
+import { app } from 'electron';
+import * as path from 'path';
+import * as fs from 'fs';
+
+import { loadBetterSqlite3, loadPrismaAdapter } from '../lib/nativeLoader';
+
 // Dynamic imports for native modules
-let Database;
-let PrismaBetterSqlite3;
+let Database: any;
+let PrismaBetterSqlite3: any;
+
 function loadNativeModules() {
-    if (Database && PrismaBetterSqlite3)
-        return; // Already loaded
+    if (Database && PrismaBetterSqlite3) return; // Already loaded
+
     try {
         logToFile(`Loading native modules via loader...`);
-        Database = (0, nativeLoader_1.loadBetterSqlite3)();
-        PrismaBetterSqlite3 = (0, nativeLoader_1.loadPrismaAdapter)();
+        Database = loadBetterSqlite3();
+        PrismaBetterSqlite3 = loadPrismaAdapter();
         logToFile('Native modules loaded.');
-    }
-    catch (e) {
+    } catch (e: any) {
         logToFile(`Fatal error loading modules: ${e.message}`);
         throw e;
     }
 }
+
 // Simple file logger for startup debugging
-function logToFile(message) {
+function logToFile(message: string) {
     try {
-        const logPath = 'C:\\Users\\arinj\\projects\\Shri-ram-physio\\Frontend\\startup_debug.log';
+        const logPath = path.join(app.getPath('userData'), 'startup_debug.log');
         const timestamp = new Date().toISOString();
         fs.appendFileSync(logPath, `${timestamp} [PrismaLoader] ${message}\n`);
-    }
-    catch (e) {
+    } catch (e) {
         // ignore logging errors
     }
 }
+
 // Create Prisma Client with dynamic SQLite path
-let prismaClient = null;
-let sqliteDb = null;
+let prismaClient: PrismaClientType | null = null;
+let sqliteDb: any | null = null;
+
 /**
  * For Electron packaged apps with Prisma, we need to use the driver adapter approach
  * which bypasses the normal Prisma client loading mechanism entirely.
@@ -78,16 +46,20 @@ let sqliteDb = null;
  */
 function getPrismaClientConstructor() {
     logToFile('getPrismaClientConstructor called');
-    const possiblePaths = [];
+    const possiblePaths: string[] = [];
+
     try {
-        if (electron_1.app.isPackaged) {
+        if (app.isPackaged) {
             logToFile(`Running in PACKAGED mode. resourcesPath: ${process.resourcesPath}`);
+
             // We expect the client to be at resources/.prisma/client/index.js
             // This is because we manually copy '.prisma' folder to 'resources/.prisma'
             possiblePaths.push(path.join(process.resourcesPath, '.prisma', 'client', 'index.js'));
+
             // Fallback: standard node_modules location if structure differs
             possiblePaths.push(path.join(process.resourcesPath, 'node_modules', '.prisma', 'client', 'index.js'));
             possiblePaths.push(path.join(process.resourcesPath, '@prisma', 'client', 'index.js')); // Stub?
+
             for (const p of possiblePaths) {
                 logToFile(`Checking path: ${p}`);
                 if (fs.existsSync(p)) {
@@ -97,75 +69,73 @@ function getPrismaClientConstructor() {
                         if (m.PrismaClient) {
                             logToFile('Successfully loaded PrismaClient');
                             return m.PrismaClient;
-                        }
-                        else {
+                        } else {
                             logToFile(`Loaded module at ${p} but PrismaClient export is missing`);
                         }
-                    }
-                    catch (e) {
+                    } catch (e: any) {
                         logToFile(`Failed to require ${p}: ${e.message}`);
                     }
                 }
             }
+
             // If we are here, we failed.
             const resourcesContent = fs.existsSync(process.resourcesPath)
                 ? fs.readdirSync(process.resourcesPath).join(', ')
                 : 'Resources folder not found';
+
             throw new Error(`PrismaClient not found.\nChecked paths:\n${possiblePaths.join('\n')}\nResources content: ${resourcesContent}`);
-        }
-        else {
+
+        } else {
             // Development mode
             logToFile('Running in DEVELOPMENT mode');
             return require('@prisma/client').PrismaClient;
         }
-    }
-    catch (error) {
+
+    } catch (error: any) {
         logToFile(`getPrismaClientConstructor FATAL ERROR: ${error.message}\n${error.stack}`);
         throw error;
     }
 }
-function getPrismaClient() {
+
+export function getPrismaClient(): PrismaClientType {
     if (!prismaClient) {
         logToFile('getPrismaClient: initializing new instance');
+
         // Load native modules (better-sqlite3, adapter, etc)
         loadNativeModules();
+
         try {
             const PrismaClient = getPrismaClientConstructor();
-            const dbPath = path.join(electron_1.app.getPath('userData'), 'shri-ram-physio.db');
+
+            const dbPath = path.join(app.getPath('userData'), 'shri-ram-physio.db');
             logToFile(`Database path: ${dbPath}`);
+
             // Ensure DB directory exists
             const dbDir = path.dirname(dbPath);
-            if (!fs.existsSync(dbDir))
-                fs.mkdirSync(dbDir, { recursive: true });
-            // We use the adapter approach
-            // In production, better-sqlite3 is loaded from resources
-            // In dev, it might be string path or instance.
-            // loadNativeModules() sets Database and PrismaBetterSqlite3 global vars in this file scope (or via nativeLoader but here we use local vars from line 9)
-            // Wait, loadNativeModules logic in this file (lines 12-24) sets 'Database' and 'PrismaBetterSqlite3' variables.
-            // But they are declared at top of file.
-            // The adapter needs an initialized Database instance.
-            // logToFile('Initializing better-sqlite3 database instance...');
-            // Database is the better-sqlite3 constructor
-            // const dbInstance = new Database(dbPath);
-            // logToFile('Database instance created.');
+            if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+
             logToFile('Initializing adapter with URL...');
             const adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` });
             logToFile('Adapter created.');
+
             logToFile('Initializing PrismaClient...');
             prismaClient = new PrismaClient({
                 adapter,
                 log: ['info', 'warn', 'error'],
-            });
+            }) as PrismaClientType;
+
             logToFile('PrismaClient created successfully!');
-        }
-        catch (error) {
+
+        } catch (error: any) {
             logToFile(`getPrismaClient ERROR: ${error.message}\n${error.stack}`);
             throw error;
         }
     }
+
     return prismaClient;
 }
-async function disconnectPrisma() {
+
+export async function disconnectPrisma() {
     if (prismaClient) {
         await prismaClient.$disconnect();
         prismaClient = null;
@@ -175,4 +145,5 @@ async function disconnectPrisma() {
         sqliteDb = null;
     }
 }
-exports.default = getPrismaClient;
+
+export default getPrismaClient;
