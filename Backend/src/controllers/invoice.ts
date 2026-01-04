@@ -3,12 +3,21 @@ import prisma from '../lib/prisma';
 import { ApiError } from '../middleware/errorHandler';
 import { CreateInvoiceRequestSchema, validateOrThrow, type CreateInvoiceRequest } from '../schemas/validation.schema';
 
-// Get next available invoice number
-export const getNextInvoiceNumber = async (_req: Request, res: Response) => {
+// Get next available invoice number for a patient
+export const getNextInvoiceNumber = async (req: Request, res: Response) => {
+  const { patientId } = req.query;
+
+  if (!patientId) {
+    throw new ApiError(400, 'patientId is required');
+  }
+
   // Use transaction to ensure atomicity and prevent race conditions
   const nextNumber = await prisma.$transaction(async (tx) => {
-    // Get the maximum invoice number from existing invoices
+    const resolvedPatientId = parseInt(patientId as string);
+
+    // Get the highest invoice number for THIS PATIENT
     const lastInvoice = await tx.invoice.findFirst({
+      where: { patientId: resolvedPatientId },
       orderBy: { invoiceNumber: 'desc' },
       select: { invoiceNumber: true }
     });
@@ -22,7 +31,7 @@ export const getNextInvoiceNumber = async (_req: Request, res: Response) => {
       }
     }
 
-    // Generate next number with padding
+    // Generate next number with padding (per patient)
     const nextNum = (maxNum + 1).toString().padStart(4, '0');
     return nextNum;
   });
@@ -121,9 +130,9 @@ export const createInvoice = async (req: Request, res: Response) => {
     throw new ApiError(404, 'Patient not found', { code: 'PATIENT_NOT_FOUND' });
   }
 
-  // Check if invoice number already exists
+  // Check if invoice number already exists for this patient
   const existingInvoice = await prisma.invoice.findUnique({
-    where: { invoiceNumber }
+    where: { patientId_invoiceNumber: { patientId, invoiceNumber } }
   });
 
   if (existingInvoice) {
@@ -187,7 +196,7 @@ export const updateInvoice = async (req: Request, res: Response) => {
   // If invoice number is being changed, check for conflicts
   if (invoiceNumber && invoiceNumber !== existingInvoice.invoiceNumber) {
     const numberConflict = await prisma.invoice.findUnique({
-      where: { invoiceNumber },
+      where: { patientId_invoiceNumber: { patientId: existingInvoice.patientId, invoiceNumber } },
     });
 
     if (numberConflict) {

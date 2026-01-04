@@ -4,16 +4,21 @@ import { ApiError } from '../middleware/errorHandler';
 
 // Get all treatment presets
 export const getAllPresets = async (_req: Request, res: Response) => {
-  const presets = await prisma.treatmentPreset.findMany({
-    orderBy: {
-      name: 'asc',
-    },
-  });
+  try {
+    const presets = await prisma.treatmentPreset.findMany({
+      orderBy: {
+        name: 'asc',
+      },
+    });
 
-  res.json({
-    success: true,
-    presets,
-  });
+    res.json({
+      success: true,
+      presets,
+    });
+  } catch (error) {
+    console.error('❌ Error fetching presets:', error instanceof Error ? error.message : String(error));
+    throw error;
+  }
 };
 
 // Get preset by ID

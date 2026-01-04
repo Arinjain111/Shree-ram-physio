@@ -12,7 +12,7 @@ import { asyncHandler } from '../middleware/errorHandler';
 
 const router = Router();
 
-// GET /api/invoices/next-number - Get next available invoice number
+// GET /api/invoices/next-number?patientId=1 - Get next invoice number for patient
 router.get('/next-number', asyncHandler(getNextInvoiceNumber));
 
 // GET /api/invoices - Get all invoices

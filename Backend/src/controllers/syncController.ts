@@ -138,12 +138,15 @@ export const syncData = async (req: Request, res: Response) => {
           // But if it does, keep the existing one and log as unresolvable conflict
           console.warn(`⚠️ CONFLICT: Patient ${resolvedPatientId} already has Invoice #${invoice.invoiceNumber}`);
           
-          result.conflicts.push({
+          const conflict: { localId?: number; originalNumber: string; newNumber: string; reason: string } = {
             reason: 'DUPLICATE_INVOICE_FOR_PATIENT',
             originalNumber: invoice.invoiceNumber,
             newNumber: invoice.invoiceNumber,  // Invoice number NEVER changes
-            localId: invoice.id
-          });
+          };
+          if (invoice.id !== undefined) {
+            conflict.localId = invoice.id;
+          }
+          result.conflicts.push(conflict);
           
           // DON'T create a new invoice, just skip this one
           // Invoice numbers are immutable and sacred (user printed it!)
