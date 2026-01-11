@@ -8,6 +8,7 @@ const PatientForm = ({ patient, setPatient }: PatientFormProps) => {
   const [ageErrors, setAgeErrors] = useState<string[]>([]);
   const [phoneErrors, setPhoneErrors] = useState<string[]>([]);
   const [uhidErrors, setUhidErrors] = useState<string[]>([]);
+  const [uhidFieldEnabled, setUhidFieldEnabled] = useState(false);
   const [showFirstNameInfo, setShowFirstNameInfo] = useState(false);
   const [showLastNameInfo, setShowLastNameInfo] = useState(false);
   const [showAgeInfo, setShowAgeInfo] = useState(false);
@@ -18,6 +19,8 @@ const PatientForm = ({ patient, setPatient }: PatientFormProps) => {
   const [ageTouched, setAgeTouched] = useState(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [uhidTouched, setUhidTouched] = useState(false);
+
+  const shouldShowUhidField = uhidFieldEnabled || !!patient.uhid;
 
   const validateField = (field: 'firstName' | 'lastName' | 'age' | 'phone' | 'uhid', value: string | number) => {
     // Only validate if user has typed at least 1 character
@@ -361,41 +364,64 @@ const PatientForm = ({ patient, setPatient }: PatientFormProps) => {
             <option value="Other">Other</option>
           </select>
         </div>
-        <div className="relative">
-          <label className="block text-sm font-medium text-gray-600 mb-1">
-            UHID No.
-          </label>
+        {!shouldShowUhidField ? (
+          <div>
+            <button
+              type="button"
+              onClick={() => setUhidFieldEnabled(true)}
+              className="text-sm font-medium text-gray-600 hover:text-gray-800 underline"
+            >
+              + Add UHID (optional)
+            </button>
+          </div>
+        ) : (
           <div className="relative">
-            <input
-              type="text"
-              value={patient.uhid}
-              onChange={(e) => handleUhidChange(e.target.value)}
-              className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 ${
-                uhidTouched && uhidErrors.length > 0 && patient.uhid
-                  ? 'border-red-500 focus:ring-red-500'
-                  : uhidTouched && patient.uhid && uhidErrors.length === 0
-                  ? 'border-green-500 focus:ring-green-500'
-                  : 'border-gray-300 focus:ring-blue-500'
-              } placeholder-gray-400`}
-              placeholder="e.g., ABC123"
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-              {getValidationIcon(
-                uhidErrors, 
-                patient.uhid || '', 
-                uhidTouched,
-                () => setShowUhidInfo(true),
-                () => setShowUhidInfo(false)
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-600">
+                UHID No.
+              </label>
+              {!patient.uhid && (
+                <button
+                  type="button"
+                  onClick={() => setUhidFieldEnabled(false)}
+                  className="text-xs text-gray-500 hover:text-gray-700 underline"
+                >
+                  Hide
+                </button>
               )}
             </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={patient.uhid}
+                onChange={(e) => handleUhidChange(e.target.value)}
+                className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 ${
+                  uhidTouched && uhidErrors.length > 0 && patient.uhid
+                    ? 'border-red-500 focus:ring-red-500'
+                    : uhidTouched && patient.uhid && uhidErrors.length === 0
+                    ? 'border-green-500 focus:ring-green-500'
+                    : 'border-gray-300 focus:ring-blue-500'
+                } placeholder-gray-400`}
+                placeholder="e.g., ABC123"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                {getValidationIcon(
+                  uhidErrors,
+                  patient.uhid || '',
+                  uhidTouched,
+                  () => setShowUhidInfo(true),
+                  () => setShowUhidInfo(false)
+                )}
+              </div>
+            </div>
+            <ValidationPopup
+              errors={uhidErrors}
+              checks={uhidValidationChecks}
+              show={showUhidInfo}
+              value={patient.uhid || ''}
+            />
           </div>
-          <ValidationPopup 
-            errors={uhidErrors} 
-            checks={uhidValidationChecks} 
-            show={showUhidInfo}
-            value={patient.uhid || ''}
-          />
-        </div>
+        )}
         <div className="relative">
           <label className="block text-sm font-medium text-gray-600 mb-1">
             Contact Number

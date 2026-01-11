@@ -38,6 +38,7 @@ const InvoiceGenerator = () => {
   const [notes, setNotes] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceNumberEdited, setInvoiceNumberEdited] = useState(false);
+  const [isRefreshingInvoiceNumber, setIsRefreshingInvoiceNumber] = useState(false);
   
   // Data State
   const [existingInvoices, setExistingInvoices] = useState<InvoiceData[]>([]);
@@ -71,6 +72,41 @@ const InvoiceGenerator = () => {
     }
   };
 
+  const refreshInvoiceNumber = async () => {
+    setIsRefreshingInvoiceNumber(true);
+    try {
+      const result = await ipcRenderer.invoke('get-next-invoice-number', {
+        id: patient?.id,
+        cloudId: patient?.cloudId
+      });
+
+      if (result?.success && result?.invoiceNumber) {
+        setInvoiceNumber(result.invoiceNumber);
+        setInvoiceNumberEdited(false);
+
+        if (result.backendErrorStatus === 429) {
+          showToast('error', result.backendErrorMessage || 'Too many requests. Using local invoice number.');
+        } else if (result.backendErrorStatus) {
+          // Backend was attempted but failed (e.g. 400/500). Still show the user why.
+          showToast('error', result.backendErrorMessage || 'Backend request failed. Using local invoice number.');
+        } else {
+          const suffix = result.source ? ` (${result.source})` : '';
+          showToast('success', `Invoice number refreshed${suffix}`);
+        }
+      } else {
+        // Fall back to local calculation if IPC failed
+        const fallback = generateNextInvoiceNumber(existingInvoices);
+        setInvoiceNumber(fallback);
+        setInvoiceNumberEdited(false);
+        showToast('error', result?.error || 'Failed to refresh invoice number');
+      }
+    } catch (error) {
+      handleError(error, 'Failed to refresh invoice number');
+    } finally {
+      setIsRefreshingInvoiceNumber(false);
+    }
+  };
+
   // Initialization Effect
   useEffect(() => {
     const initialize = async () => {
@@ -98,6 +134,14 @@ const InvoiceGenerator = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Refresh invoice number when patient changes (no loop: depends only on patient IDs)
+  useEffect(() => {
+    // If patient changes, any previous manual edit should not block fetching
+    setInvoiceNumberEdited(false);
+    fetchInvoiceNumber(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patient?.id, patient?.cloudId]);
+
   // Sync Completion Listener (Handled by useSyncManager globally, but we might want to refresh invoices here)
   useEffect(() => {
       const handleInvoicesUpdated = async () => {
@@ -113,7 +157,6 @@ const InvoiceGenerator = () => {
       window.addEventListener('invoices-updated', handleInvoicesUpdated);
       return () => window.removeEventListener('invoices-updated', handleInvoicesUpdated);
   }, []);
-
 
   // Debounce Preview
   useEffect(() => {
@@ -300,20 +343,29 @@ const InvoiceGenerator = () => {
                         setInvoiceNumberEdited(true);
                         setInvoiceNumber(toPaddedInvoiceNumber(e.target.value));
                       }}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg bg-white text-gray-700 font-semibold"
+                      className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg bg-white text-gray-700 font-semibold"
                       placeholder={isSyncing ? "Syncing..." : "401"}
                     />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      {isSyncing ? (
-                         <svg className="animate-spin w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24">
-                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                         </svg>
-                      ) : (
-                         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                         </svg>
-                      )}
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <button
+                        type="button"
+                        onClick={refreshInvoiceNumber}
+                        disabled={isRefreshingInvoiceNumber}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-slate-100 text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Refresh invoice number"
+                      >
+                        {isRefreshingInvoiceNumber ? (
+                          <svg className="animate-spin w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 14a8 8 0 00-14.828-3M4 10a8 8 0 0014.828 3" />
+                          </svg>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>

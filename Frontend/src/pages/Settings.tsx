@@ -10,6 +10,7 @@ const Settings = () => {
   const [saveLocation, setSaveLocation] = useState('');
   const [autoSaveInvoicePdf, setAutoSaveInvoicePdf] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [isFullSyncing, setIsFullSyncing] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -61,6 +62,29 @@ const Settings = () => {
       }
     } catch (error) {
       handleFrontendError(error, showToast, 'Failed to change save location');
+    }
+  };
+
+  const handleForceFullSync = async () => {
+    setIsFullSyncing(true);
+    try {
+      showToast('info', 'Forcing full sync...');
+      const reset = await ipcRenderer.invoke('reset-sync-timestamp');
+      if (!reset?.success) {
+        showToast('error', reset?.error || 'Failed to reset sync timestamp');
+        return;
+      }
+
+      const sync = await ipcRenderer.invoke('sync-now');
+      if (sync?.success) {
+        showToast('success', 'Full sync completed');
+      } else {
+        showToast('error', sync?.error || 'Full sync failed');
+      }
+    } catch (error) {
+      handleFrontendError(error, showToast, 'Failed to force full sync');
+    } finally {
+      setIsFullSyncing(false);
     }
   };
 
@@ -188,6 +212,37 @@ const Settings = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Sync */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 14a8 8 0 00-14.828-3M4 10a8 8 0 0014.828 3" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-slate-800">Sync</h3>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Full sync downloads all cloud data again. Use only when needed.
+            </p>
+            <button
+              type="button"
+              onClick={handleForceFullSync}
+              disabled={isFullSyncing}
+              className={`px-5 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                isFullSyncing
+                  ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              }`}
+            >
+              {isFullSyncing ? 'Syncing…' : 'Force Full Sync'}
+            </button>
           </div>
         </div>
 

@@ -165,34 +165,41 @@ const DatabaseFind = () => {
   const visiblePatientGroups = patientGroups.slice(0, visibleCount);
 
   const handlePrintInvoice = async (invoice: DatabaseInvoice) => {
-    // Map DatabaseInvoice to InvoiceData structure expected by printer
-    const invoiceData: InvoiceData = {
-      invoiceNumber: invoice.invoiceNumber,
-      date: invoice.date,
-      patient: {
-        firstName: invoice.patient.firstName,
-        lastName: invoice.patient.lastName,
-        age: invoice.patient.age,
-        gender: invoice.patient.gender,
-        phone: invoice.patient.phone || '0000000000', // Provide default valid phone if missing
-        uhid: invoice.patient.uhid
-      },
-      treatments: invoice.treatments.map(t => ({
-        name: t.name,
-        sessions: t.sessions,
-        startDate: t.startDate,
-        endDate: t.endDate,
-        amount: t.amount,
-        duration: '', // Required by schema
-      })),
-      diagnosis: invoice.diagnosis || '',
-      notes: invoice.notes || '',
-      paymentMethod: invoice.paymentMethod,
-      total: invoice.total.toString(),
-      timestamp: new Date().toISOString()
-    };
+    try {
+      // Map DatabaseInvoice to InvoiceData structure expected by printer
+      const invoiceData: InvoiceData = {
+        invoiceNumber: invoice.invoiceNumber,
+        date: invoice.date,
+        patient: {
+          firstName: invoice.patient.firstName,
+          lastName: invoice.patient.lastName,
+          age: invoice.patient.age,
+          gender: invoice.patient.gender,
+          phone: invoice.patient.phone || '0000000000', // Provide default valid phone if missing
+          uhid: invoice.patient.uhid
+        },
+        treatments: invoice.treatments.map(t => ({
+          name: t.name,
+          sessions: t.sessions,
+          startDate: t.startDate,
+          endDate: t.endDate,
+          amount: t.amount,
+          duration: '', // Required by schema
+        })),
+        diagnosis: invoice.diagnosis || '',
+        notes: invoice.notes || '',
+        paymentMethod: invoice.paymentMethod,
+        total: invoice.total.toString(),
+        timestamp: new Date().toISOString()
+      };
 
-    await printInvoice(invoiceData);
+      const success = await printInvoice(invoiceData);
+      if (success) {
+        showToast('success', 'Invoice printed successfully');
+      }
+    } catch (error) {
+      handleError(error, 'Failed to print invoice');
+    }
   };
 
   return (
@@ -339,7 +346,7 @@ const DatabaseFind = () => {
              type="text"
              value={searchQuery}
              onChange={(e) => setSearchQuery(e.target.value)}
-             placeholder="Search patients by name, phone, or UHID..."
+             placeholder="Search patients by name or phone..."
              className="w-full pl-11 pr-4 py-4 bg-white border-0 rounded-2xl shadow-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 transition-all text-slate-600 placeholder:text-slate-400"
            />
            {searchQuery && (

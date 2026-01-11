@@ -450,7 +450,7 @@ export const generateInvoiceHTML = (
             </div>
             <div class="info-box">
               <p><strong>Contact Number</strong> : <span>${invoiceData.patient.phone}</span></p>
-              <p><strong>UHID No.</strong> : <span>${invoiceData.patient.uhid}</span></p>
+              ${(invoiceData.patient.uhid || '').trim() ? `<p><strong>UHID No.</strong> : <span>${invoiceData.patient.uhid}</span></p>` : ''}
             </div>
           </div>
 
@@ -461,7 +461,7 @@ export const generateInvoiceHTML = (
             </div>
             <div class="summary-box">
               <div class="label">PAYMENT MODE</div>
-              <div class="value">${invoiceData.paymentMethod.toUpperCase()}</div>
+              <div class="value">${(invoiceData.paymentMethod || 'CASH').toUpperCase()}</div>
             </div>
             <div class="summary-box">
               <div class="label">BILL DATE</div>

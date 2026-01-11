@@ -97,25 +97,33 @@ export function registerPatientHandlers() {
 
             const result = { local: false, cloud: false, errors: [] as string[] };
 
+            // Fetch once so we can reuse cloudId and optionally enforce semantics.
+            const patient = await prisma.patient.findUnique({ where: { id: patientId } });
+
             // 1. Delete from Cloud
             if (target === 'cloud' || target === 'both') {
                 try {
-                    const patient = await prisma.patient.findUnique({ where: { id: patientId } });
                     if (patient && patient.cloudId) {
                         await axios.delete(`${backendUrl}/api/patients/${patient.cloudId}`);
                         result.cloud = true;
-                    } else if (target === 'cloud') {
+                    } else {
                         throw new Error('Patient not synced to cloud (no Cloud ID)');
                     }
                 } catch (e: any) {
+                    const status = e?.response?.status;
+                    const msg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Cloud delete failed';
                     console.error('Cloud delete failed', e);
-                    result.errors.push(`Cloud: ${e.message}`);
+                    result.errors.push(`Cloud${status ? ` (${status})` : ''}: ${msg}`);
                 }
             }
 
             // 2. Delete from Local
             if (target === 'local' || target === 'both') {
                 try {
+                    // For 'both', only delete local if cloud succeeded.
+                    if (target === 'both' && !result.cloud) {
+                        throw new Error('Skipped local delete because cloud delete failed');
+                    }
                     await prisma.patient.delete({ where: { id: patientId } });
                     result.local = true;
                 } catch (e: any) {
@@ -124,7 +132,13 @@ export function registerPatientHandlers() {
                 }
             }
 
-            return { success: result.local || result.cloud, ...result };
+            const success = target === 'local'
+                ? result.local
+                : target === 'cloud'
+                    ? result.cloud
+                    : (result.local && result.cloud);
+
+            return { success, ...result };
 
         } catch (error) {
             return { success: false, error: String(error) };

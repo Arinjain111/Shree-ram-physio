@@ -154,7 +154,15 @@ export class PrismaSyncEngine {
       }
 
       console.log(`⬇️ Proceeding to sync: ${check.message}`);
-      console.log('🔄 Starting full sync...');
+      console.log('🔄 Starting sync...');
+
+      // Determine incremental sync cursor.
+      // If there is no prior successful sync (or sync logs were reset), backend will return ALL records.
+      const lastSuccessfulSync = await this.prisma.syncLog.findFirst({
+        where: { status: 'success' },
+        orderBy: { createdAt: 'desc' }
+      });
+      const lastSyncTime = lastSuccessfulSync?.createdAt?.toISOString() ?? null;
 
       // === FETCH PENDING DATA ===
       // We query full objects immediately for upload
@@ -169,12 +177,18 @@ export class PrismaSyncEngine {
       });
 
       console.log(`🔎 Found pending items: ${pendingPatients.length} patients, ${pendingInvoices.length} invoices, ${pendingTreatments.length} treatments`);
-      console.log(`📊 Local DB empty: ${pendingPatients.length === 0 && pendingInvoices.length === 0 && pendingTreatments.length === 0 ? 'YES - should fetch ALL from cloud' : 'NO'}`);
+      const [totalPatients, totalInvoices, totalTreatments] = await this.prisma.$transaction([
+        this.prisma.patient.count(),
+        this.prisma.invoice.count(),
+        this.prisma.treatment.count()
+      ]);
+      const dbEmpty = totalPatients === 0 && totalInvoices === 0 && totalTreatments === 0;
+      console.log(`📊 Local DB empty: ${dbEmpty ? 'YES' : 'NO'} (${totalPatients} patients, ${totalInvoices} invoices, ${totalTreatments} treatments)`);
 
       // === PREPARE DATA FOR UPLOAD ===
-      // ALWAYS use lastSyncTime: null to fetch ALL cloud data (cloud is source of truth)
+      // Use incremental cursor when available; backend returns only updates since lastSyncTime.
       const syncPayload = {
-        lastSyncTime: null, // Always fetch ALL from cloud, not just recent updates
+        lastSyncTime,
         patients: pendingPatients.map(p => ({
           id: p.id,
           cloudId: p.cloudId,
@@ -216,7 +230,11 @@ export class PrismaSyncEngine {
 
       console.log(`📤 Uploading: ${pendingPatients.length} patients, ${pendingInvoices.length} invoices, ${pendingTreatments.length} treatments`);
       console.log(`📡 Sync URL: ${this.backendUrl}/api/sync`);
-      console.log(`📅 Full sync mode: Fetching ALL cloud data + uploading pending local changes`);
+      console.log(
+        lastSyncTime
+          ? `📅 Incremental sync: Fetching updates since ${lastSyncTime}`
+          : '📅 Full sync: No previous sync found (or reset). Fetching ALL cloud data'
+      );
 
       const response = await axios.post(
         `${this.backendUrl}/api/sync`,

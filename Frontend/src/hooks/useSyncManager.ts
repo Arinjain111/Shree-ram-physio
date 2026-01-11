@@ -26,9 +26,6 @@ export const useSyncManager = () => {
         setIsSyncing(true);
         setSyncMessage('Syncing with backend...');
         try {
-            // Mark any unsynced records to ensure they are pushed in this cycle
-            await ipcRenderer.invoke('force-sync-push').catch(() => {});
-
             const result = await ipcRenderer.invoke('sync-now');
             if (result.success) {
                 const msg = result.result.message || 'Sync completed successfully!';

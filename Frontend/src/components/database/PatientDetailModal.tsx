@@ -90,12 +90,16 @@ export const PatientDetailModal = ({ invoices, onClose, onPrintInvoice }: Patien
                 </div>
                 
                 <div className="w-1 h-1 rounded-full bg-slate-300"></div>
-                
-                <div className="text-sm text-slate-600 font-medium">
-                  UHID: <span className="text-slate-800">{patient.uhid}</span>
-                </div>
 
-                <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+                {!!patient.uhid && (
+                  <>
+                    <div className="text-sm text-slate-600 font-medium">
+                      UHID: <span className="text-slate-800">{patient.uhid}</span>
+                    </div>
+
+                    <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+                  </>
+                )}
 
                 {patient.phone && (
                   <div className="text-sm text-slate-600 font-medium flex items-center gap-1">

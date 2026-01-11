@@ -160,30 +160,54 @@ export function registerInvoiceHandlers() {
     try {
       const minimumInvoiceNumber = 401;
       let backendNextNumber = 0;
+      let backendAvailable = false;
+      let backendAttempted = false;
+      let checkedUrl: string | undefined;
+      let backendErrorStatus: number | undefined;
+      let backendErrorMessage: string | undefined;
 
       // 1. Try to fetch from backend with patient context
       try {
-        const query = new URLSearchParams();
-        if (patientData?.cloudId) {
-          query.append('patientCloudId', patientData.cloudId.toString());
-        } else if (patientData?.id) {
-          query.append('patientId', patientData.id.toString());
-        }
-        
-        const url = `${backendUrl}/api/invoices/next-number?${query.toString()}`;
-        const response = await axios.get(url, {
-          timeout: 3000 // Short timeout to not block UI
-        });
+        // Backend expects `patientId` (its own DB id).
+        // In our local DB, `cloudId` maps to backend Patient.id.
+        // Do NOT send local sqlite `id` to backend.
+        const backendPatientId = patientData?.cloudId;
 
-        if (response.data.success && response.data.invoiceNumber) {
-          // Assume numeric 0001 format
-          const match = response.data.invoiceNumber.match(/(\d+)$/);
-          if (match) {
-            backendNextNumber = parseInt(match[1], 10);
+        if (backendPatientId) {
+          backendAttempted = true;
+          const query = new URLSearchParams({ patientId: backendPatientId.toString() });
+          const url = `${backendUrl}/api/invoices/next-number?${query.toString()}`;
+          checkedUrl = url;
+
+          const response = await axios.get(url, {
+            timeout: 3000 // Short timeout to not block UI
+          });
+
+          if (response.data?.success && response.data?.invoiceNumber != null) {
+            const raw = String(response.data.invoiceNumber);
+            const match = raw.match(/(\d+)$/);
+            if (match) {
+              backendNextNumber = parseInt(match[1], 10);
+              backendAvailable = true;
+            }
           }
         }
       } catch (e) {
-        logWarning('Invoice number', 'Backend unavailable, checking local ONLY');
+        const anyErr: any = e;
+        backendErrorStatus = anyErr?.response?.status;
+        backendErrorMessage =
+          anyErr?.response?.data?.message ||
+          anyErr?.response?.data?.error ||
+          anyErr?.message ||
+          'Backend request failed';
+
+        const msg = backendErrorStatus === 429
+          ? `Rate limited (${checkedUrl || backendUrl}): ${backendErrorMessage}`
+          : (checkedUrl
+              ? `Backend unavailable (${checkedUrl}); checking local only`
+              : 'Backend unavailable; checking local only');
+
+        logWarning('Invoice number', msg);
       }
 
       // 2. Check Local Database - also per patient
@@ -191,11 +215,22 @@ export function registerInvoiceHandlers() {
         throw new Error('Prisma not initialized');
       }
 
+      // Resolve a local patientId when we only have cloudId.
+      // Without this, local checks fall back to global max invoice number.
+      let localPatientId: number | undefined = patientData?.id;
+      if (!localPatientId && patientData?.cloudId) {
+        const localPatient = await prisma.patient.findFirst({
+          where: { cloudId: patientData.cloudId },
+          select: { id: true }
+        });
+        localPatientId = localPatient?.id;
+      }
+
       let lastInvoice;
-      if (patientData?.id) {
+      if (localPatientId) {
         // Get last invoice for this specific patient
         lastInvoice = await prisma.invoice.findFirst({
-          where: { patientId: patientData.id },
+          where: { patientId: localPatientId },
           orderBy: { invoiceNumber: 'desc' },
           select: { invoiceNumber: true }
         });
@@ -219,11 +254,22 @@ export function registerInvoiceHandlers() {
       const nextNumVal = Math.max(backendNextNumber, localMax + 1, minimumInvoiceNumber);
       const nextNumber = nextNumVal.toString().padStart(4, '0');
 
+      const minIsDriving = nextNumVal === minimumInvoiceNumber && backendNextNumber < minimumInvoiceNumber && localMax + 1 < minimumInvoiceNumber;
+      const source = !backendAttempted
+        ? (minIsDriving ? 'minimum' : 'local-only')
+        : !backendAvailable
+          ? (minIsDriving ? 'minimum' : 'backend-unavailable-local')
+          : (nextNumVal === backendNextNumber ? 'backend' : 'local-conflict-resolved');
+
       return {
         success: true,
         invoiceNumber: nextNumber,
-        source: nextNumVal > backendNextNumber ? 'local-conflict-resolved' : 'backend',
-        patientId: patientData?.id
+        source,
+        patientId: patientData?.id,
+        backendUrl,
+        checkedUrl,
+        backendErrorStatus,
+        backendErrorMessage
       };
 
     } catch (error) {
