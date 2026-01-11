@@ -196,26 +196,20 @@ export const deletePatient = async (req: Request, res: Response) => {
     throw new ApiError(400, 'Invalid patient ID', { code: 'INVALID_PATIENT_ID' });
   }
 
-  // Check if patient exists
-  const existingPatient = await prisma.patient.findUnique({
-    where: { id: patientId },
-    include: {
-      invoices: true,
-    },
-  });
-
-  if (!existingPatient) {
-    throw new ApiError(404, 'Patient not found', { code: 'PATIENT_NOT_FOUND' });
+  // Deleting a patient should delete all related invoices/treatments in cloud.
+  // Prisma schema enforces cascade deletes via relations.
+  try {
+    await prisma.patient.delete({
+      where: { id: patientId },
+    });
+  } catch (e: any) {
+    // Prisma throws when record doesn't exist
+    const code = e?.code;
+    if (code === 'P2025') {
+      throw new ApiError(404, 'Patient not found', { code: 'PATIENT_NOT_FOUND' });
+    }
+    throw e;
   }
-
-  // Check if patient has invoices
-  if (existingPatient.invoices.length > 0) {
-    throw new ApiError(400, 'Cannot delete patient with existing invoices', { code: 'PATIENT_HAS_INVOICES' });
-  }
-
-  await prisma.patient.delete({
-    where: { id: patientId },
-  });
 
   res.json({
     success: true,
