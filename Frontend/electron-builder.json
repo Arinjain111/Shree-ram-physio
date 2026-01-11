@@ -2,6 +2,7 @@
   "npmRebuild": true,
   "appId": "com.shreeRampPhysio.invoicing",
   "productName": "Shri Ram Physio",
+  "artifactName": "${productName} Setup.${ext}",
   "asar": true,
   "directories": {
     "output": "release",
