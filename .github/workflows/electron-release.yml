@@ -42,6 +42,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate tag matches package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $expected = $tag.Substring(1)
+          $pkg = node -p "require('./package.json').version"
+          Write-Host "Tag: $tag"
+          Write-Host "Frontend/package.json version: $pkg"
+          if ($pkg -ne $expected) {
+            Write-Error "Version mismatch: tag '$tag' expects version '$expected' but Frontend/package.json is '$pkg'. Fix by committing the version bump, then create/push a new tag."
+            exit 1
+          }
+
       - name: Build application
         run: npm run build
 
@@ -70,6 +84,31 @@ jobs:
         with:
           name: update-blockmap
           path: Frontend/release/*.blockmap
+
+      - name: Delete existing release assets (if any)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          Write-Host "Checking for existing release assets for tag: $tag"
+
+          $repo = $env:GITHUB_REPOSITORY
+          $json = gh release view $tag --repo $repo --json assets 2>$null
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($json)) {
+            Write-Host "No existing release found for $tag (nothing to delete)."
+            exit 0
+          }
+
+          $assets = ($json | ConvertFrom-Json).assets
+          foreach ($a in $assets) {
+            $name = $a.name
+            if ($name -match 'latest\.yml$' -or $name -match '\.blockmap$' -or $name -match '\.exe$') {
+              Write-Host "Deleting asset: $name"
+              gh release delete-asset $tag $name --repo $repo -y
+            }
+          }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release (tags)
         if: startsWith(github.ref, 'refs/tags/')
