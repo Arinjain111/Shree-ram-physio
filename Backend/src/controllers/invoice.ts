@@ -5,7 +5,7 @@ import { CreateInvoiceRequestSchema, validateOrThrow, type CreateInvoiceRequest 
 
 // Get next available invoice number for a patient
 export const getNextInvoiceNumber = async (req: Request, res: Response) => {
-  const { patientId } = req.query;
+  const { patientId } = req.query as { patientId?: number | string };
 
   if (!patientId) {
     throw new ApiError(400, 'patientId is required');
@@ -13,7 +13,10 @@ export const getNextInvoiceNumber = async (req: Request, res: Response) => {
 
   // Use transaction to ensure atomicity and prevent race conditions
   const nextNumber = await prisma.$transaction(async (tx) => {
-    const resolvedPatientId = parseInt(patientId as string);
+    const resolvedPatientId = parseInt(patientId as string, 10);
+    if (Number.isNaN(resolvedPatientId)) {
+      throw new ApiError(400, 'Invalid patientId', { code: 'INVALID_PATIENT_ID' });
+    }
 
     // Get the highest invoice number for THIS PATIENT
     const lastInvoice = await tx.invoice.findFirst({
