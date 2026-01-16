@@ -89,9 +89,12 @@ export const searchPatients = async (req: Request, res: Response) => {
 export const createPatient = async (req: Request, res: Response) => {
   const { first_name, last_name, age, gender, phone, uhid } = req.body;
 
+  const normalizedUhid = typeof uhid === 'string' ? uhid.trim() : undefined;
+  const effectiveUhid = normalizedUhid ? normalizedUhid : undefined;
+
   // Basic validation for incoming form data
-  if (!first_name || !last_name || !age || !gender || !phone || !uhid) {
-    throw new ApiError(400, 'All fields are required', { code: 'MISSING_REQUIRED_FIELDS' });
+  if (!first_name || !last_name || !age || !gender || !phone) {
+    throw new ApiError(400, 'Missing required fields', { code: 'MISSING_REQUIRED_FIELDS' });
   }
 
   const numericAge = parseInt(age, 10);
@@ -99,13 +102,15 @@ export const createPatient = async (req: Request, res: Response) => {
     throw new ApiError(400, 'Age must be a valid non-negative number', { code: 'INVALID_AGE' });
   }
 
-  // Check if UHID already exists
-  const existingPatient = await prisma.patient.findUnique({
-    where: { uhid },
-  });
+  // Check if UHID already exists (only when provided)
+  if (effectiveUhid) {
+    const existingPatient = await prisma.patient.findUnique({
+      where: { uhid: effectiveUhid },
+    });
 
-  if (existingPatient) {
-    throw new ApiError(409, 'Patient with this UHID already exists', { code: 'DUPLICATE_UHID' });
+    if (existingPatient) {
+      throw new ApiError(409, 'Patient with this UHID already exists', { code: 'DUPLICATE_UHID' });
+    }
   }
 
   const patient = await prisma.patient.create({
@@ -115,7 +120,7 @@ export const createPatient = async (req: Request, res: Response) => {
       age: numericAge,
       gender,
       phone,
-      uhid,
+      ...(effectiveUhid ? { uhid: effectiveUhid } : {}),
     },
   });
 
@@ -129,6 +134,11 @@ export const createPatient = async (req: Request, res: Response) => {
 export const updatePatient = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, age, gender, phone, uhid } = req.body;
+
+  const normalizedUhid = typeof uhid === 'string' ? uhid.trim() : undefined;
+  const isUhidProvided = uhid !== undefined;
+  const shouldClearUhid = isUhidProvided && normalizedUhid === '';
+  const effectiveUhid = normalizedUhid ? normalizedUhid : undefined;
 
   if (!id) {
     throw new ApiError(400, 'Patient ID is required', { code: 'PATIENT_ID_REQUIRED' });
@@ -148,10 +158,10 @@ export const updatePatient = async (req: Request, res: Response) => {
     throw new ApiError(404, 'Patient not found', { code: 'PATIENT_NOT_FOUND' });
   }
 
-  // If UHID is being changed, check for conflicts
-  if (uhid && uhid !== existingPatient.uhid) {
+  // If UHID is being changed, check for conflicts (only if setting a non-empty value)
+  if (effectiveUhid && effectiveUhid !== existingPatient.uhid) {
     const uhidConflict = await prisma.patient.findUnique({
-      where: { uhid },
+      where: { uhid: effectiveUhid },
     });
 
     if (uhidConflict) {
@@ -170,7 +180,8 @@ export const updatePatient = async (req: Request, res: Response) => {
   }
   if (gender) updateData.gender = gender;
   if (phone) updateData.phone = phone;
-  if (uhid) updateData.uhid = uhid;
+  if (effectiveUhid) updateData.uhid = effectiveUhid;
+  if (shouldClearUhid) updateData.uhid = null;
 
   const patient = await prisma.patient.update({
     where: { id: patientId },

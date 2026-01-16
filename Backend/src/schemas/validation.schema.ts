@@ -7,6 +7,8 @@
 import { z } from 'zod';
 import { ApiError } from '../middleware/errorHandler';
 
+const OptionalUhidSchema = z.union([z.string().max(50), z.literal('')]).optional().nullable();
+
 // ============================================
 // BASE SCHEMAS - Core data types
 // ============================================
@@ -21,7 +23,7 @@ export const PatientSchema = z.object({
   age: z.number().int().min(0).max(150),
   gender: z.enum(['Male', 'Female', 'Other']),
   phone: z.string().min(10, 'Phone must be at least 10 digits').max(15),
-  uhid: z.string().min(1, 'UHID is required').max(50),
+  uhid: OptionalUhidSchema,
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime().optional(),
 });
@@ -81,7 +83,7 @@ export const PatientSyncSchema = z.object({
   age: z.number().int().min(0).max(150),
   gender: z.enum(['Male', 'Female', 'Other']),
   phone: z.string().min(10, 'Phone must be at least 10 digits').max(15),
-  uhid: z.string().min(1, 'UHID is required').max(50),
+  uhid: OptionalUhidSchema,
   updatedAt: z.iso.datetime().optional(),
 });
 
@@ -185,7 +187,7 @@ export const CreatePatientRequestSchema = z.object({
   age: z.number().int().min(0).max(150),
   gender: z.enum(['Male', 'Female', 'Other']),
   phone: z.string().min(10).max(15),
-  uhid: z.string().min(1).max(50),
+  uhid: OptionalUhidSchema,
 });
 
 export type CreatePatientRequest = z.infer<typeof CreatePatientRequestSchema>;

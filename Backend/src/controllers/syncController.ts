@@ -2,6 +2,12 @@ import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { SyncRequestSchema, validateOrThrow, type SyncRequest } from '../schemas/validation.schema';
 
+function normalizeUhid(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export const syncData = async (req: Request, res: Response) => {
   console.log('🔄 [SYNC START] /api/sync endpoint called');
   console.log(`📥 Request received at ${new Date().toISOString()}`);
@@ -36,37 +42,37 @@ export const syncData = async (req: Request, res: Response) => {
     for (const patient of patients) {
       let cloudPatient;
 
+      const uhid = normalizeUhid((patient as any).uhid);
+      const patientUpdateData: any = {
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+        age: patient.age,
+        gender: patient.gender,
+        phone: patient.phone,
+        ...(uhid ? { uhid } : {}),
+      };
+
+      const patientCreateData: any = {
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+        age: patient.age,
+        gender: patient.gender,
+        phone: patient.phone,
+        ...(uhid ? { uhid } : {}),
+      };
+
       if (patient.cloudId) {
         // Update existing patient
         cloudPatient = await prisma.patient.upsert({
           where: { id: patient.cloudId },
-          update: {
-            firstName: patient.firstName,
-            lastName: patient.lastName,
-            age: patient.age,
-            gender: patient.gender,
-            phone: patient.phone,
-            uhid: patient.uhid,
-          },
-          create: {
-            firstName: patient.firstName,
-            lastName: patient.lastName,
-            age: patient.age,
-            gender: patient.gender,
-            phone: patient.phone,
-            uhid: patient.uhid,
-          },
+          update: patientUpdateData,
+          create: patientCreateData,
         });
       } else {
         // Create new patient
         cloudPatient = await prisma.patient.create({
           data: {
-            firstName: patient.firstName,
-            lastName: patient.lastName,
-            age: patient.age,
-            gender: patient.gender,
-            phone: patient.phone,
-            uhid: patient.uhid,
+            ...patientCreateData,
           },
         });
       }

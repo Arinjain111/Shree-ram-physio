@@ -18,7 +18,7 @@ model Patient {
   age       Int
   gender    String
   phone     String
-  uhid      String    @unique
+  uhid      String?   @unique
   
   // Timestamps for sync
   createdAt DateTime  @default(now()) @map("created_at")
