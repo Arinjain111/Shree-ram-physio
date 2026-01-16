@@ -18,7 +18,7 @@ export interface PatientInfo {
   age: number;
   gender: string;
   phone: string;
-  uhid: string;
+  uhid?: string | null;
 }
 
 export interface InvoiceData {

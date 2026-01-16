@@ -18,7 +18,7 @@ model Patient {
   age       Int
   gender    String
   phone     String
-  uhid      String    @unique
+  uhid      String?   @unique
   
   // Sync tracking
   cloudId   Int?      @map("cloud_id") // Maps to Azure SQL ID

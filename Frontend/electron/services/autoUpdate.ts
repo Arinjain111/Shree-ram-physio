@@ -11,41 +11,74 @@ export function setupAutoUpdates() {
     try {
         // Configure electron-updater
         autoUpdater.logger = console;
-        autoUpdater.autoDownload = false; // We'll prompt the user
+        // Auto-download so updates are seamless; we still prompt for restart.
+        autoUpdater.autoDownload = true;
         autoUpdater.autoInstallOnAppQuit = true;
 
-        let updateAvailableButDeferred = false;
+        let restartPromptDeferred = false;
         const getWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
 
-        autoUpdater.on('error', (err) => {
-            // Never crash the app for updater issues
-            console.error('[AutoUpdate] error:', err);
-        });
-
-        autoUpdater.on('update-available', async (info) => {
-            if (updateAvailableButDeferred) return;
-
+        const showMessageBoxSafe = async (options: Electron.MessageBoxOptions) => {
             const win = getWindow();
-            const result = await dialog.showMessageBox(win ?? undefined, {
+            try {
+                // Passing `undefined` makes it app-modal when no window exists.
+                return await dialog.showMessageBox(win ?? undefined, options);
+            } catch (e) {
+                // If a dialog cannot be shown (rare), never crash.
+                console.warn('[AutoUpdate] showMessageBox failed:', e);
+                return { response: 1, checkboxChecked: false } as any;
+            }
+        };
+
+        const promptRestartWhenReady = async (version: string) => {
+            if (restartPromptDeferred) return;
+
+            const result = await showMessageBoxSafe({
                 type: 'info',
-                title: 'Update Available',
-                message: `A new version (${info.version}) is available.`,
-                detail: 'Do you want to download it now? The update will be installed when you restart the app.',
-                buttons: ['Download', 'Later'],
+                title: 'Update Ready',
+                message: `Version ${version} has been downloaded.`,
+                detail: 'Restart now to install the update?',
+                buttons: ['Restart Now', 'Later'],
                 defaultId: 0,
                 cancelId: 1,
                 noLink: true,
             });
 
             if (result.response === 0) {
-                try {
-                    await autoUpdater.downloadUpdate();
-                } catch (e) {
-                    console.warn('[AutoUpdate] downloadUpdate failed:', e);
-                }
+                // quitAndInstall(silent, forceRunAfter)
+                autoUpdater.quitAndInstall(false, true);
             } else {
-                updateAvailableButDeferred = true;
+                restartPromptDeferred = true;
             }
+        };
+
+        autoUpdater.on('error', (err) => {
+            // Never crash the app for updater issues
+            console.error('[AutoUpdate] error:', err);
+        });
+
+        autoUpdater.on('checking-for-update', () => {
+            console.log('[AutoUpdate] checking-for-update');
+        });
+
+        autoUpdater.on('update-not-available', (info) => {
+            console.log('[AutoUpdate] update-not-available', { version: info?.version });
+        });
+
+        autoUpdater.on('update-available', async (info) => {
+            console.log('[AutoUpdate] update-available', { version: info?.version });
+
+            // With autoDownload=true, downloading starts automatically.
+            // Keep this informational and non-blocking.
+            await showMessageBoxSafe({
+                type: 'info',
+                title: 'Update Available',
+                message: `A new version (${info.version}) is available.`,
+                detail: 'Downloading in the background. You will be prompted to restart once it is ready.',
+                buttons: ['OK'],
+                defaultId: 0,
+                noLink: true,
+            });
         });
 
         autoUpdater.on('download-progress', (progress) => {
@@ -59,24 +92,22 @@ export function setupAutoUpdates() {
             const win = getWindow();
             if (win) win.setProgressBar(-1);
 
-            const result = await dialog.showMessageBox(win ?? undefined, {
-                type: 'info',
-                title: 'Update Ready',
-                message: `Version ${info.version} has been downloaded.`,
-                detail: 'Restart now to install the update?',
-                buttons: ['Restart Now', 'Later'],
-                defaultId: 0,
-                cancelId: 1,
-                noLink: true,
-            });
+            console.log('[AutoUpdate] update-downloaded', { version: info?.version });
 
-            if (result.response === 0) {
-                autoUpdater.quitAndInstall(false, true);
+            // If no window exists yet, wait for one to be created to show the prompt.
+            if (!win) {
+                const version = info?.version ?? '';
+                app.once('browser-window-created', () => {
+                    void promptRestartWhenReady(version);
+                });
+                return;
             }
+
+            await promptRestartWhenReady(info.version);
         });
 
         const check = async (label: string) => {
-            if (updateAvailableButDeferred) return;
+            if (restartPromptDeferred) return;
             try {
                 await autoUpdater.checkForUpdates();
             } catch (err) {

@@ -187,6 +187,23 @@ export class PrismaSyncEngine {
 
       // === PREPARE DATA FOR UPLOAD ===
       // Use incremental cursor when available; backend returns only updates since lastSyncTime.
+      const normalizeUhidForSync = (value: unknown): string | null => {
+        if (typeof value !== 'string') return null;
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+
+        // Do NOT affect local DB; only avoid syncing values that are very likely auto-generated.
+        // (UUIDs / long random tokens). If the user entered UHID, it will typically be shorter.
+        const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+        const longHex = /^[0-9a-f]{24,}$/i.test(trimmed);
+        const longToken = /^[A-Za-z0-9_-]{24,}$/.test(trimmed);
+        if (uuidLike || longHex || longToken) return null;
+
+        return trimmed;
+      };
+
+      const patientsWithFilteredUhid = new Set<number>();
+
       const syncPayload = {
         lastSyncTime,
         patients: pendingPatients.map(p => ({
@@ -197,7 +214,13 @@ export class PrismaSyncEngine {
           age: p.age,
           gender: p.gender,
           phone: p.phone,
-          uhid: p.uhid,
+          uhid: (() => {
+            const sanitized = normalizeUhidForSync((p as any).uhid);
+            if (sanitized === null && (p as any).uhid && p.id) {
+              patientsWithFilteredUhid.add(p.id);
+            }
+            return sanitized;
+          })(),
           updatedAt: p.updatedAt.toISOString()
         })),
         invoices: pendingInvoices.map(inv => ({
@@ -270,12 +293,14 @@ export class PrismaSyncEngine {
       // Update patients with cloud IDs
       for (const patient of synced.patients) {
         if (patient.localId && patient.cloudId) {
+          const shouldClearUhid = patientsWithFilteredUhid.has(patient.localId);
           await this.prisma.patient.update({
             where: { id: patient.localId },
             data: {
               cloudId: patient.cloudId,
               syncStatus: 'SYNCED',
-              lastSyncAt: new Date()
+              lastSyncAt: new Date(),
+              ...(shouldClearUhid ? { uhid: null } : {})
             }
           });
         }

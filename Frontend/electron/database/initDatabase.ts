@@ -23,6 +23,57 @@ export async function initializeDatabase(): Promise<void> {
             ).get();
 
             if (tables) {
+                // Lightweight migration: make patients.uhid nullable (optional) while preserving data.
+                // This is needed because UHID is now optional end-to-end.
+                const cols: Array<{ name: string; notnull: number }> = db.prepare('PRAGMA table_info(patients);').all() as any;
+                const uhidCol = cols.find(c => c.name === 'uhid');
+                const needsUhidNullableMigration = !!uhidCol && uhidCol.notnull === 1;
+
+                if (needsUhidNullableMigration) {
+                    console.log('🔧 Migrating local DB: making patients.uhid nullable...');
+                    db.exec('PRAGMA foreign_keys = OFF;');
+                    db.exec('BEGIN;');
+                    try {
+                        db.exec(`
+                          CREATE TABLE patients_new (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            first_name TEXT NOT NULL,
+                            last_name TEXT NOT NULL,
+                            age INTEGER NOT NULL,
+                            gender TEXT NOT NULL,
+                            phone TEXT NOT NULL,
+                            uhid TEXT UNIQUE,
+                            cloud_id INTEGER,
+                            sync_status TEXT NOT NULL DEFAULT 'PENDING',
+                            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            last_sync_at TEXT
+                          );
+                        `);
+
+                        db.exec(`
+                          INSERT INTO patients_new (
+                            id, first_name, last_name, age, gender, phone, uhid, cloud_id, sync_status, created_at, updated_at, last_sync_at
+                          )
+                          SELECT
+                            id, first_name, last_name, age, gender, phone, uhid, cloud_id, sync_status, created_at, updated_at, last_sync_at
+                          FROM patients;
+                        `);
+
+                        db.exec('DROP TABLE patients;');
+                        db.exec('ALTER TABLE patients_new RENAME TO patients;');
+
+                        db.exec('COMMIT;');
+                        console.log('✅ Local DB migration complete');
+                    } catch (e) {
+                        db.exec('ROLLBACK;');
+                        console.error('❌ Local DB migration failed:', e);
+                        throw e;
+                    } finally {
+                        db.exec('PRAGMA foreign_keys = ON;');
+                    }
+                }
+
                 console.log('✅ Database already initialized');
                 db.close();
                 return;
@@ -50,7 +101,7 @@ export async function initializeDatabase(): Promise<void> {
         age INTEGER NOT NULL,
         gender TEXT NOT NULL,
         phone TEXT NOT NULL,
-        uhid TEXT NOT NULL UNIQUE,
+        uhid TEXT UNIQUE,
         cloud_id INTEGER,
         sync_status TEXT NOT NULL DEFAULT 'PENDING',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

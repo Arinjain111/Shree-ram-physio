@@ -8,12 +8,20 @@ export function registerPatientHandlers() {
     const prisma = getPrismaClient();
     const backendUrl = getBackendUrl();
 
+    const normalizeUhid = (value: unknown): string | null => {
+        if (typeof value !== 'string') return null;
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : null;
+    };
+
     // Create patient
     ipcMain.handle('create-patient', async (_event, patientData: any) => {
         try {
             if (!prisma) {
                 throw new Error('Prisma not initialized');
             }
+
+            const uhid = normalizeUhid(patientData.uhid);
 
             const patient = await prisma.patient.create({
                 data: {
@@ -22,7 +30,7 @@ export function registerPatientHandlers() {
                     age: patientData.age,
                     gender: patientData.gender,
                     phone: patientData.phone,
-                    uhid: patientData.uhid,
+                    ...(uhid ? { uhid } : {}),
                     syncStatus: 'PENDING'
                 }
             });
@@ -176,6 +184,8 @@ export function registerPatientHandlers() {
                 throw new Error('Prisma not initialized');
             }
 
+            const uhid = normalizeUhid(patientData.uhid);
+
             await prisma.patient.update({
                 where: { id: patientId },
                 data: {
@@ -184,7 +194,7 @@ export function registerPatientHandlers() {
                     age: patientData.age,
                     gender: patientData.gender,
                     phone: patientData.phone,
-                    uhid: patientData.uhid,
+                    ...(patientData.uhid === undefined ? {} : (uhid ? { uhid } : { uhid: null })),
                     syncStatus: 'PENDING'
                 }
             });

@@ -8,6 +8,18 @@ export function registerInvoiceHandlers() {
   const prisma = getPrismaClient();
   const backendUrl = getBackendUrl();
 
+  function normalizeUhid(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  function normalizePhone(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
   ipcMain.handle('save-invoice', async (_event, invoiceData: any) => {
     try {
       if (!prisma) {
@@ -28,10 +40,30 @@ export function registerInvoiceHandlers() {
 
       const validatedData = validation.data;
 
+      const uhid = normalizeUhid(validatedData.patient.uhid);
+      const phone = normalizePhone(validatedData.patient.phone);
+
       // Check if patient exists or create new
-      let patient = await prisma.patient.findUnique({
-        where: { uhid: validatedData.patient.uhid }
-      });
+      let patient = null as any;
+
+      if (uhid) {
+        patient = await prisma.patient.findUnique({
+          where: { uhid }
+        });
+      } else if (validatedData.patient.cloudId) {
+        patient = await prisma.patient.findFirst({
+          where: { cloudId: validatedData.patient.cloudId }
+        });
+      } else if (phone) {
+        // Best-effort match when UHID is absent.
+        patient = await prisma.patient.findFirst({
+          where: {
+            firstName: validatedData.patient.firstName,
+            lastName: validatedData.patient.lastName,
+            phone
+          }
+        });
+      }
 
       if (patient) {
         // Update patient info if changed
@@ -43,6 +75,7 @@ export function registerInvoiceHandlers() {
             age: validatedData.patient.age,
             gender: validatedData.patient.gender,
             phone: validatedData.patient.phone,
+            ...(uhid ? { uhid } : {}),
             syncStatus: 'PENDING'
           }
         });
@@ -55,7 +88,7 @@ export function registerInvoiceHandlers() {
             age: validatedData.patient.age,
             gender: validatedData.patient.gender,
             phone: validatedData.patient.phone,
-            uhid: validatedData.patient.uhid,
+            ...(uhid ? { uhid } : {}),
             syncStatus: 'PENDING'
           }
         });

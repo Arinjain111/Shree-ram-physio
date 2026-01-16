@@ -31,7 +31,7 @@ export interface DatabaseInvoice {
     age: number;
     gender: string;
     phone?: string;
-    uhid: string;
+    uhid?: string | null;
     syncStatus?: string;
     cloudId?: number;
   };
