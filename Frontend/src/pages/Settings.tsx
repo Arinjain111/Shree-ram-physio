@@ -264,7 +264,7 @@ const Settings = () => {
             </div>
             <div className="flex justify-between py-2 border-b border-slate-100">
               <span className="text-slate-600">Version</span>
-              <span className="font-medium text-slate-800">1.1.2</span>
+              <span className="font-medium text-slate-800">1.1.3</span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-slate-600">Developer</span>
