@@ -1,5 +1,6 @@
 import type { DatabaseInvoice } from '@/types/database.types';
 import TreatmentCalendar from './TreatmentCalendar';
+import { useNavigate } from 'react-router-dom';
 
 // Utils
 const getSyncStatusBadge = (status?: string) => {
@@ -29,6 +30,9 @@ interface InvoiceHistoryCardProps {
 }
 
 export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: InvoiceHistoryCardProps) => {
+  const navigate = useNavigate();
+  const canEdit = invoice.syncStatus !== 'SYNCED';
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
       {/* Invoice Header */}
@@ -47,6 +51,33 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
         
         <div className="flex items-center gap-3">
           {getSyncStatusBadge(invoice.syncStatus)}
+
+          {canEdit ? (
+            <button
+              onClick={() => navigate('/invoice-generator', { state: { mode: 'edit', invoiceId: invoice.id } })}
+              disabled={!invoice.id}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-amber-300 hover:text-amber-700 text-slate-600 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              title={!invoice.id ? 'Missing invoice id' : 'Edit this invoice (not synced yet)'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.586-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.414-8.414z" />
+              </svg>
+              Edit
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/invoice-generator', { state: { mode: 'duplicate', invoiceId: invoice.id } })}
+              disabled={!invoice.id}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-amber-300 hover:text-amber-700 text-slate-600 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              title={!invoice.id ? 'Missing invoice id' : 'Reissue: creates a new invoice based on this one'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8m-8 4h8m-8 4h5M7 21h10a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-2.414-2.414A2 2 0 0014.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              Reissue
+            </button>
+          )}
+
           <button
             onClick={() => onPrint(invoice)}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 text-slate-600 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"

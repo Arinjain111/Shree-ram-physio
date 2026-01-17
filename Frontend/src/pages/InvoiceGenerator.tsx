@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useUI } from '@/context/UIContext';
 import { useSyncManager } from '@/hooks/useSyncManager';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
@@ -21,11 +22,20 @@ import { calculateTotal } from '@/utils/calculationUtils';
 
 const { ipcRenderer } = window.require('electron');
 
+type InvoiceGeneratorMode = 'create' | 'edit' | 'duplicate';
+
+type InvoiceGeneratorNavState = {
+  mode?: InvoiceGeneratorMode;
+  invoiceId?: number;
+};
+
 const InvoiceGenerator = () => {
   const { showToast, showModal } = useUI();
   const { isSyncing, syncNow } = useSyncManager(); // Use central sync state
   const { handleError } = useErrorHandler();
   const { printInvoice } = useInvoicePrinter();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Form State
   const [patient, setPatient] = useState<PatientInfo>(samplePatient);
@@ -39,6 +49,9 @@ const InvoiceGenerator = () => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceNumberEdited, setInvoiceNumberEdited] = useState(false);
   const [isRefreshingInvoiceNumber, setIsRefreshingInvoiceNumber] = useState(false);
+
+  const [mode, setMode] = useState<InvoiceGeneratorMode>('create');
+  const [editingInvoiceId, setEditingInvoiceId] = useState<number | null>(null);
   
   // Data State
   const [existingInvoices, setExistingInvoices] = useState<InvoiceData[]>([]);
@@ -46,6 +59,9 @@ const InvoiceGenerator = () => {
 
   // Helper to fetch invoice number (Logic refactored to be cleaner)
   const fetchInvoiceNumber = async (force = false) => {
+    if (editingInvoiceId) {
+      return;
+    }
     if (!force && invoiceNumberEdited) {
       return;
     }
@@ -111,12 +127,70 @@ const InvoiceGenerator = () => {
   useEffect(() => {
     const initialize = async () => {
       try {
+        const state = (location.state || {}) as InvoiceGeneratorNavState;
+        const navMode: InvoiceGeneratorMode = state.mode || 'create';
+        setMode(navMode);
+
         // 1. Load Invoices
         const result = await ipcRenderer.invoke('load-invoices');
         const loadedInvoices = result?.invoices || [];
         setExistingInvoices(loadedInvoices);
 
-        // 2. Fetch Initial Number
+        // If opened for edit/duplicate, load the invoice
+        if (state.invoiceId) {
+          const invoiceResult = await ipcRenderer.invoke('get-invoice', state.invoiceId);
+          if (!invoiceResult?.success || !invoiceResult?.invoice) {
+            showToast('error', invoiceResult?.error || 'Failed to load invoice');
+          } else {
+            const inv = invoiceResult.invoice;
+
+            // Populate form with invoice data
+            setPatient({
+              id: inv.patient?.id,
+              cloudId: inv.patient?.cloudId,
+              firstName: inv.patient?.firstName,
+              lastName: inv.patient?.lastName,
+              age: inv.patient?.age,
+              gender: inv.patient?.gender,
+              phone: inv.patient?.phone,
+              uhid: inv.patient?.uhid || undefined
+            } as any);
+
+            setTreatments(
+              (inv.treatments || []).map((t: any) => ({
+                name: t.name,
+                duration: t.duration || '',
+                startDate: t.startDate,
+                endDate: t.endDate,
+                sessions: t.sessions,
+                amount: t.amount
+              }))
+            );
+
+            setDiagnosis(inv.diagnosis || '');
+            setNotes(inv.notes || '');
+            setInvoiceDate(inv.date);
+            setPaymentMethod(inv.paymentMethod || 'Cash');
+
+            if (navMode === 'edit') {
+              if (inv.syncStatus === 'SYNCED') {
+                showToast('error', 'This invoice is already synced. Use Reissue instead.');
+                setMode('duplicate');
+                setEditingInvoiceId(null);
+              } else {
+                setEditingInvoiceId(inv.id);
+                setInvoiceNumber(inv.invoiceNumber);
+                setInvoiceNumberEdited(true);
+              }
+            } else if (navMode === 'duplicate') {
+              setEditingInvoiceId(null);
+              setInvoiceNumber('');
+              setInvoiceNumberEdited(false);
+            }
+          }
+        }
+
+        // 2. Fetch Initial Number (create/duplicate only)
         await fetchInvoiceNumber(true);
 
         // 3. Trigger Sync (Background)
@@ -136,6 +210,9 @@ const InvoiceGenerator = () => {
 
   // Refresh invoice number when patient changes (no loop: depends only on patient IDs)
   useEffect(() => {
+    if (editingInvoiceId) {
+      return;
+    }
     // If patient changes, any previous manual edit should not block fetching
     setInvoiceNumberEdited(false);
     fetchInvoiceNumber(true);
@@ -211,27 +288,34 @@ const InvoiceGenerator = () => {
     if (!validatedData) return;
 
     try {
-        const saveResult = await ipcRenderer.invoke('save-invoice', validatedData);
+        const saveResult = editingInvoiceId
+          ? await ipcRenderer.invoke('update-invoice', editingInvoiceId, validatedData)
+          : await ipcRenderer.invoke('save-invoice', validatedData);
         if (!saveResult.success) throw saveResult;
 
-        showToast('success', `Invoice ${data.invoiceNumber} saved!`);
+        showToast('success', editingInvoiceId ? `Invoice ${data.invoiceNumber} updated!` : `Invoice ${data.invoiceNumber} saved!`);
 
         // Push to cloud right away; background sync remains as fallback
         await ipcRenderer.invoke('sync-now').catch(() => {
           /* non-blocking; still proceed to print */
         });
         
-        // Update local state
-        setExistingInvoices(prev => [...prev, data]);
-        
-        // Prepare next invoice
-        await fetchInvoiceNumber(true);
+        window.dispatchEvent(new CustomEvent('invoices-updated'));
+
+        // Update local state (best-effort)
+        if (!editingInvoiceId) {
+          setExistingInvoices(prev => [...prev, data]);
+          await fetchInvoiceNumber(true);
+        }
 
         // Print
         const result = await printInvoice(data);
         if (result) {
-            // Reset form only if print initiated successfully
+          if (editingInvoiceId) {
+            navigate('/database-find');
+          } else {
             resetForm();
+          }
         }
 
     } catch (error) {
@@ -245,21 +329,31 @@ const InvoiceGenerator = () => {
       if (!validatedData) return;
 
       try {
-          const saveResult = await ipcRenderer.invoke('save-invoice', validatedData);
+          const saveResult = editingInvoiceId
+            ? await ipcRenderer.invoke('update-invoice', editingInvoiceId, validatedData)
+            : await ipcRenderer.invoke('save-invoice', validatedData);
           if (!saveResult.success) throw saveResult;
-          showToast('success', `Invoice ${data.invoiceNumber} saved!`);
+          showToast('success', editingInvoiceId ? `Invoice ${data.invoiceNumber} updated!` : `Invoice ${data.invoiceNumber} saved!`);
 
           // Push immediately to cloud; ignore failures so user can still print
           await ipcRenderer.invoke('sync-now').catch(() => {});
 
+          window.dispatchEvent(new CustomEvent('invoices-updated'));
+
           // Update State
-          setExistingInvoices(prev => [...prev, data]);
-          await fetchInvoiceNumber(true);
-          resetForm();
+          if (!editingInvoiceId) {
+            setExistingInvoices(prev => [...prev, data]);
+            await fetchInvoiceNumber(true);
+            resetForm();
+          }
 
           // Print via OS dialog (no local PDF save)
           const result = await printInvoice(data);
           if (!result) throw new Error('Print failed');
+
+          if (editingInvoiceId) {
+            navigate('/database-find');
+          }
 
       } catch (error) {
           handleError(error, 'Error saving/generating PDF');

@@ -171,6 +171,7 @@ export function registerInvoiceHandlers() {
         diagnosis: invoice.diagnosis,
         treatments: invoice.treatments.map(t => ({
           name: t.name,
+          duration: t.duration,
           sessions: t.sessions,
           startDate: t.startDate,
           endDate: t.endDate,
@@ -185,6 +186,154 @@ export function registerInvoiceHandlers() {
       return { success: true, invoices: formattedInvoices };
     } catch (error) {
       logError('Load invoices', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('get-invoice', async (_event, invoiceId: number) => {
+    try {
+      if (!prisma) {
+        throw new Error('Prisma not initialized');
+      }
+
+      const invoice = await prisma.invoice.findUnique({
+        where: { id: invoiceId },
+        include: { patient: true, treatments: true }
+      });
+
+      if (!invoice) {
+        return { success: false, error: 'Invoice not found' };
+      }
+
+      return {
+        success: true,
+        invoice: {
+          id: invoice.id,
+          patientId: invoice.patientId,
+          invoiceNumber: invoice.invoiceNumber,
+          date: invoice.date,
+          patient: {
+            id: invoice.patient.id,
+            firstName: invoice.patient.firstName,
+            lastName: invoice.patient.lastName,
+            age: invoice.patient.age,
+            gender: invoice.patient.gender,
+            phone: invoice.patient.phone,
+            uhid: invoice.patient.uhid,
+            syncStatus: invoice.patient.syncStatus,
+            cloudId: invoice.patient.cloudId
+          },
+          diagnosis: invoice.diagnosis,
+          notes: invoice.notes,
+          paymentMethod: invoice.paymentMethod,
+          total: invoice.total,
+          syncStatus: invoice.syncStatus,
+          cloudId: invoice.cloudId,
+          lastSyncAt: invoice.lastSyncAt,
+          treatments: invoice.treatments.map(t => ({
+            name: t.name,
+            duration: t.duration,
+            sessions: t.sessions,
+            startDate: t.startDate,
+            endDate: t.endDate,
+            amount: t.amount
+          }))
+        }
+      };
+    } catch (error) {
+      logError('Get invoice', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('update-invoice', async (_event, invoiceId: number, invoiceData: any) => {
+    try {
+      if (!prisma) {
+        throw new Error('Prisma not initialized');
+      }
+
+      const existing = await prisma.invoice.findUnique({
+        where: { id: invoiceId },
+        select: { id: true, patientId: true, syncStatus: true }
+      });
+
+      if (!existing) {
+        return { success: false, error: 'Invoice not found' };
+      }
+
+      // Safety: avoid mutating invoices that are already synced.
+      if (existing.syncStatus === 'SYNCED') {
+        return { success: false, error: 'This invoice is already synced. Please duplicate/reissue instead of editing.' };
+      }
+
+      const { InvoiceDataSchema, validateData } = await import('../../src/schemas/validation.schema');
+      const validation = validateData(InvoiceDataSchema, invoiceData);
+      if (!validation.success) {
+        return {
+          success: false,
+          error: `Validation failed: ${validation.errors.join(', ')}`
+        };
+      }
+
+      const validatedData = validation.data;
+      const uhid = normalizeUhid(validatedData.patient.uhid);
+      const phone = normalizePhone(validatedData.patient.phone);
+
+      const totalAmount = typeof validatedData.total === 'string'
+        ? parseFloat(validatedData.total)
+        : validatedData.total;
+
+      await prisma.$transaction(async (tx) => {
+        // Update patient info (associated with this invoice)
+        await tx.patient.update({
+          where: { id: existing.patientId },
+          data: {
+            firstName: validatedData.patient.firstName,
+            lastName: validatedData.patient.lastName,
+            age: validatedData.patient.age,
+            gender: validatedData.patient.gender,
+            phone: phone || validatedData.patient.phone,
+            ...(uhid ? { uhid } : {}),
+            syncStatus: 'PENDING'
+          }
+        });
+
+        // Update invoice
+        await tx.invoice.update({
+          where: { id: existing.id },
+          data: {
+            invoiceNumber: validatedData.invoiceNumber,
+            date: validatedData.date,
+            diagnosis: validatedData.diagnosis || '',
+            notes: validatedData.notes || '',
+            paymentMethod: validatedData.paymentMethod || 'Cash',
+            total: totalAmount,
+            syncStatus: 'PENDING',
+            lastSyncAt: null
+          }
+        });
+
+        // Replace treatments
+        await tx.treatment.deleteMany({ where: { invoiceId: existing.id } });
+        for (const treatment of validatedData.treatments) {
+          await tx.treatment.create({
+            data: {
+              invoiceId: existing.id,
+              name: treatment.name,
+              duration: treatment.duration || '',
+              sessions: treatment.sessions,
+              startDate: treatment.startDate,
+              endDate: treatment.endDate,
+              amount: treatment.amount,
+              syncStatus: 'PENDING'
+            }
+          });
+        }
+      });
+
+      return { success: true, invoiceId };
+    } catch (error) {
+      logError('Update invoice', error);
       return { success: false, error: String(error) };
     }
   });

@@ -15,6 +15,7 @@ export interface Patient {
 
 export interface Treatment {
   name: string;
+  duration?: string;
   sessions: number;
   startDate: string;
   endDate: string;
@@ -22,6 +23,8 @@ export interface Treatment {
 }
 
 export interface DatabaseInvoice {
+  id?: number;
+  patientId?: number;
   invoiceNumber: string;
   date: string;
   patient: {
