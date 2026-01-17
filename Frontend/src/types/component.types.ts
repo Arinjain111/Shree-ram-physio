@@ -58,3 +58,8 @@ export interface HeaderDetailsSectionProps {
   formData: LayoutConfig;
   onChange: (field: keyof LayoutConfig, value: any) => void;
 }
+
+export interface FooterDetailsSectionProps {
+  formData: LayoutConfig;
+  onChange: (field: keyof LayoutConfig, value: any) => void;
+}

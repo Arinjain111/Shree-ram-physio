@@ -34,7 +34,34 @@ export const generateInvoiceHTML = (
     logoMaxHeight = 100,
     headerLeftAlign = 'left',
     headerRightAlign = 'right',
+    footerBgColor = '#f3f4f6',
+    footerTextColor = '#000000',
   } = layout;
+
+  const clinicNameMaxWidth =
+    typeof layout.clinicNameMaxWidth === 'number' && Number.isFinite(layout.clinicNameMaxWidth)
+      ? Math.max(120, Math.min(800, layout.clinicNameMaxWidth))
+      : 300;
+
+  const clinicNameSingleLine = layout.clinicNameSingleLine !== false;
+
+  const logoClinicNameSpacing =
+    typeof layout.logoClinicNameSpacing === 'number' && Number.isFinite(layout.logoClinicNameSpacing)
+      ? Math.max(0, Math.min(80, layout.logoClinicNameSpacing))
+      : 20;
+
+  const titleText = (layout.title || 'PHYSIOTHERAPY RECIEPT').trim();
+  const clinicTagline = (layout.clinicTagline || '').trim();
+  const footerNoteTitle = (layout.footerNoteTitle || 'Note:').trim();
+  const footerNotesLines = (layout.footerNotes || '')
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  const signatureLabel = (layout.signatureLabel || '').trim();
+  const signatureName = (layout.signatureName || '').trim() || (layout.doctorName || '').trim();
+  const signatureQualification = (layout.signatureQualification || '').trim() || (layout.doctorQualification || '').trim();
+  const signatureImage = (layout.signatureImagePath || '').trim();
   
   // Helper function to convert yyyy-mm-dd to dd-mm-yyyy
   const formatDate = (dateStr: string): string => {
@@ -105,15 +132,18 @@ export const generateInvoiceHTML = (
           align-items: flex-start; 
           padding: 15px; 
           border: 1px solid #8764b6; 
-          gap: 40px;
+          gap: 20px;
           background: ${headerBgColor};
           color: ${headerTextColor};
+          overflow: hidden;
         }
         .header-left { 
           display: flex; 
           flex-direction: column; 
-          gap: 20px; 
+          gap: ${logoClinicNameSpacing}px;
           text-align: ${headerLeftAlign};
+          flex: 1 1 auto;
+          min-width: 0;
         }
         .header-left img { 
           width: ${logoMaxWidth}px; 
@@ -123,9 +153,19 @@ export const generateInvoiceHTML = (
         .clinic-name { 
           font-size: ${fontSizeValue}px; 
           font-weight: 700; 
-          line-height: 26px;
-          max-width: 300px;
+          line-height: 1.2;
+          max-width: ${clinicNameMaxWidth}px;
           color: #000;
+          white-space: normal;
+          overflow-wrap: break-word;
+          word-wrap: break-word;
+        }
+        .clinic-tagline {
+          font-size: ${Math.max(metaFontSize, 11)}px;
+          font-weight: 600;
+          opacity: 0.85;
+          line-height: 1.2;
+          max-width: 320px;
         }
         .header-right { 
           text-align: ${headerRightAlign}; 
@@ -137,6 +177,7 @@ export const generateInvoiceHTML = (
           flex-direction: column;
           justify-content: center;
           gap: 10px;
+          flex: 0 0 auto;
         }
 
         /* Title Bar */
@@ -354,7 +395,8 @@ export const generateInvoiceHTML = (
           display: grid; 
           grid-template-columns: 2fr 1fr; 
           padding: 1px; 
-          background-color: #f8f3ff; 
+          background-color: ${footerBgColor};
+          color: ${footerTextColor};
           border: 1px solid #8764b6;
           font-size: 15px;
           margin-top: auto;
@@ -375,7 +417,7 @@ export const generateInvoiceHTML = (
           margin-top: 10px;
         }
         .signature { 
-          background: white;
+          background: #ffffff;
           border-left: 1px solid #8764b6;
           display: flex; 
           flex-direction: column; 
@@ -431,6 +473,7 @@ export const generateInvoiceHTML = (
           <div class="header-left">
             ${layout.logoPath ? `<img src="${toFileUrl(layout.logoPath)}" alt="Clinic Logo">` : ''}
             <div class="clinic-name">${layout.clinicName}</div>
+            ${clinicTagline ? `<div class="clinic-tagline">${clinicTagline}</div>` : ''}
           </div>
           <div class="header-right">
             <p>UAN : ${layout.uan}</p>
@@ -440,7 +483,7 @@ export const generateInvoiceHTML = (
 
         <!-- Patient Details Container -->
         <div class="patient-details-container">
-          <div class="title-bar">PHYSIOTHERAPY RECIEPT</div>
+          <div class="title-bar">${titleText}</div>
           
           <div class="info-section">
             <div class="info-box">
@@ -525,15 +568,24 @@ export const generateInvoiceHTML = (
             <p><strong>Contact No :</strong> ${layout.clinicPhone}</p>
             <p><strong>Email :</strong> ${layout.clinicEmail}</p>
             <div class="footer-notes">
-              <p><strong>Note:</strong> This is a professional physiotherapy treatment receipt for medical reimbursement.</p>
-              <p><strong>No refund after treatment taken.</strong></p>
+              ${footerNotesLines.length > 0
+                ? footerNotesLines
+                    .map((line, idx) => {
+                      if (idx === 0) {
+                        return `<p><strong>${footerNoteTitle}</strong> ${line}</p>`;
+                      }
+                      return `<p>${line}</p>`;
+                    })
+                    .join('')
+                : ''}
             </div>
           </div>
           <div class="signature">
-            <img src="${toFileUrl(layout.logoPath)}" alt="Signature" style="display: none;" />
+            ${signatureImage ? `<img src="${toFileUrl(signatureImage)}" alt="Signature" />` : ''}
             <div class="signature-text">
-              <p>Dr. ${layout.doctorName}</p>
-              <p>(${layout.doctorQualification})</p>
+              ${signatureLabel ? `<p>${signatureLabel}</p>` : ''}
+              <p>${signatureName}</p>
+              ${signatureQualification ? `<p>(${signatureQualification})</p>` : ''}
             </div>
           </div>
         </div>

@@ -7,10 +7,15 @@ export type { LayoutConfig };
 
 const defaultLayout: LayoutConfig = {
   clinicName: 'Shree Ram Physiotherapy & Rehabilitation Center',
+  clinicTagline: '',
+  clinicNameMaxWidth: 520,
+  logoClinicNameSpacing: 20,
+  clinicNameSingleLine: false,
   address: 'B-8, Mahesh Nagar, 80 Feet Road, Near Punjab National Bank, Jaipur, Rajasthan, 302015',
   uan: 'RJ17D0099951',
   regNo: 'GAPT/21/G00281',
   logoPath: '',
+  signatureImagePath: '',
   clinicPhone: '9783960050, 9214556934',
   clinicEmail: 'drajay_36hot@yahoo.co.in',
   doctorName: 'Ajay Gupta (PT)',
@@ -37,6 +42,12 @@ const defaultLayout: LayoutConfig = {
   sectionBgColor: '#F8F3FF',
   footerBgColor: '#F3F4F6',
   footerTextColor: '#000000',
+
+  footerNoteTitle: 'Note:',
+  footerNotes: 'This is a professional physiotherapy treatment receipt for medical reimbursement.\nNo refund after treatment taken.',
+  signatureLabel: 'Authorized Signatory',
+  signatureName: '',
+  signatureQualification: '',
 };
 
 export const useInvoiceLayout = () => {
@@ -51,7 +62,7 @@ export const useInvoiceLayout = () => {
     try {
       const result = await ipcRenderer.invoke('load-layout');
       if (result.success && result.layout) {
-        setLayout(result.layout);
+        setLayout({ ...defaultLayout, ...result.layout });
       }
     } catch (error) {
       console.error('Error loading layout:', error);

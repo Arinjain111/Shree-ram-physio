@@ -3,6 +3,7 @@ import { useInvoiceLayout, LayoutConfig } from '@/hooks/useInvoiceLayout';
 import { useUI } from '@/context/UIContext';
 import PageHeader from '@/components/layout/PageHeader';
 import HeaderDetailsSection from '@/components/customizer/HeaderDetailsSection';
+import FooterDetailsSection from '@/components/customizer/FooterDetailsSection';
 import StylingSection from '@/components/customizer/StylingSection';
 import PreviewPanel from '@/components/customizer/PreviewPanel';
 import { SaveIcon, RotateCcwIcon, LayoutIcon } from '@/components/icons';
@@ -86,6 +87,17 @@ const InvoiceCustomizer = () => {
               </div>
               <div className="p-6">
                 <HeaderDetailsSection formData={formData} onChange={handleChange} />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-6 border-b border-slate-100">
+                <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                  Footer & Signature
+                </h2>
+              </div>
+              <div className="p-6">
+                <FooterDetailsSection formData={formData} onChange={handleChange} />
               </div>
             </div>
             

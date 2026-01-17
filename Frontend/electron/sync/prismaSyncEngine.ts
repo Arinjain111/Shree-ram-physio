@@ -513,8 +513,10 @@ export class PrismaSyncEngine {
       if (hasPendingData) {
         console.log('⚠️ Skipping cleanup: Still have pending local changes that need to be synced');
         console.log(`   Pending: ${remainingPending[0]} patients, ${remainingPending[1]} invoices, ${remainingPending[2]} treatments`);
-      } else {
-        // Safe to cleanup - all local changes have been synced
+      } else if (!lastSyncTime) {
+        // Safe to cleanup ONLY on full sync.
+        // Incremental sync returns only *recently updated* cloud records, not a full snapshot.
+        // If we cleanup during incremental sync, we'd incorrectly delete valid local records.
         const cloudPatientIds = (updates.patients || []).map((p: any) => p.id);
         const cloudInvoiceIds = (updates.invoices || []).map((i: any) => i.id);
         const cloudTreatmentIds = (updates.treatments || []).map((t: any) => t.id);
@@ -556,6 +558,8 @@ export class PrismaSyncEngine {
             console.log(`   🗑️ Removed ${deletedTreatments.count} treatments that no longer exist in cloud`);
           }
         }
+      } else {
+        console.log('ℹ️ Skipping cleanup: incremental sync does not include full cloud snapshot');
       }
 
       // === SYNC TREATMENT PRESETS ===

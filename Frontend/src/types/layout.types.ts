@@ -2,10 +2,15 @@
 
 export interface LayoutConfig {
   clinicName: string;
+  clinicTagline?: string;
+  clinicNameMaxWidth?: number;
+  logoClinicNameSpacing?: number;
+  clinicNameSingleLine?: boolean;
   address: string;
   uan: string;
   regNo: string;
   logoPath: string;
+  signatureImagePath?: string;
   clinicPhone: string;
   clinicEmail: string;
   doctorName: string;
@@ -34,4 +39,11 @@ export interface LayoutConfig {
   sectionBgColor?: string;
   footerTextColor?: string;
   footerBgColor?: string;
+
+  // Footer customization
+  footerNoteTitle?: string;
+  footerNotes?: string; // newline-separated
+  signatureLabel?: string;
+  signatureName?: string;
+  signatureQualification?: string;
 }

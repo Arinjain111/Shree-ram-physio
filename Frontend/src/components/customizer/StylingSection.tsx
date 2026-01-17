@@ -122,6 +122,16 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
               value={formData.headerTextColor}
               onChange={(v) => onChange('headerTextColor', v)}
             />
+            <ColorCircle
+              label="Footer BG"
+              value={formData.footerBgColor}
+              onChange={(v) => onChange('footerBgColor', v)}
+            />
+            <ColorCircle
+              label="Footer Text"
+              value={formData.footerTextColor}
+              onChange={(v) => onChange('footerTextColor', v)}
+            />
           </div>
         </div>
 
@@ -152,6 +162,60 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
                 placeholder="e.g., 12"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Clinic Name Max Width (px)</label>
+              <input
+                type="number"
+                min="120"
+                max="800"
+                value={formData.clinicNameMaxWidth ?? 300}
+                onChange={(e) => onChange('clinicNameMaxWidth', parseInt(e.target.value) || 300)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                placeholder="e.g., 300"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Logo ↔ Clinic Name Spacing (px)</label>
+              <input
+                type="number"
+                min="0"
+                max="80"
+                value={formData.logoClinicNameSpacing ?? 20}
+                onChange={(e) => onChange('logoClinicNameSpacing', parseInt(e.target.value) || 0)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                placeholder="e.g., 20"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-3">Clinic Name Line Break</label>
+              <div className="flex gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => onChange('clinicNameSingleLine', false)}
+                  className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                    (formData.clinicNameSingleLine !== true)
+                      ? 'bg-teal-600 text-white shadow-md ring-2 ring-teal-600 ring-offset-2'
+                      : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 hover:border-slate-400'
+                  }`}
+                >
+                  Auto Wrap (Default)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChange('clinicNameSingleLine', true)}
+                  className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                    (formData.clinicNameSingleLine === true)
+                      ? 'bg-teal-600 text-white shadow-md ring-2 ring-teal-600 ring-offset-2'
+                      : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 hover:border-slate-400'
+                  }`}
+                >
+                  Force Single Line (…)
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                Auto wrap keeps it on one line if it fits, otherwise wraps without cutting off. Force single line truncates with “…” if needed.
+              </p>
             </div>
           </div>
 
