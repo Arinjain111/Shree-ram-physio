@@ -1,5 +1,5 @@
 import type { DatabaseInvoice } from '@/types/database.types';
-import TreatmentCalendar from './TreatmentCalendar';
+import TreatmentCalendar, { COLORS } from './TreatmentCalendar';
 import { useNavigate } from 'react-router-dom';
 
 // Utils
@@ -107,16 +107,23 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
             </div>
           )}
 
-          <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Payment Details</h4>
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-slate-500">Method</span>
-              <span className="text-sm font-medium text-slate-700">{invoice.paymentMethod || 'Cash'}</span>
-            </div>
-            <div className="flex justify-between items-center pt-2 border-t border-slate-200">
-              <span className="text-sm font-bold text-slate-700">Total Paid</span>
-              <span className="text-lg font-bold text-emerald-600">₹{invoice.total}</span>
-            </div>
+          <div className="flex flex-col gap-3">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Treatments</h4>
+            {invoice.treatments.map((t, idx) => {
+              const color = COLORS[idx % COLORS.length];
+              return (
+                <div key={idx} className={`flex flex-col gap-1 px-4 py-3 rounded-xl border ${color.bg} ${color.border}`}>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${color.dot}`} />
+                    <span className={`text-sm font-bold ${color.text}`}>{t.name}</span>
+                    <span className={`text-xs ${color.text} opacity-75`}>({t.sessions} sessions)</span>
+                  </div>
+                  <div className={`text-xs ${color.text} pl-4 opacity-90`}>
+                    {new Date(t.startDate).toLocaleDateString()} - {new Date(t.endDate).toLocaleDateString()}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

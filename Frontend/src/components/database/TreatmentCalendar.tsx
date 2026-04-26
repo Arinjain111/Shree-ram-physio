@@ -2,7 +2,7 @@ import type { DatabaseInvoice } from '@/types/database.types';
 
 type Invoice = DatabaseInvoice;
 
-const COLORS = [
+export const COLORS = [
   { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-500' },
   { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-500' },
   { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
@@ -93,24 +93,6 @@ const TreatmentCalendar = ({ treatments }: { treatments: Invoice['treatments'] }
         ))}
       </div>
       
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3">
-        {treatments.map((t, idx) => {
-          const color = COLORS[idx % COLORS.length];
-          return (
-            <div key={idx} className={`flex flex-col gap-1 px-4 py-2 rounded-xl border ${color.bg} ${color.border}`}>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${color.dot}`} />
-                <span className={`text-sm font-bold ${color.text}`}>{t.name}</span>
-                <span className={`text-xs ${color.text} opacity-75`}>({t.sessions} sessions)</span>
-              </div>
-              <div className={`text-xs ${color.text} pl-4 opacity-90`}>
-                {new Date(t.startDate).toLocaleDateString()} - {new Date(t.endDate).toLocaleDateString()}
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 };

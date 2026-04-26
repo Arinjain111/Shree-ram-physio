@@ -5,6 +5,7 @@ import DatabaseFind from './pages/DatabaseFind';
 import InvoiceCustomizer from './pages/InvoiceCustomizer';
 import TreatmentSettings from './pages/TreatmentSettings';
 import Settings from './pages/Settings';
+import Finances from './pages/Finances';
 import UpdateBanner from './components/layout/UpdateBanner';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
           <Route path="/database-find" element={<DatabaseFind />} />
           <Route path="/treatment-settings" element={<TreatmentSettings />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/finances" element={<Finances />} />
         </Routes>
       </div>
     </div>

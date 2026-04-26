@@ -22,8 +22,10 @@ export const PatientDetailModal = ({ invoices, onClose, onPrintInvoice }: Patien
   const latest = invoices[0];
   const patient = latest.patient;
   
-  // Calculate total paid across all invoices
+  // Calculate total paid and payment modes across all invoices
   const totalPaid = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+  const paymentModes = Array.from(new Set(invoices.map(inv => inv.paymentMethod || 'Cash')));
+  const paymentModeText = paymentModes.length > 0 ? paymentModes.join(' / ') : 'Cash';
 
   const handleDelete = (target: 'local' | 'cloud' | 'both') => {
       showModal({
@@ -109,6 +111,10 @@ export const PatientDetailModal = ({ invoices, onClose, onPrintInvoice }: Patien
                 )}
 
                 <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+
+                <div className="text-sm font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                  {paymentModeText}
+                </div>
 
                 <div className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
                   Total Paid: ₹{totalPaid}

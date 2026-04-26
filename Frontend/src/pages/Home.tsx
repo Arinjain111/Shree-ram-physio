@@ -39,6 +39,13 @@ const Home = () => {
       description: 'Configure app settings and invoice save location',
       path: '/settings',
       color: 'from-slate-500 to-slate-600'
+    },
+    {
+      title: 'Finances & Analytics',
+      icon: '📈',
+      description: 'Track revenue, view trends, and analyze clinic performance',
+      path: '/finances',
+      color: 'from-indigo-500 to-indigo-600'
     }
   ];
 
