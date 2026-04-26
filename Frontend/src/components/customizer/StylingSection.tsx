@@ -25,10 +25,81 @@ const ColorCircle = ({ label, value, onChange }: ColorCircleProps) => {
 };
 
 const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
+  const currentPaper = formData.paperSize || 'A4';
+  const currentOrientation = formData.paperOrientation || 'portrait';
+
+  // Paper option thumbnails — proportional aspect ratios
+  const paperOptions: { size: 'A4' | 'A5'; orientation: 'portrait' | 'landscape'; label: string; w: number; h: number; desc: string }[] = [
+    { size: 'A4', orientation: 'portrait',  label: 'A4 Portrait',  w: 48, h: 68, desc: '210 × 297 mm' },
+    { size: 'A5', orientation: 'portrait',  label: 'A5 Portrait',  w: 40, h: 56, desc: '148 × 210 mm' },
+  ];
+
   return (
     <section className="">
-      {/* <h3 className="text-xl font-semibold text-slate-800 mb-2">Layout & Styling</h3> */}
+      {/* Paper Size & Orientation */}
       <div className="space-y-8">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Paper Size & Orientation</label>
+          <p className="text-xs text-slate-500 mb-4">Choose the paper format for printed invoices and PDF exports.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {paperOptions.map((opt) => {
+              const isActive = currentPaper === opt.size && currentOrientation === opt.orientation;
+              return (
+                <button
+                  key={`${opt.size}-${opt.orientation}`}
+                  type="button"
+                  onClick={() => {
+                    onChange('paperSize', opt.size);
+                    onChange('paperOrientation', opt.orientation);
+                  }}
+                  className={`group relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
+                    isActive
+                      ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-500 ring-offset-2 shadow-md'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm'
+                  }`}
+                >
+                  {/* Paper thumbnail */}
+                  <div
+                    className={`rounded-sm border-2 transition-colors ${
+                      isActive 
+                        ? 'border-teal-400 bg-white' 
+                        : 'border-slate-300 bg-slate-50 group-hover:border-slate-400'
+                    }`}
+                    style={{ width: opt.w, height: opt.h }}
+                  >
+                    {/* Mini content lines inside the paper */}
+                    <div className="flex flex-col items-center justify-center h-full gap-1 p-1.5">
+                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-teal-300' : 'bg-slate-300'}`} style={{ width: '70%' }} />
+                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-teal-200' : 'bg-slate-200'}`} style={{ width: '50%' }} />
+                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-teal-200' : 'bg-slate-200'}`} style={{ width: '60%' }} />
+                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-teal-200' : 'bg-slate-200'}`} style={{ width: '40%' }} />
+                    </div>
+                  </div>
+                  {/* Label */}
+                  <div className="text-center">
+                    <span className={`block text-xs font-semibold ${isActive ? 'text-teal-700' : 'text-slate-700'}`}>
+                      {opt.label}
+                    </span>
+                    <span className={`block text-[10px] ${isActive ? 'text-teal-500' : 'text-slate-400'}`}>
+                      {opt.desc}
+                    </span>
+                  </div>
+                  {/* Active checkmark */}
+                  {isActive && (
+                    <div className="absolute top-2 right-2 w-5 h-5 bg-teal-500 rounded-full flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="border-t border-slate-100 pt-6">
+          <h4 className="text-sm font-semibold text-slate-800 mb-4 uppercase tracking-wider">Alignment</h4>
         {/* Header Alignment Controls */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-3">Left Section Alignment (Logo & Clinic Name)</label>
@@ -96,6 +167,8 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
               Inline (Side by Side)
             </button>
           </div>
+        </div>
+
         </div>
 
         <div className="border-t border-slate-100 pt-6">

@@ -48,6 +48,10 @@ const defaultLayout: LayoutConfig = {
   signatureLabel: 'Authorized Signatory',
   signatureName: '',
   signatureQualification: '',
+
+  // Paper size defaults
+  paperSize: 'A4',
+  paperOrientation: 'portrait',
 };
 
 export const useInvoiceLayout = () => {

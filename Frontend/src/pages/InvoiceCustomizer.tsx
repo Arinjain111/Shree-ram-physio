@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useInvoiceLayout, LayoutConfig } from '@/hooks/useInvoiceLayout';
 import { useUI } from '@/context/UIContext';
 import PageHeader from '@/components/layout/PageHeader';
@@ -10,12 +10,19 @@ import { SaveIcon, RotateCcwIcon, LayoutIcon } from '@/components/icons';
 
 const InvoiceCustomizer = () => {
   const { showToast, showModal } = useUI();
-  const { layout: savedLayout, saveLayout, resetLayout } = useInvoiceLayout();
+  const { layout: savedLayout, loading: layoutLoading, saveLayout, resetLayout } = useInvoiceLayout();
   
   const [formData, setFormData] = useState<LayoutConfig>(savedLayout);
 
+  // Sync local form state when the async layout finishes loading
+  useEffect(() => {
+    if (!layoutLoading) {
+      setFormData(savedLayout);
+    }
+  }, [savedLayout, layoutLoading]);
+
   const handleChange = (field: keyof LayoutConfig, value: any) => {
-    setFormData({ ...formData, [field]: value });
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
@@ -42,7 +49,7 @@ const InvoiceCustomizer = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-8">
-      <div className="max-w-400 mx-auto">
+      <div className="max-w-[1800px] mx-auto">
         {/* Header Section */}
         <PageHeader 
           title="Invoice Customizer"

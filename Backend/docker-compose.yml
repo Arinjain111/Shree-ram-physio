@@ -1,10 +1,10 @@
-name: Shree-Ram-Physio
+name: shree-ram-physio
 
 services:
-  # PostgreSQL for local development
+  # ── Local PostgreSQL (mirrors Supabase schema) ──────────────────────────────
   postgres:
     image: postgres:15-alpine
-    container_name: postgres
+    container_name: srp_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -21,29 +21,36 @@ services:
     networks:
       - backend-network
 
-  # Backend API
+  # ── Backend API ──────────────────────────────────────────────────────────────
   backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: backend
+    container_name: srp_backend
     ports:
       - "3000:3000"
+    # Load env vars from .env.docker (local Postgres, no Accelerate)
+    env_file:
+      - .env.docker
+    # Override specific vars to ensure container-internal hostname is used
     environment:
-      # Connect to the local postgres service
       DATABASE_URL: "postgresql://postgres:password@postgres:5432/shri_ram_physio_dev"
       DIRECT_URL: "postgresql://postgres:password@postgres:5432/shri_ram_physio_dev"
       PORT: 3000
       NODE_ENV: development
-      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:3000"
+      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:3000,http://localhost:8080"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - backend-network
     restart: unless-stopped
-    # Use prisma db push to sync schema on startup for dev
-    command: sh -c "npx prisma db push && npm start"
+    # On startup: push schema to local Postgres, then start the server.
+    # Prisma CLI reads prisma.config.ts via its bundled TS executor (jiti) —
+    # no ts-node required. The `prisma` package is in dependencies so it's
+    # available after `npm ci --omit=dev`.
+    command: >
+      sh -c "npx prisma db push && node dist/server.js"
 
 volumes:
   postgres_data:

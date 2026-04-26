@@ -13,7 +13,20 @@ import {
   samplePaymentMode
 } from '@/data/sampleInvoiceData';
 
+const PAPER_DIMS: Record<string, Record<string, [number, number]>> = {
+  A4: { portrait: [794, 1123], landscape: [1123, 794] },
+  A5: { portrait: [559, 794],  landscape: [794, 559] },
+};
+
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ formData }) => {
+  const paperSize = formData.paperSize || 'A4';
+  const paperOrientation = formData.paperOrientation || 'portrait';
+  const dims = PAPER_DIMS[paperSize]?.[paperOrientation] ?? PAPER_DIMS.A4.portrait;
+  const pageW = dims[0];
+
+  // Larger zoom for smaller paper so it stays readable
+  const zoom = paperSize === 'A5' ? 0.55 : 0.65;
+
   const previewHTML = useMemo(() => {
     const sampleInvoiceData: InvoiceData = {
       invoiceNumber: sampleInvoiceNumber,
@@ -42,10 +55,16 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ formData }) => {
             Live Preview
           </h3>
           <span className='text-xs text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200'>Auto-updates</span>
+          <span className='text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200 font-medium'>
+            {paperSize} {paperOrientation}
+          </span>
         </div>
       </div>
       <div className="bg-slate-500/10 rounded-xl overflow-hidden flex justify-center p-8 border border-slate-200/50 shadow-inner">
-        <div className="shadow-2xl rounded-sm bg-white transition-all duration-300 ease-in-out" style={{ zoom: '0.65', minWidth: '800px', transformOrigin: 'top center' }}>
+        <div 
+          className="shadow-2xl rounded-sm bg-white transition-all duration-300 ease-in-out" 
+          style={{ zoom, minWidth: `${pageW}px`, transformOrigin: 'top center' }}
+        >
           <div dangerouslySetInnerHTML={{ __html: previewHTML }} />
         </div>
       </div>
@@ -54,3 +73,4 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ formData }) => {
 };
 
 export default PreviewPanel;
+

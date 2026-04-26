@@ -1,6 +1,7 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { logError } from '../utils/errorLogger';
 import { getSettings } from './settings';
 
@@ -86,7 +87,7 @@ export function registerPrintHandlers() {
         }
     });
 
-    ipcMain.handle('print-invoice-save-and-preview', async (_event, htmlContent: string, invoiceData: any) => {
+    ipcMain.handle('print-invoice-save-and-preview', async (_event, htmlContent: string, invoiceData: any, paperConfig?: { paperSize?: string; paperOrientation?: string }) => {
         try {
             const printWindow = new BrowserWindow({
                 show: false,
@@ -101,12 +102,29 @@ export function registerPrintHandlers() {
             await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
             await new Promise(resolve => setTimeout(resolve, 500));
 
+            // Calculate page size in microns for the OS print dialog
+            // A4 = 210mm x 297mm, A5 = 148mm x 210mm
+            const PAPER_MICRONS: Record<string, { portrait: { width: number; height: number }; landscape: { width: number; height: number } }> = {
+                A4: {
+                    portrait:  { width: 210000, height: 297000 },
+                    landscape: { width: 297000, height: 210000 },
+                },
+                A5: {
+                    portrait:  { width: 148000, height: 210000 },
+                    landscape: { width: 210000, height: 148000 },
+                },
+            };
+            const size = paperConfig?.paperSize || 'A4';
+            const orient = paperConfig?.paperOrientation || 'portrait';
+            const pageSize = PAPER_MICRONS[size]?.[orient as 'portrait' | 'landscape'] ?? PAPER_MICRONS.A4.portrait;
+
             // 1) Always show OS print dialog
             await new Promise<void>((resolve, reject) => {
                 printWindow.webContents.print({
                     silent: false,
                     printBackground: true,
                     color: true,
+                    pageSize,
                     margins: {
                         marginType: 'printableArea'
                     }
@@ -149,6 +167,48 @@ export function registerPrintHandlers() {
         } catch (error: any) {
             logError('Print and save invoice', error);
             return { success: false, saved: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('preview-only', async (_event, htmlContent: string, paperConfig?: { paperSize?: string; paperOrientation?: string }) => {
+        try {
+            const printWindow = new BrowserWindow({
+                show: false,
+                width: 1200,
+                height: 800,
+                webPreferences: {
+                    nodeIntegration: true,
+                    contextIsolation: false
+                }
+            });
+
+            await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Set page size for PDF generation
+            const isA5 = paperConfig?.paperSize === 'A5';
+            const isLandscape = paperConfig?.paperOrientation === 'landscape';
+            const pageSize = isA5 ? 'A5' : 'A4';
+
+            const pdfBuffer = await printWindow.webContents.printToPDF({
+                printBackground: true,
+                preferCSSPageSize: true,
+                pageSize: pageSize,
+                landscape: isLandscape,
+            });
+
+            const tempFilePath = path.join(os.tmpdir(), `Invoice_Preview_${Date.now()}.pdf`);
+            fs.writeFileSync(tempFilePath, pdfBuffer);
+            
+            printWindow.close();
+            
+            // Open PDF with default system viewer
+            await shell.openPath(tempFilePath);
+            
+            return { success: true };
+        } catch (error: any) {
+            logError('Preview only', error);
+            return { success: false, error: error.message };
         }
     });
 }

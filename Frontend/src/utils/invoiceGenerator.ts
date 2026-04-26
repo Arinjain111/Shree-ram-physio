@@ -21,6 +21,26 @@ export const generateInvoiceHTML = (
   invoiceData: InvoiceData,
   layout: LayoutConfig,
 ): string => {
+  // ─── Paper size configuration ──────────────────────────────────────────
+  const paperSize = layout.paperSize || 'A4';
+  const paperOrientation = layout.paperOrientation || 'portrait';
+
+  // Dimensions in px at 96dpi
+  const PAPER_DIMS: Record<string, { portrait: [number, number]; landscape: [number, number] }> = {
+    A4: { portrait: [794, 1123], landscape: [1123, 794] },
+    A5: { portrait: [559, 794],  landscape: [794, 559] },
+  };
+  const dims = PAPER_DIMS[paperSize]?.[paperOrientation] ?? PAPER_DIMS.A4.portrait;
+  const pageW = dims[0];
+  const pageH = dims[1];
+
+  // CSS @page size string
+  const pageSizeCSS = `${paperSize} ${paperOrientation}`;
+
+  // Scale factor relative to A4 portrait (the original design baseline)
+  const scale = Math.min(pageW / 794, pageH / 1123);
+  const isCompact = scale < 0.95; // A5 or small formats
+
   // Extract dynamic styling values with fallbacks
   const {
     headerBgColor = '#ffffff',
@@ -29,26 +49,25 @@ export const generateInvoiceHTML = (
     titleTextColor = '#ffffff',
     sectionBgColor = '#f8f3ff',
     fontSizeValue = 20,
-    metaFontSize = 12,
+    metaFontSize = 10,
     logoMaxWidth = 150,
     logoMaxHeight = 100,
-    headerLeftAlign = 'left',
     headerRightAlign = 'right',
     footerBgColor = '#f3f4f6',
     footerTextColor = '#000000',
   } = layout;
 
-  const clinicNameMaxWidth =
-    typeof layout.clinicNameMaxWidth === 'number' && Number.isFinite(layout.clinicNameMaxWidth)
-      ? Math.max(120, Math.min(800, layout.clinicNameMaxWidth))
-      : 300;
-
-  const clinicNameSingleLine = layout.clinicNameSingleLine !== false;
-
-  const logoClinicNameSpacing =
-    typeof layout.logoClinicNameSpacing === 'number' && Number.isFinite(layout.logoClinicNameSpacing)
-      ? Math.max(0, Math.min(80, layout.logoClinicNameSpacing))
-      : 20;
+  // Scaled values for compact paper sizes to fit 5-6+ treatments per page
+  const s = (v: number) => Math.round(v * scale);
+  const tableFontSize = isCompact ? 9 : 12; // reduced to fit more rows
+  const cellPad = isCompact ? 4 : 6; // tighter cells
+  const headerPad = isCompact ? 8 : 12;
+  const infoPad = isCompact ? 8 : 10;
+  const gapSize = isCompact ? 6 : 10;
+  const summaryBoxHeight = isCompact ? 35 : 45;
+  const footerPad = isCompact ? 8 : 12;
+  const titleHeight = isCompact ? 24 : 30;
+  const titleFontSize = isCompact ? 14 : 16;
 
   const titleText = (layout.title || 'PHYSIOTHERAPY RECIEPT').trim();
   const clinicTagline = (layout.clinicTagline || '').trim();
@@ -57,18 +76,17 @@ export const generateInvoiceHTML = (
     .split(/\r?\n/)
     .map(l => l.trim())
     .filter(Boolean);
-
-  const signatureLabel = (layout.signatureLabel || '').trim();
+    
   const signatureName = (layout.signatureName || '').trim() || (layout.doctorName || '').trim();
   const signatureQualification = (layout.signatureQualification || '').trim() || (layout.doctorQualification || '').trim();
   const signatureImage = (layout.signatureImagePath || '').trim();
   
-  // Helper function to convert yyyy-mm-dd to dd-mm-yyyy
+  // Helper function to convert yyyy-mm-dd to dd-mm
   const formatDate = (dateStr: string): string => {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
     if (parts.length === 3) {
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      return `${parts[2]}-${parts[1]}`;
     }
     return dateStr;
   };
@@ -113,82 +131,105 @@ export const generateInvoiceHTML = (
         body { font-family: 'Inter', Arial, sans-serif; margin: 0; color: #000; }
         * { box-sizing: border-box; }
         .invoice-container { 
-          max-width: 800px; 
-          min-height: 1123px; 
+          max-width: ${pageW}px; 
+          min-height: ${pageH}px; 
           margin: 0 auto; 
-          padding: 15px; 
+          padding: ${headerPad}px; 
           background: white; 
-          display: flex;
-          flex-direction: column;
-          gap: 15px;
+          box-sizing: border-box;
+        }
+        .layout-table {
+          width: 100%;
+          border-collapse: collapse;
+          height: calc(${pageH}px - ${headerPad * 2}px);
+        }
+        .layout-table > thead > tr > td,
+        .layout-table > tbody > tr > td,
+        .layout-table > tfoot > tr > td {
+          padding: 0;
+          border: none;
+        }
+        .layout-table > tbody > tr > td {
+          height: 100%;
+          vertical-align: top;
+        }
+        .layout-table > tfoot > tr > td {
+          vertical-align: bottom;
+        }
+        .content-wrapper {
+          display: block;
+          padding-top: ${gapSize}px;
+          padding-bottom: ${gapSize}px;
+        }
+        .content-wrapper > * {
+          margin-bottom: ${isCompact ? 6 : 10}px;
+        }
+        .content-wrapper > *:last-child {
+          margin-bottom: 0;
         }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
         
         /* Header */
         .header { 
-          display: flex; 
-          justify-content: space-between; 
-          align-items: flex-start; 
-          padding: 15px; 
+          padding: ${headerPad}px; 
           border: 1px solid #8764b6; 
-          gap: 20px;
           background: ${headerBgColor};
           color: ${headerTextColor};
-          overflow: hidden;
         }
-        .header-left { 
-          display: flex; 
-          flex-direction: column; 
-          gap: ${logoClinicNameSpacing}px;
-          text-align: ${headerLeftAlign};
-          flex: 1 1 auto;
-          min-width: 0;
+        .header-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: ${isCompact ? 12 : 20}px;
         }
-        .header-left img { 
-          width: ${logoMaxWidth}px; 
-          height: ${logoMaxHeight}px; 
+        .header-top img { 
+          width: ${s(logoMaxWidth)}px; 
+          height: ${s(logoMaxHeight)}px; 
           object-fit: contain;
-        }
-        .clinic-name { 
-          font-size: ${fontSizeValue}px; 
-          font-weight: 700; 
-          line-height: 1.2;
-          max-width: ${clinicNameMaxWidth}px;
-          color: #000;
-          white-space: normal;
-          overflow-wrap: break-word;
-          word-wrap: break-word;
-        }
-        .clinic-tagline {
-          font-size: ${Math.max(metaFontSize, 11)}px;
-          font-weight: 600;
-          opacity: 0.85;
-          line-height: 1.2;
-          max-width: 320px;
         }
         .header-right { 
           text-align: ${headerRightAlign}; 
-          font-size: ${metaFontSize}px; 
-          font-weight: 700; 
-          line-height: 26px;
+          font-size: ${isCompact ? 9 : 11}px; 
+          font-weight: 600; 
+          line-height: ${isCompact ? 12 : 18}px;
           white-space: nowrap;
           display: flex;
           flex-direction: column;
           justify-content: center;
-          gap: 10px;
+          gap: ${isCompact ? 2 : 6}px;
           flex: 0 0 auto;
+        }
+        .header-right p {
+          margin: 0;
+        }
+        .header-bottom {
+          margin-top: ${isCompact ? 4 : 8}px;
+        }
+        .clinic-name { 
+          font-size: ${s(fontSizeValue)}px; 
+          font-weight: 700; 
+          line-height: 1.2;
+          color: #000;
+          white-space: nowrap;
+        }
+        .clinic-tagline {
+          font-size: ${Math.max(s(metaFontSize), 9)}px;
+          font-weight: 600;
+          opacity: 0.85;
+          line-height: 1.2;
+          margin-top: ${isCompact ? 2 : 4}px;
         }
 
         /* Title Bar */
         .title-bar { 
           background-color: ${titleBgColor}; 
           color: ${titleTextColor}; 
-          padding: 10px; 
+          padding: ${isCompact ? 6 : 10}px; 
           text-align: center; 
-          font-size: 22px; 
+          font-size: ${titleFontSize}px; 
           font-weight: 600; 
-          height: 40px;
+          height: ${titleHeight}px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -203,26 +244,26 @@ export const generateInvoiceHTML = (
           padding: 0;
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 8px;
         }
 
         /* Info Sections */
         .info-section { 
           display: grid; 
           grid-template-columns: 1fr 1fr; 
-          gap: 15px; 
-          padding: 0 15px 30px 15px;
+          gap: ${isCompact ? 8 : 12}px; 
+          padding: 0 ${infoPad}px ${isCompact ? 10 : 15}px ${infoPad}px;
         }
         .info-box { 
           background-color: white; 
-          border: 2px solid #8764b6; 
-          border-radius: 10px; 
-          padding: 15px; 
-          font-size: 15px; 
+          border: ${isCompact ? 1 : 2}px solid #8764b6; 
+          border-radius: ${isCompact ? 6 : 8}px; 
+          padding: ${isCompact ? 6 : 10}px; 
+          font-size: ${isCompact ? 11 : 13}px; 
           line-height: 1;
         }
         .info-box p { 
-          margin: 0 0 10px 0; 
+          margin: 0 0 6px 0; 
           line-height: normal;
           display: flex;
         }
@@ -231,7 +272,7 @@ export const generateInvoiceHTML = (
         }
         .info-box strong { 
           font-weight: 700; 
-          min-width: 150px;
+          min-width: ${isCompact ? 100 : 150}px;
           display: inline-block;
         }
         .info-box span { 
@@ -242,31 +283,30 @@ export const generateInvoiceHTML = (
         /* Summary Boxes */
         .summary-section { 
           display: flex; 
-          gap: 16px; 
-          padding: 0 15px 0 15px;
-          height: 15px;
+          gap: ${isCompact ? 6 : 12}px; 
+          padding: ${isCompact ? 6 : 10}px ${infoPad}px;
           align-items: center;
         }
         .summary-box { 
           background: white;
-          border: 2px solid #8764b6; 
-          padding: 10px; 
+          border: ${isCompact ? 1 : 2}px solid #8764b6; 
+          padding: ${isCompact ? 6 : 10}px; 
           text-align: center; 
           flex: 1; 
-          border-radius: 10px; 
+          border-radius: ${isCompact ? 6 : 10}px; 
           display: flex;
           flex-direction: column;
-          gap: 5px;
+          gap: ${isCompact ? 2 : 5}px;
           justify-content: center;
-          min-height: 70px;
+          min-height: ${summaryBoxHeight}px;
         }
         .summary-box .label { 
           font-weight: 700; 
-          font-size: 14px;
+          font-size: ${isCompact ? 11 : 14}px;
           line-height: normal;
         }
         .summary-box .value { 
-          font-size: 12px; 
+          font-size: ${isCompact ? 10 : 12}px; 
           font-weight: 400;
           line-height: normal;
         }
@@ -274,13 +314,13 @@ export const generateInvoiceHTML = (
         /* Diagnosis */
         .diagnosis { 
           display: flex; 
-          gap: 10px; 
+          gap: ${isCompact ? 2 : 10}px; 
           align-items: flex-end; 
-          padding-bottom: 10px;
-          padding-top: 30px;
+          padding-bottom: ${isCompact ? 4 : 8}px;
+          padding-top: ${isCompact ? 8 : 12}px;
+          font-size: ${isCompact ? 11 : 14}px; 
         }
         .diagnosis strong { 
-          font-size: 14px; 
           font-weight: 700;
           white-space: nowrap;
         }
@@ -292,42 +332,44 @@ export const generateInvoiceHTML = (
 
         /* Treatment Provided */
         .treatment-provided { 
-          font-size: 14px; 
+          padding-bottom: ${isCompact ? 4 : 8}px;
+          font-size: ${isCompact ? 11 : 14}px; 
           font-weight: 700;
           margin-bottom: 0;
         }
 
         /* Treatments Table */
-        table { 
+        .treatments-table { 
           width: 100%; 
           border-collapse: collapse; 
-          font-size: 14px;
+          font-size: ${tableFontSize}px;
           table-layout: fixed;
         }
-        thead { 
+        .treatments-table thead { 
           background-color: ${sectionBgColor}; 
           border-top: 1px solid #8764b6;
           border-bottom: 1px solid #8764b6;
-          height: 66px;
+          height: ${isCompact ? 40 : 50}px;
         }
-        th { 
+        .treatments-table th { 
           color: #000; 
           font-weight: 700;
-          padding: 10px;
+          padding: 5px;
           border-left: 1px solid #8764b6;
           line-height: normal;
         }
         
         /* Additional Information */
         .additional-information { 
+          padding-top: 10px;
           display: flex; 
           gap: 10px; 
           align-items: flex-end; 
           padding-bottom: 5px;
           padding-top: 5px;
+          font-size: ${isCompact ? 11 : 14}px; 
         }
         .additional-information strong { 
-          font-size: 14px; 
           font-weight: 700;
           white-space: nowrap;
         }
@@ -337,55 +379,55 @@ export const generateInvoiceHTML = (
           background: #000;
         }
 
-        th:nth-child(1) { width: 8%; }
-        th:nth-child(2) { width: 28%; }
-        th:nth-child(3) { width: 12%; }
-        th:nth-child(4) { width: 17%; white-space: nowrap; }
-        th:nth-child(5) { width: 17%; white-space: nowrap; }
-        th:nth-child(6) { width: 11%; }
-        th:nth-child(7) { width: 11%; }
-        th:first-child {
+        .treatments-table th:nth-child(1) { width: 8%; }
+        .treatments-table th:nth-child(2) { width: 28%; }
+        .treatments-table th:nth-child(3) { width: 12%; }
+        .treatments-table th:nth-child(4) { width: 17%; white-space: nowrap; }
+        .treatments-table th:nth-child(5) { width: 17%; white-space: nowrap; }
+        .treatments-table th:nth-child(6) { width: 11%; }
+        .treatments-table th:nth-child(7) { width: 11%; }
+        .treatments-table th:first-child {
           border-left: 1px solid #8764b6;
         }
-        th:last-child {
+        .treatments-table th:last-child {
           border-right: 1px solid #8764b6;
         }
-        thead tr:nth-child(2) th {
+        .treatments-table thead tr:nth-child(2) th {
           border-top: 1px solid #8764b6;
         }
-        tbody tr {
-          min-height: 42px;
+        .treatments-table tbody tr {
+          min-height: ${isCompact ? 24 : 32}px;
+          height: ${isCompact ? 24 : 32}px;
         }
-        td { 
-          padding: 10px; 
+        .treatments-table td { 
+          padding: ${cellPad}px; 
           border-left: 1px solid #8764b6;
           font-weight: 400;
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        td:nth-child(2) {
+        .treatments-table td:nth-child(2) {
           word-wrap: break-word;
           overflow-wrap: break-word;
         }
-        td:nth-child(4), td:nth-child(5) {
+        .treatments-table td:nth-child(4), .treatments-table td:nth-child(5) {
           white-space: normal;
           word-wrap: break-word;
-          font-size: 13px;
         }
-        td:first-child {
+        .treatments-table td:first-child {
           border-left: 1px solid #8764b6;
         }
-        td:last-child {
+        .treatments-table td:last-child {
           border-right: 1px solid #8764b6;
         }
-        .total-row { 
+        .treatments-table .total-row { 
           font-weight: 700; 
           background-color: #f8f3ff;
           border-top: 1px solid #8764b6;
           border-bottom: 1px solid #8764b6;
-          height: 42px;
+          height: ${isCompact ? 30 : 40}px;
         }
-        .total-row th {
+        .treatments-table .total-row th {
           padding: 10px;
           vertical-align: middle;
         }
@@ -398,15 +440,15 @@ export const generateInvoiceHTML = (
           background-color: ${footerBgColor};
           color: ${footerTextColor};
           border: 1px solid #8764b6;
-          font-size: 15px;
+          font-size: ${isCompact ? 10 : 14}px;
           margin-top: auto;
           line-height: normal;
         }
         .footer-left {
-          padding: 20px;
+          padding: ${footerPad}px;
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: ${isCompact ? 4 : 8}px;
         }
         .footer-left p { 
           margin: 0;
@@ -414,7 +456,7 @@ export const generateInvoiceHTML = (
         }
         .footer strong { font-weight: 700; }
         .footer-notes { 
-          margin-top: 10px;
+          margin-top: ${isCompact ? 5 : 10}px;
         }
         .signature { 
           background: #ffffff;
@@ -423,19 +465,28 @@ export const generateInvoiceHTML = (
           flex-direction: column; 
           align-items: center; 
           justify-content: flex-end;
-          padding: 15px 0;
+          padding: ${isCompact ? 10 : 15}px 0;
         }
         .signature img {
-          width: 138px;
-          height: 64px;
+          width: ${isCompact ? 90 : 138}px;
+          height: ${isCompact ? 40 : 64}px;
           object-fit: contain;
-          margin-bottom: 10px;
+          margin-bottom: ${isCompact ? 5 : 10}px;
         }
         .signature-text {
           font-weight: 700;
-          font-size: 15px;
-          line-height: 23px;
+          font-size: ${isCompact ? 10 : 15}px;
+          line-height: ${isCompact ? 16 : 23}px;
           text-align: center;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .signature-text p {
+          margin: 0;
+        }
+        .signature-space {
+          height: ${isCompact ? 30 : 50}px;
         }
 
         /* Print Styles */
@@ -447,148 +498,173 @@ export const generateInvoiceHTML = (
             print-color-adjust: exact;
           }
           @page { 
-            size: A4; 
+            size: ${pageSizeCSS}; 
             margin: 0;
           }
           .invoice-container {
-            width: 800px !important;
-            max-width: 800px !important;
+            width: ${pageW}px !important;
+            max-width: ${pageW}px !important;
+            min-height: ${pageH}px !important;
             margin: 0 auto !important;
-            padding: 15px !important;
+            padding: ${headerPad}px !important;
             background: #ffffff !important;
           }
-          .header { padding: 15px !important; }
-          .patient-details-container { padding: 0 !important; }
-          .info-section { padding: 0 15px 30px 15px !important; }
-          .summary-section { padding: 0 15px !important; }
-          .summary-box { padding: 10px !important; }
+          .layout-table { page-break-inside: auto; }
+          .treatments-table { page-break-inside: auto; }
+          .treatments-table tr { page-break-inside: avoid; page-break-after: auto; }
+          .footer { page-break-inside: avoid; }
           table { width: 100% !important; }
         }
       </style>
     </head>
     <body>
       <div class="invoice-container">
-        <!-- Header -->
-        <div class="header">
-          <div class="header-left">
-            ${layout.logoPath ? `<img src="${toFileUrl(layout.logoPath)}" alt="Clinic Logo">` : ''}
-            <div class="clinic-name">${layout.clinicName}</div>
-            ${clinicTagline ? `<div class="clinic-tagline">${clinicTagline}</div>` : ''}
-          </div>
-          <div class="header-right">
-            <p>UAN : ${layout.uan}</p>
-            <p>Reg No. : ${layout.regNo}</p>
-          </div>
-        </div>
-
-        <!-- Patient Details Container -->
-        <div class="patient-details-container">
-          <div class="title-bar">${titleText}</div>
-          
-          <div class="info-section">
-            <div class="info-box">
-              <p><strong>Patient Name</strong> : <span>${displayPatientName}</span></p>
-              <p><strong>Age </strong> : <span>${invoiceData.patient.age} Y</span></p>
-              <p><strong>Sex </strong> : <span>${invoiceData.patient.gender}</span></p>
-            </div>
-            <div class="info-box">
-              <p><strong>Contact Number</strong> : <span>${invoiceData.patient.phone}</span></p>
-              ${(invoiceData.patient.uhid || '').trim() ? `<p><strong>UHID No.</strong> : <span>${invoiceData.patient.uhid}</span></p>` : ''}
-            </div>
-          </div>
-
-          <div class="summary-section">
-            <div class="summary-box">
-              <div class="label">RECEIPT NUMBER</div>
-              <div class="value">${invoiceData.invoiceNumber}</div>
-            </div>
-            <div class="summary-box">
-              <div class="label">PAYMENT MODE</div>
-              <div class="value">${(invoiceData.paymentMethod || 'CASH').toUpperCase()}</div>
-            </div>
-            <div class="summary-box">
-              <div class="label">BILL DATE</div>
-              <div class="value">${formatDate(invoiceData.date)}</div>
-            </div>
-            <div class="summary-box">
-              <div class="label">BILL AMOUNT</div>
-              <div class="value">${invoiceData.total}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Diagnosis -->
-        <div class="diagnosis">
-          <strong>Diagnosis / Complaint:</strong>
-          <span style="margin-left: 10px; font-weight: 400;">${invoiceData.diagnosis || ''}</span>
-        </div>
-
-        <!-- Treatment Provided -->
-        <p class="treatment-provided">Treatment Provided:</p>
-
-        <!-- Treatments Table -->
-        <table>
+        <!-- Layout Table for Repeating Header/Footer on Print -->
+        <table class="layout-table">
           <thead>
             <tr>
-              <th class="text-center" rowspan="2">Sr No.</th>
-              <th rowspan="2">Type of Service</th>
-              <th class="text-center" rowspan="2">Sessions<br/>(Number)</th>
-              <th class="text-center" colspan="2">Date</th>
-              <th class="text-center" rowspan="2">Amount<br/>(per session)</th>
-              <th class="text-center" rowspan="2">Amount<br/>(Total)</th>
-            </tr>
-            <tr>
-              <th class="text-center">From</th>
-              <th class="text-center">To</th>
+              <td>
+                <!-- Header -->
+                <div class="header">
+                  <div class="header-top">
+                    ${layout.logoPath ? `<img src="${toFileUrl(layout.logoPath)}" alt="Clinic Logo">` : ''}
+                    <div class="header-right">
+                      <p>UAN : ${layout.uan}</p>
+                      <p>Reg No. : ${layout.regNo}</p>
+                    </div>
+                  </div>
+                  <div class="header-bottom">
+                    <div class="clinic-name">${layout.clinicName}</div>
+                    ${clinicTagline ? `<div class="clinic-tagline">${clinicTagline}</div>` : ''}
+                  </div>
+                </div>
+              </td>
             </tr>
           </thead>
+          
           <tbody>
-            ${treatmentsHTML}
+            <tr>
+              <td>
+                <div class="content-wrapper">
+                  <!-- Patient Details Container -->
+                  <div class="patient-details-container">
+                    <div class="title-bar">${titleText}</div>
+                    
+                    <div class="info-section">
+                      <div class="info-box">
+                        <p><strong>Patient Name</strong> : <span>${displayPatientName}</span></p>
+                        <p><strong>Age </strong> : <span>${invoiceData.patient.age} Y</span></p>
+                        <p><strong>Sex </strong> : <span>${invoiceData.patient.gender}</span></p>
+                      </div>
+                      <div class="info-box">
+                        <p><strong>Contact Number</strong> : <span>${invoiceData.patient.phone}</span></p>
+                        ${(invoiceData.patient.uhid || '').trim() ? `<p><strong>UHID No.</strong> : <span>${invoiceData.patient.uhid}</span></p>` : ''}
+                      </div>
+                    </div>
+
+                    <div class="summary-section">
+                      <div class="summary-box">
+                        <div class="label">RECEIPT NUMBER</div>
+                        <div class="value">${invoiceData.invoiceNumber}</div>
+                      </div>
+                      <div class="summary-box">
+                        <div class="label">PAYMENT MODE</div>
+                        <div class="value">${(invoiceData.paymentMethod || 'CASH').toUpperCase()}</div>
+                      </div>
+                      <div class="summary-box">
+                        <div class="label">BILL DATE</div>
+                        <div class="value">${formatDate(invoiceData.date)}</div>
+                      </div>
+                      <div class="summary-box">
+                        <div class="label">BILL AMOUNT</div>
+                        <div class="value">${invoiceData.total}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Diagnosis -->
+                  <div class="diagnosis">
+                    <strong>Diagnosis / Complaint:</strong>
+                    <span style="margin-left: 10px; font-weight: 400;">${invoiceData.diagnosis || ''}</span>
+                  </div>
+
+                  <!-- Treatment Provided -->
+                  <p class="treatment-provided">Treatment Provided:</p>
+
+                  <!-- Treatments Table -->
+                  <table class="treatments-table">
+                    <thead>
+                      <tr>
+                        <th class="text-center" rowspan="2">Sr No.</th>
+                        <th rowspan="2">Type of Service</th>
+                        <th class="text-center" rowspan="2">Sessions<br/>(Number)</th>
+                        <th class="text-center" colspan="2">Date</th>
+                        <th class="text-center" rowspan="2">Amount<br/>(per session)</th>
+                        <th class="text-center" rowspan="2">Amount<br/>(Total)</th>
+                      </tr>
+                      <tr>
+                        <th class="text-center">From</th>
+                        <th class="text-center">To</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${treatmentsHTML}
+                    </tbody>
+                    <tfoot>
+                      <tr class="total-row">
+                        <th colspan="6" class="text-right">TOTAL AMOUNT :</th>
+                        <th class="text-right">${invoiceData.total}</th>
+                      </tr>
+                    </tfoot>
+                  </table>
+
+                  <!-- Additional Notes / Prescription -->
+                  ${invoiceData.notes ? `
+                  <div class="additional-information">
+                    <strong>Additional Notes / Prescription:</strong>
+                    <span style="margin-left: 10px; font-weight: 400;">${invoiceData.notes}</span>
+                  </div>
+                  ` : ''}
+                </div>
+              </td>
+            </tr>
           </tbody>
+
           <tfoot>
-            <tr class="total-row">
-              <th colspan="6" class="text-right">TOTAL AMOUNT :</th>
-              <th class="text-right">${invoiceData.total}</th>
+            <tr>
+              <td>
+                <!-- Footer -->
+                <div class="footer">
+                  <div class="footer-left">
+                    <p><strong>Address :</strong> ${layout.address}</p>
+                    <p><strong>Contact No :</strong> ${layout.clinicPhone}</p>
+                    <p><strong>Email :</strong> ${layout.clinicEmail}</p>
+                    <div class="footer-notes">
+                      ${footerNotesLines.length > 0
+                        ? footerNotesLines
+                            .map((line, idx) => {
+                              if (idx === 0) {
+                                return `<p><strong>${footerNoteTitle}</strong> ${line}</p>`;
+                              }
+                              return `<p>${line}</p>`;
+                            })
+                            .join('')
+                        : ''}
+                    </div>
+                  </div>
+                  <div class="signature">
+                    ${signatureImage ? `<img src="${toFileUrl(signatureImage)}" alt="Signature" />` : ''}
+                    <div class="signature-text">
+                      ${!signatureImage ? `<div class="signature-space"></div>` : ''}
+                      <p>${signatureName}</p>
+                      ${signatureQualification ? `<p>(${signatureQualification})</p>` : ''}
+                    </div>
+                  </div>
+                </div>
+              </td>
             </tr>
           </tfoot>
         </table>
-
-        <!-- Additional Notes / Prescription -->
-        ${invoiceData.notes ? `
-        <div class="additional-information">
-          <strong>Additional Notes / Prescription:</strong>
-          <span style="margin-left: 10px; font-weight: 400;">${invoiceData.notes}</span>
-        </div>
-        ` : ''}
-
-        <!-- Footer -->
-        <div class="footer">
-          <div class="footer-left">
-            <p><strong>Address :</strong> ${layout.address}</p>
-            <p><strong>Contact No :</strong> ${layout.clinicPhone}</p>
-            <p><strong>Email :</strong> ${layout.clinicEmail}</p>
-            <div class="footer-notes">
-              ${footerNotesLines.length > 0
-                ? footerNotesLines
-                    .map((line, idx) => {
-                      if (idx === 0) {
-                        return `<p><strong>${footerNoteTitle}</strong> ${line}</p>`;
-                      }
-                      return `<p>${line}</p>`;
-                    })
-                    .join('')
-                : ''}
-            </div>
-          </div>
-          <div class="signature">
-            ${signatureImage ? `<img src="${toFileUrl(signatureImage)}" alt="Signature" />` : ''}
-            <div class="signature-text">
-              ${signatureLabel ? `<p>${signatureLabel}</p>` : ''}
-              <p>${signatureName}</p>
-              ${signatureQualification ? `<p>(${signatureQualification})</p>` : ''}
-            </div>
-          </div>
-        </div>
 
       </div>
     </body>

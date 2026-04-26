@@ -176,7 +176,7 @@ const DatabaseFind = () => {
           age: invoice.patient.age,
           gender: invoice.patient.gender,
           phone: invoice.patient.phone || '0000000000', // Provide default valid phone if missing
-          uhid: invoice.patient.uhid
+          uhid: invoice.patient.uhid || ''
         },
         treatments: invoice.treatments.map(t => ({
           name: t.name,

@@ -46,4 +46,8 @@ export interface LayoutConfig {
   signatureLabel?: string;
   signatureName?: string;
   signatureQualification?: string;
+
+  // Paper size & orientation
+  paperSize?: 'A4' | 'A5';
+  paperOrientation?: 'portrait' | 'landscape';
 }

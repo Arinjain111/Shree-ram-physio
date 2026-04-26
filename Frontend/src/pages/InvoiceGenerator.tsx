@@ -33,7 +33,7 @@ const InvoiceGenerator = () => {
   const { showToast, showModal } = useUI();
   const { isSyncing, syncNow } = useSyncManager(); // Use central sync state
   const { handleError } = useErrorHandler();
-  const { printInvoice } = useInvoicePrinter();
+  const { printInvoice, previewInvoice } = useInvoicePrinter();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -282,44 +282,18 @@ const InvoiceGenerator = () => {
     return validation.data;
   };
 
-  const handlePrint = async () => {
+  const handlePreview = async () => {
     const data = getCurrentInvoiceData();
     const validatedData = validateInvoice(data);
     if (!validatedData) return;
 
     try {
-        const saveResult = editingInvoiceId
-          ? await ipcRenderer.invoke('update-invoice', editingInvoiceId, validatedData)
-          : await ipcRenderer.invoke('save-invoice', validatedData);
-        if (!saveResult.success) throw saveResult;
-
-        showToast('success', editingInvoiceId ? `Invoice ${data.invoiceNumber} updated!` : `Invoice ${data.invoiceNumber} saved!`);
-
-        // Push to cloud right away; background sync remains as fallback
-        await ipcRenderer.invoke('sync-now').catch(() => {
-          /* non-blocking; still proceed to print */
-        });
-        
-        window.dispatchEvent(new CustomEvent('invoices-updated'));
-
-        // Update local state (best-effort)
-        if (!editingInvoiceId) {
-          setExistingInvoices(prev => [...prev, data]);
-          await fetchInvoiceNumber(true);
+        const result = await previewInvoice(data);
+        if (!result) {
+            showToast('error', 'Failed to generate preview PDF');
         }
-
-        // Print
-        const result = await printInvoice(data);
-        if (result) {
-          if (editingInvoiceId) {
-            navigate('/database-find');
-          } else {
-            resetForm();
-          }
-        }
-
     } catch (error) {
-        handleError(error, 'Error saving/printing invoice');
+        handleError(error, 'Error previewing invoice');
     }
   };
 
@@ -379,11 +353,14 @@ const InvoiceGenerator = () => {
         actions={
           <>
             <button 
-              onClick={handlePrint} 
+              onClick={handlePreview} 
               className="px-5 py-2.5 bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 font-medium shadow-sm transition-colors flex items-center gap-2"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-              Print
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              Preview PDF
             </button>
             <button 
               onClick={handleSaveAndPDF} 

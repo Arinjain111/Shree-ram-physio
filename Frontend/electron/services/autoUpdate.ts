@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 
 export function setupAutoUpdates() {
@@ -17,6 +17,13 @@ export function setupAutoUpdates() {
 
         let restartPromptDeferred = false;
         const getWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+
+        const sendUpdateStatus = (data: any) => {
+            const win = getWindow();
+            if (win) {
+                win.webContents.send('update-status', data);
+            }
+        };
 
         const showMessageBoxSafe = async (options: Electron.MessageBoxOptions) => {
             const win = getWindow();
@@ -53,39 +60,33 @@ export function setupAutoUpdates() {
         };
 
         autoUpdater.on('error', (err) => {
-            // Never crash the app for updater issues
             console.error('[AutoUpdate] error:', err);
+            sendUpdateStatus({ status: 'error', error: err?.message || 'Unknown error' });
         });
 
         autoUpdater.on('checking-for-update', () => {
             console.log('[AutoUpdate] checking-for-update');
+            sendUpdateStatus({ status: 'checking' });
         });
 
         autoUpdater.on('update-not-available', (info) => {
             console.log('[AutoUpdate] update-not-available', { version: info?.version });
+            sendUpdateStatus({ status: 'not-available', version: info?.version });
         });
 
         autoUpdater.on('update-available', async (info) => {
             console.log('[AutoUpdate] update-available', { version: info?.version });
-
-            // With autoDownload=true, downloading starts automatically.
-            // Keep this informational and non-blocking.
-            await showMessageBoxSafe({
-                type: 'info',
-                title: 'Update Available',
-                message: `A new version (${info.version}) is available.`,
-                detail: 'Downloading in the background. You will be prompted to restart once it is ready.',
-                buttons: ['OK'],
-                defaultId: 0,
-                noLink: true,
-            });
+            sendUpdateStatus({ status: 'available', version: info?.version });
+            // Download starts automatically, no blocking dialog needed.
         });
 
         autoUpdater.on('download-progress', (progress) => {
             const win = getWindow();
-            if (!win) return;
-            const fraction = Math.max(0, Math.min(1, progress.percent / 100));
-            win.setProgressBar(fraction);
+            if (win) {
+                const fraction = Math.max(0, Math.min(1, progress.percent / 100));
+                win.setProgressBar(fraction);
+            }
+            sendUpdateStatus({ status: 'downloading', progress });
         });
 
         autoUpdater.on('update-downloaded', async (info) => {
@@ -93,6 +94,7 @@ export function setupAutoUpdates() {
             if (win) win.setProgressBar(-1);
 
             console.log('[AutoUpdate] update-downloaded', { version: info?.version });
+            sendUpdateStatus({ status: 'downloaded', version: info?.version });
 
             // If no window exists yet, wait for one to be created to show the prompt.
             if (!win) {
@@ -104,6 +106,22 @@ export function setupAutoUpdates() {
             }
 
             await promptRestartWhenReady(info.version);
+        });
+
+        // Add IPC handler for renderer to trigger install
+        ipcMain.handle('install-update', () => {
+            autoUpdater.quitAndInstall(false, true);
+        });
+
+        // Add IPC handler for manual update check
+        ipcMain.handle('check-for-updates', async () => {
+            if (restartPromptDeferred) return { status: 'deferred' };
+            try {
+                const result = await autoUpdater.checkForUpdates();
+                return { status: 'success', result };
+            } catch (err: any) {
+                return { status: 'error', error: err?.message };
+            }
         });
 
         const check = async (label: string) => {

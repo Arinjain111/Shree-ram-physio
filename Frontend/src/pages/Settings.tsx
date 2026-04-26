@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useUI } from '@/context/UIContext';
 import PageHeader from '@/components/layout/PageHeader';
 import { handleFrontendError } from '@/services/errorHandler';
+import { useAutoUpdater } from '@/hooks/useAutoUpdater';
+import packageJson from '../../package.json';
 
 const { ipcRenderer } = window.require('electron');
 
@@ -11,6 +13,7 @@ const Settings = () => {
   const [autoSaveInvoicePdf, setAutoSaveInvoicePdf] = useState(true);
   const [loading, setLoading] = useState(true);
   const [isFullSyncing, setIsFullSyncing] = useState(false);
+  const { status, checkForUpdates } = useAutoUpdater();
 
   useEffect(() => {
     loadSettings();
@@ -264,11 +267,23 @@ const Settings = () => {
             </div>
             <div className="flex justify-between py-2 border-b border-slate-100">
               <span className="text-slate-600">Version</span>
-              <span className="font-medium text-slate-800">1.1.3</span>
+              <span className="font-medium text-slate-800">{packageJson.version}</span>
             </div>
-            <div className="flex justify-between py-2">
+            <div className="flex justify-between py-2 border-b border-slate-100">
               <span className="text-slate-600">Developer</span>
               <span className="font-medium text-slate-800">Shree Ram Physiotherapy</span>
+            </div>
+            <div className="pt-4 flex justify-end">
+              <button
+                onClick={checkForUpdates}
+                disabled={status === 'checking' || status === 'downloading'}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                <svg className={`w-4 h-4 ${status === 'checking' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {status === 'checking' ? 'Checking...' : 'Check for Updates'}
+              </button>
             </div>
           </div>
         </div>
