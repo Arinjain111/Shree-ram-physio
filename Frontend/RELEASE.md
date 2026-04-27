@@ -1,6 +1,6 @@
 # Release Process
 
-This app uses **Electron Forge** with **update.electronjs.org** for automatic updates.
+This app uses **electron-builder** (NSIS) + **electron-updater** with **GitHub Releases** for automatic updates.
 
 ## 🚀 Creating a Release
 
@@ -20,23 +20,24 @@ This will:
 git push origin main --tags
 ```
 
-This triggers the GitHub Actions workflow which will:
+This triggers the GitHub Actions workflow (`.github/workflows/electron-release.yml`) which will:
 - Build the Windows installer (`.exe`)
-- Create a ZIP archive
-- Publish a GitHub Release
-- Upload the artifacts
+- Generate update metadata (`latest.yml`) and a blockmap (`.exe.blockmap`)
+- Create/Update the GitHub Release for that tag
+- Upload the artifacts to the release
 
 ### 3. Automatic Updates
 
-Once published, the app will automatically check for updates every hour via **update.electronjs.org**.
+Once published, the installed app will automatically check for updates every hour via **GitHub Releases**.
 
 Users will be notified and can install updates automatically.
 
 ## 📦 Distribution Files
 
 Each release creates:
-- **`Shri-Ram-Physio-Setup.exe`** - Windows installer (Squirrel)
-- **`shri-ram-physio-win32-x64-*.zip`** - Portable Windows ZIP
+- **`Shri-Ram-Physio-Setup-{version}.exe`** - Windows installer (NSIS)
+- **`latest.yml`** - update metadata used by `electron-updater`
+- **`Shri-Ram-Physio-Setup-{version}.exe.blockmap`** - differential update metadata
 
 ## 🔧 Manual Build & Publish
 
@@ -45,26 +46,21 @@ If you need to build/publish manually:
 ```bash
 cd Frontend
 
-# Build only (creates local artifacts in out/)
-npm run make
-
-# Build AND publish to GitHub Releases
-# Requires GITHUB_TOKEN environment variable
-npm run publish
+# Build the installer locally (outputs to Frontend/release/)
+npm run dist:win
 ```
 
 ## 📋 Requirements
 
-- GitHub repository must be public (for free update.electronjs.org)
-- GitHub token with repo permissions (automatically provided in Actions)
-- Windows runner for building .exe files
+- GitHub Release assets must include `latest.yml` and the referenced installer `.exe`
+- For auto-update downloads without authentication, the GitHub repository must be **public**
+- Windows runner for building `.exe` files (handled by GitHub Actions)
 
 ## 🔄 How Auto-Update Works
 
-1. App checks update.electronjs.org every hour
-2. Service queries GitHub Releases for latest version
-3. If new version found, downloads and installs automatically
-4. User sees notification and can restart to apply update
+1. App checks GitHub Releases every hour
+2. If a newer version is found, it downloads the installer referenced by `latest.yml`
+3. When the update is downloaded, the app prompts the user to restart
 
 ## 📝 Version Scheme
 

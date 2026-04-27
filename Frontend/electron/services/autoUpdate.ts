@@ -1,10 +1,53 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 
 export function setupAutoUpdates() {
-    // Skip auto-updates in development
+    const getWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+
+    const sendUpdateStatus = (data: any) => {
+        const win = getWindow();
+        if (win) {
+            win.webContents.send('update-status', data);
+        }
+    };
+
+    // Always register IPC handlers so renderer calls never throw
+    // (auto-updates are disabled in development because the app isn't packaged).
+    // In dev we return a clean response instead of "No handler registered".
+    ipcMain.removeHandler('install-update');
+    ipcMain.removeHandler('check-for-updates');
+
+    let restartPromptDeferred = false;
+
+    ipcMain.handle('install-update', () => {
+        if (!app.isPackaged) {
+            return { status: 'disabled', reason: 'not_packaged' };
+        }
+        autoUpdater.quitAndInstall(false, true);
+        return { status: 'installing' };
+    });
+
+    ipcMain.handle('check-for-updates', async () => {
+        if (!app.isPackaged) {
+            sendUpdateStatus({ status: 'not-available', version: app.getVersion() });
+            return { status: 'disabled', reason: 'not_packaged' };
+        }
+
+        if (restartPromptDeferred) return { status: 'deferred' };
+        try {
+            const result = await autoUpdater.checkForUpdates();
+            // Never return electron-updater objects over IPC (not structured-cloneable).
+            return { status: 'success', version: result?.updateInfo?.version };
+        } catch (err: any) {
+            const message = err?.message || 'Unknown error';
+            sendUpdateStatus({ status: 'error', error: message });
+            return { status: 'error', error: message };
+        }
+    });
+
+    // Skip auto-updates in development (but keep IPC handlers registered).
     if (!app.isPackaged) {
-        console.log('[AutoUpdate] Skip checkForUpdates because application is not packaged');
+        console.log('[AutoUpdate] Disabled (app not packaged)');
         return;
     }
 
@@ -14,50 +57,6 @@ export function setupAutoUpdates() {
         // Auto-download so updates are seamless; we still prompt for restart.
         autoUpdater.autoDownload = true;
         autoUpdater.autoInstallOnAppQuit = true;
-
-        let restartPromptDeferred = false;
-        const getWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
-
-        const sendUpdateStatus = (data: any) => {
-            const win = getWindow();
-            if (win) {
-                win.webContents.send('update-status', data);
-            }
-        };
-
-        const showMessageBoxSafe = async (options: Electron.MessageBoxOptions) => {
-            const win = getWindow();
-            try {
-                // Passing `undefined` makes it app-modal when no window exists.
-                return await dialog.showMessageBox(win ?? undefined, options);
-            } catch (e) {
-                // If a dialog cannot be shown (rare), never crash.
-                console.warn('[AutoUpdate] showMessageBox failed:', e);
-                return { response: 1, checkboxChecked: false } as any;
-            }
-        };
-
-        const promptRestartWhenReady = async (version: string) => {
-            if (restartPromptDeferred) return;
-
-            const result = await showMessageBoxSafe({
-                type: 'info',
-                title: 'Update Ready',
-                message: `Version ${version} has been downloaded.`,
-                detail: 'Restart now to install the update?',
-                buttons: ['Restart Now', 'Later'],
-                defaultId: 0,
-                cancelId: 1,
-                noLink: true,
-            });
-
-            if (result.response === 0) {
-                // quitAndInstall(silent, forceRunAfter)
-                autoUpdater.quitAndInstall(false, true);
-            } else {
-                restartPromptDeferred = true;
-            }
-        };
 
         autoUpdater.on('error', (err) => {
             console.error('[AutoUpdate] error:', err);
@@ -91,38 +90,19 @@ export function setupAutoUpdates() {
 
         autoUpdater.on('update-downloaded', async (info) => {
             const win = getWindow();
-            if (win) win.setProgressBar(-1);
+            if (win) {
+                win.setProgressBar(-1);
+            }
 
             console.log('[AutoUpdate] update-downloaded', { version: info?.version });
+            // Notify the frontend via IPC. The renderer will show a non-intrusive banner.
             sendUpdateStatus({ status: 'downloaded', version: info?.version });
-
-            // If no window exists yet, wait for one to be created to show the prompt.
-            if (!win) {
-                const version = info?.version ?? '';
-                app.once('browser-window-created', () => {
-                    void promptRestartWhenReady(version);
-                });
-                return;
-            }
-
-            await promptRestartWhenReady(info.version);
+            
+            // Mark deferred so periodic checks don't repeatedly download or error
+            restartPromptDeferred = true;
         });
 
-        // Add IPC handler for renderer to trigger install
-        ipcMain.handle('install-update', () => {
-            autoUpdater.quitAndInstall(false, true);
-        });
-
-        // Add IPC handler for manual update check
-        ipcMain.handle('check-for-updates', async () => {
-            if (restartPromptDeferred) return { status: 'deferred' };
-            try {
-                const result = await autoUpdater.checkForUpdates();
-                return { status: 'success', result };
-            } catch (err: any) {
-                return { status: 'error', error: err?.message };
-            }
-        });
+        // IPC handlers are registered above (also for dev).
 
         const check = async (label: string) => {
             if (restartPromptDeferred) return;

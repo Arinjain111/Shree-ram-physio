@@ -81,12 +81,22 @@ export const generateInvoiceHTML = (
   const signatureQualification = (layout.signatureQualification || '').trim() || (layout.doctorQualification || '').trim();
   const signatureImage = (layout.signatureImagePath || '').trim();
   
-  // Helper function to convert yyyy-mm-dd to dd-mm
+  // Helper function to convert yyyy-mm-dd to dd-mm for treatments
   const formatDate = (dateStr: string): string => {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
     if (parts.length === 3) {
       return `${parts[2]}-${parts[1]}`;
+    }
+    return dateStr;
+  };
+
+  // Helper function to convert yyyy-mm-dd to dd-mm-yyyy for bill date
+  const formatBillDate = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
     return dateStr;
   };
@@ -573,7 +583,7 @@ export const generateInvoiceHTML = (
                       </div>
                       <div class="summary-box">
                         <div class="label">BILL DATE</div>
-                        <div class="value">${formatDate(invoiceData.date)}</div>
+                        <div class="value">${formatBillDate(invoiceData.date)}</div>
                       </div>
                       <div class="summary-box">
                         <div class="label">BILL AMOUNT</div>

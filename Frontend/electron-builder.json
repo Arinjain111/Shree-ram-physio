@@ -2,7 +2,7 @@
   "npmRebuild": true,
   "appId": "com.shreeRampPhysio.invoicing",
   "productName": "Shri Ram Physio",
-  "artifactName": "${productName} Setup.${ext}",
+  "artifactName": "Shri-Ram-Physio-Setup-${version}.${ext}",
   "asar": true,
   "directories": {
     "output": "release",
@@ -40,13 +40,15 @@
     "icon": "assets/icon.ico"
   },
   "nsis": {
-    "oneClick": false,
-    "allowToChangeInstallationDirectory": true,
+    "oneClick": true,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": false,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "Shri Ram Physio",
     "installerIcon": "assets/icon.ico",
     "uninstallerIcon": "assets/icon.ico",
+    "runAfterFinish": true,
     "deleteAppDataOnUninstall": false
   },
   "publish": [
