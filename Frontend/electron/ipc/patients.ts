@@ -146,7 +146,7 @@ export function registerPatientHandlers() {
                     ? result.cloud
                     : (result.local && result.cloud);
 
-            return { success, ...result };
+            return { success, ...result, error: result.errors.length ? result.errors.join(' | ') : undefined };
 
         } catch (error) {
             return { success: false, error: String(error) };

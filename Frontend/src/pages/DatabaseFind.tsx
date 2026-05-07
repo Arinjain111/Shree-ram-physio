@@ -356,7 +356,7 @@ const DatabaseFind = () => {
         />
 
         {/* Master-Detail Layout */}
-        <div className="flex-1 flex gap-6 mt-4 min-h-[600px] max-h-[calc(100vh-140px)]">
+        <div className="flex-1 flex gap-6 mt-4 min-h-150 max-h-[calc(100vh-140px)]">
             
             {/* Left Pane: Master List */}
             <div className="w-[45%] lg:w-[40%] flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">

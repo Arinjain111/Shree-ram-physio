@@ -78,6 +78,12 @@ export const ValidDateStringSchema = z.string()
     return val >= '2000-01-01' && val <= maxDate;
   }, { message: "Date must be between year 2000 and today's date" });
 
+export const ValidFutureDateStringSchema = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+  .refine(val => {
+    return val >= '2000-01-01';
+  }, { message: "Date must be year 2000 or later" });
+
 /**
  * Invoice Schema - Validates invoice data
  */
@@ -114,8 +120,8 @@ export const TreatmentSchema = z.object({
   name: z.string().min(1, 'Treatment name is required').max(200),
   duration: z.string().max(100).default(''),
   sessions: z.number().int().min(1, 'At least 1 session required'),
-  startDate: ValidDateStringSchema,
-  endDate: ValidDateStringSchema,
+  startDate: ValidFutureDateStringSchema,
+  endDate: ValidFutureDateStringSchema,
   amount: z.number().min(0, 'Amount must be positive'),
   // Sync fields
   cloudId: z.number().int().positive().optional(),
@@ -134,8 +140,8 @@ export const TreatmentFormSchema = z.object({
   name: z.string().min(1, 'Treatment name is required').max(200),
   duration: z.string().default(''), // Required string to match TreatmentItem
   sessions: z.number().int().min(1, 'At least 1 session required'),
-  startDate: ValidDateStringSchema,
-  endDate: ValidDateStringSchema,
+  startDate: ValidFutureDateStringSchema,
+  endDate: ValidFutureDateStringSchema,
   amount: z.number().min(0, 'Amount must be positive'),
   rate: z.number().optional(), // Deprecated field for backward compatibility
 });

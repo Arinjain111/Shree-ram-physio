@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import type { DatabaseInvoice } from '@/types/database.types';
 import TreatmentCalendar, { COLORS } from './TreatmentCalendar';
 import { useNavigate } from 'react-router-dom';
+import { useUI } from '@/context/UIContext';
+
+const { ipcRenderer } = window.require('electron');
 
 // Utils
 const getSyncStatusBadge = (status?: string) => {
@@ -31,7 +35,44 @@ interface InvoiceHistoryCardProps {
 
 export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: InvoiceHistoryCardProps) => {
   const navigate = useNavigate();
+  const { showModal, showToast } = useUI();
   const canEdit = invoice.syncStatus !== 'SYNCED';
+  const hasCloudData = !!invoice.cloudId;
+  const [showDeleteOptions, setShowDeleteOptions] = useState(false);
+
+  const handleDelete = async (target: 'local' | 'cloud' | 'both') => {
+    showModal({
+      type: 'danger',
+      title: `Delete Invoice (${target === 'both' ? 'Everywhere' : target})`,
+      message: `Are you sure you want to delete this invoice ${target === 'both' ? 'everywhere' : 'from ' + target}?\nThis cannot be undone.`,
+      confirmText: 'Yes, Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const result = await ipcRenderer.invoke('delete-invoice', invoice.id, target);
+          if (result.success) {
+            showToast('success', `Invoice deleted successfully (${target})`);
+            window.dispatchEvent(new CustomEvent('invoices-updated'));
+          } else {
+            showModal({
+              title: 'Delete Failed',
+              message: result.error || 'Unknown error occurred',
+              type: 'danger',
+              confirmText: 'Close'
+            });
+            if (result.errors?.length) {
+              console.error('Invoice Delete errors:', result.errors);
+            }
+          }
+        } catch (error) {
+          showToast('error', 'Failed to invoke delete operation');
+          console.error(error);
+        } finally {
+          setShowDeleteOptions(false);
+        }
+      }
+    });
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -92,6 +133,46 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
             </svg>
             Print Invoice
           </button>
+          
+          <div className="relative">
+            <button
+              onClick={() => setShowDeleteOptions(!showDeleteOptions)}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
+              title="Delete Invoice"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              Delete
+            </button>
+            {showDeleteOptions && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-60 overflow-hidden">
+                <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Delete from:</div>
+                <button 
+                  onClick={() => handleDelete('local')} 
+                  className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-rose-50 hover:text-rose-600 transition-colors flex items-center justify-between group"
+                >
+                  <span>Local Database</span>
+                  <span className="opacity-0 group-hover:opacity-100 text-rose-400">→</span>
+                </button>
+                <button 
+                  onClick={() => handleDelete('cloud')} 
+                  disabled={!hasCloudData}
+                  className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between group ${!hasCloudData ? 'text-slate-400 opacity-50 cursor-not-allowed bg-slate-50' : 'text-slate-700 hover:bg-rose-50 hover:text-rose-600'}`}
+                >
+                  <span>Cloud Database</span>
+                  {hasCloudData && <span className="opacity-0 group-hover:opacity-100 text-rose-400">→</span>}
+                </button>
+                <div className="h-px bg-slate-100 my-1"></div>
+                <button 
+                  onClick={() => handleDelete('both')} 
+                  disabled={!hasCloudData}
+                  className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-between group ${!hasCloudData ? 'text-rose-300 opacity-50 cursor-not-allowed bg-slate-50' : 'text-rose-600 hover:bg-rose-50'}`}
+                >
+                  <span>Everywhere</span>
+                  {hasCloudData && <span className="opacity-0 group-hover:opacity-100">→</span>}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

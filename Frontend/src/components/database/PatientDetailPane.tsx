@@ -33,6 +33,7 @@ export const PatientDetailPane = ({ invoices, onPrintInvoice }: PatientDetailPan
   const totalPaid = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
   const paymentModes = Array.from(new Set(invoices.map(inv => inv.paymentMethod || 'Cash')));
   const paymentModeText = paymentModes.length > 0 ? paymentModes.join(' / ') : 'Cash';
+  const hasCloudData = !!patient.cloudId;
 
   const handleDelete = (target: 'local' | 'cloud' | 'both') => {
       showModal({
@@ -143,17 +144,19 @@ export const PatientDetailPane = ({ invoices, onPrintInvoice }: PatientDetailPan
                             <span>💻 Local Only</span>
                         </button>
                         <button 
-                            disabled={isDeleting}
+                            disabled={isDeleting || !hasCloudData}
                             onClick={() => handleDelete('cloud')} 
-                            className="text-left px-3 py-2 text-sm text-slate-700 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors flex items-center gap-2"
+                            className={`text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-2 ${!hasCloudData ? 'text-slate-400 opacity-50 cursor-not-allowed bg-slate-50' : 'text-slate-700 hover:bg-rose-50 hover:text-rose-600'}`}
+                            title={!hasCloudData ? "Not synced to Cloud" : ""}
                         >
                             <span>☁️ Cloud Only</span>
                         </button>
                         <div className="h-px bg-slate-100 my-1"></div>
                         <button 
-                            disabled={isDeleting}
+                            disabled={isDeleting || !hasCloudData}
                             onClick={() => handleDelete('both')} 
-                            className="text-left px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-2"
+                            className={`text-left px-3 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 ${!hasCloudData ? 'text-rose-300 opacity-50 cursor-not-allowed bg-slate-50' : 'text-rose-600 hover:bg-rose-50'}`}
+                            title={!hasCloudData ? "Not synced to Cloud" : ""}
                         >
                             <span>🗑️ Everywhere</span>
                         </button>

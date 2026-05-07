@@ -340,6 +340,66 @@ export function registerInvoiceHandlers() {
     }
   });
 
+  ipcMain.handle('delete-invoice', async (_event, invoiceId: number, target: 'local' | 'cloud' | 'both') => {
+    try {
+      if (!prisma) {
+        throw new Error('Prisma not initialized');
+      }
+
+      const result = { local: false, cloud: false, errors: [] as string[] };
+      const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId } });
+
+      if (!invoice) {
+        return { success: false, error: 'Invoice not found locally' };
+      }
+
+      // 1. Delete from Cloud
+      if (target === 'cloud' || target === 'both') {
+        try {
+          if (invoice.cloudId) {
+            await axios.delete(`${backendUrl}/api/invoices/${invoice.cloudId}`);
+            result.cloud = true;
+          } else {
+            throw new Error('Invoice not synced to cloud (no Cloud ID)');
+          }
+        } catch (e: any) {
+          const status = e?.response?.status;
+          const msg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Cloud delete failed';
+          console.error('Cloud delete failed', e);
+          result.errors.push(`Cloud${status ? ` (${status})` : ''}: ${msg}`);
+        }
+      }
+
+      // 2. Delete from Local
+      if (target === 'local' || target === 'both') {
+        try {
+          if (target === 'both' && !result.cloud) {
+             throw new Error('Skipped local delete because cloud delete failed');
+          }
+          await prisma.$transaction(async (tx) => {
+            await tx.treatment.deleteMany({ where: { invoiceId: invoice.id } });
+            await tx.invoice.delete({ where: { id: invoice.id } });
+          });
+          result.local = true;
+        } catch (e: any) {
+          console.error('Local delete failed', e);
+          result.errors.push(`Local: ${e.message}`);
+        }
+      }
+
+      const success = target === 'local'
+        ? result.local
+        : target === 'cloud'
+          ? result.cloud
+          : (result.local && result.cloud);
+
+      return { success, ...result, error: result.errors.length ? result.errors.join(' | ') : undefined };
+    } catch (error) {
+      logError('Delete invoice', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
   ipcMain.handle('get-next-invoice-number', async (_event, patientData?: { id?: number; cloudId?: number }) => {
     try {
       const minimumInvoiceNumber = 401;

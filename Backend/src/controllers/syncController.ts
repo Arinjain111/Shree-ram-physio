@@ -312,9 +312,15 @@ export const syncData = async (req: Request, res: Response) => {
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
     }
-    res.status(500).json({
+    
+    // Check if it's an ApiError (from validation)
+    const isApiError = error && typeof error === 'object' && 'statusCode' in error;
+    const statusCode = isApiError ? (error as any).statusCode || 400 : 500;
+    
+    res.status(statusCode).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error during sync'
+      error: error instanceof Error ? error.message : 'Unknown error during sync',
+      details: isApiError ? (error as any).details : undefined
     });
   }
 };

@@ -16,6 +16,12 @@ export const ValidDateStringSchema = z.string()
     return val >= '2000-01-01' && val <= maxDate;
   }, { message: "Date must be between year 2000 and today's date" });
 
+export const ValidFutureDateStringSchema = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+  .refine(val => {
+    return val >= '2000-01-01';
+  }, { message: "Date must be year 2000 or later" });
+
 // ============================================
 // BASE SCHEMAS - Core data types
 // ============================================
@@ -29,7 +35,7 @@ export const PatientSchema = z.object({
   lastName: z.string().min(1, 'Last name is required').max(50),
   age: z.number().int().min(0).max(150),
   gender: z.enum(['Male', 'Female', 'Other']),
-  phone: z.string().min(10, 'Phone must be at least 10 digits').max(15),
+  phone: z.union([z.string().min(10, 'Phone must be at least 10 digits').max(15), z.literal('')]),
   uhid: OptionalUhidSchema,
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime().optional(),
@@ -67,8 +73,8 @@ export const TreatmentSchema = z.object({
   invoiceId: z.number().int().positive(),
   duration: z.string().max(100).default(''),
   sessions: z.number().int().min(1, 'At least 1 session required'),
-  startDate: ValidDateStringSchema,
-  endDate: ValidDateStringSchema,
+  startDate: ValidFutureDateStringSchema,
+  endDate: ValidFutureDateStringSchema,
   amount: z.number().min(0, 'Amount must be positive'),
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime().optional(),
@@ -90,7 +96,7 @@ export const PatientSyncSchema = z.object({
   lastName: z.string().min(1, 'Last name is required').max(50),
   age: z.number().int().min(0).max(150),
   gender: z.enum(['Male', 'Female', 'Other']),
-  phone: z.string().min(10, 'Phone must be at least 10 digits').max(15),
+  phone: z.union([z.string().min(10, 'Phone must be at least 10 digits').max(15), z.literal('')]),
   uhid: OptionalUhidSchema,
   updatedAt: z.iso.datetime().optional(),
 });
@@ -136,8 +142,8 @@ export const TreatmentSyncSchema = z.object({
   name: z.string().min(1, 'Treatment name is required').max(100),
   duration: z.string().max(100).nullish(),
   sessions: z.number().int().min(1, 'At least 1 session required'),
-  startDate: ValidDateStringSchema,
-  endDate: ValidDateStringSchema,
+  startDate: ValidFutureDateStringSchema,
+  endDate: ValidFutureDateStringSchema,
   amount: z.number().min(0, 'Amount must be positive'),
   updatedAt: z.iso.datetime().optional(),
 }).transform(data => ({
@@ -180,8 +186,8 @@ export const CreateInvoiceRequestSchema = z.object({
       name: z.string().min(1),
       duration: z.string().optional(),
       sessions: z.number().int().min(1),
-      startDate: ValidDateStringSchema,
-      endDate: ValidDateStringSchema,
+      startDate: ValidFutureDateStringSchema,
+      endDate: ValidFutureDateStringSchema,
       amount: z.number().min(0),
     })
   ).optional(),
@@ -197,7 +203,7 @@ export const CreatePatientRequestSchema = z.object({
   lastName: z.string().min(1).max(50),
   age: z.number().int().min(0).max(150),
   gender: z.enum(['Male', 'Female', 'Other']),
-  phone: z.string().min(10).max(15),
+  phone: z.union([z.string().min(10).max(15), z.literal('')]),
   uhid: OptionalUhidSchema,
 });
 
