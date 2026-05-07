@@ -108,6 +108,7 @@ export function registerInvoiceHandlers() {
           diagnosis: validatedData.diagnosis || '',
           notes: validatedData.notes || '',
           paymentMethod: validatedData.paymentMethod || 'Cash',
+          TransactionId: validatedData.TransactionId || null,
           total: totalAmount,
           syncStatus: 'PENDING'
         }
@@ -307,6 +308,7 @@ export function registerInvoiceHandlers() {
             diagnosis: validatedData.diagnosis || '',
             notes: validatedData.notes || '',
             paymentMethod: validatedData.paymentMethod || 'Cash',
+            TransactionId: validatedData.TransactionId || null,
             total: totalAmount,
             syncStatus: 'PENDING',
             lastSyncAt: null

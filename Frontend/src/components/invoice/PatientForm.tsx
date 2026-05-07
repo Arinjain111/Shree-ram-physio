@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PatientFormSchema } from '@/schemas/validation.schema.ts';
 import type { PatientFormProps } from '@/types/component.types';
 
-const PatientForm = ({ patient, setPatient }: PatientFormProps) => {
+const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, paymentMethod }: PatientFormProps) => {
   const [firstNameErrors, setFirstNameErrors] = useState<string[]>([]);
   const [lastNameErrors, setLastNameErrors] = useState<string[]>([]);
   const [ageErrors, setAgeErrors] = useState<string[]>([]);
@@ -364,6 +364,65 @@ const PatientForm = ({ patient, setPatient }: PatientFormProps) => {
             <option value="Other">Other</option>
           </select>
         </div>
+        
+        {/* Contact Number placed here */}
+        <div className="relative">
+          <label className="block text-sm font-medium text-gray-600 mb-1">
+            Contact Number
+          </label>
+          <div className="relative">
+            <input
+              type="tel"
+              maxLength={10}
+              value={patient.phone}
+              onChange={(e) => handlePhoneChange(e.target.value)}
+              className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 ${
+                phoneTouched && phoneErrors.length > 0 && patient.phone
+                  ? 'border-red-500 focus:ring-red-500'
+                  : phoneTouched && patient.phone && phoneErrors.length === 0
+                  ? 'border-green-500 focus:ring-green-500'
+                  : 'border-gray-300 focus:ring-blue-500'
+              } placeholder-gray-400`}
+              placeholder="e.g., 9876543210"
+            />
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+              {getValidationIcon(
+                phoneErrors, 
+                patient.phone || '', 
+                phoneTouched,
+                () => setShowPhoneInfo(true),
+                () => setShowPhoneInfo(false)
+              )}
+            </div>
+          </div>
+          <ValidationPopup 
+            errors={phoneErrors} 
+            checks={phoneValidationChecks} 
+            show={showPhoneInfo}
+            value={patient.phone || ''}
+          />
+        </div>
+
+        {/* UPI Transaction ID placed between Contact Number and UHID */}
+        <div className="relative">
+          <label className="block text-sm font-medium text-gray-600 mb-1">
+            UPI/Card Transaction ID
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={TransactionId || ''}
+              onChange={(e) => setTransactionId && setTransactionId(e.target.value)}
+              disabled={!(paymentMethod === 'UPI' || paymentMethod === 'Card')}
+              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 placeholder-gray-400 ${
+                !(paymentMethod === 'UPI' || paymentMethod === 'Card') ? 'bg-gray-100 cursor-not-allowed text-gray-500' : 'bg-white'
+              }`}
+              placeholder={paymentMethod === 'UPI' || paymentMethod === 'Card' ? "Enter transaction ID" : "Requires UPI or Card"}
+            />
+          </div>
+        </div>
+
+        {/* UHID placed here */}
         {!shouldShowUhidField ? (
           <div>
             <button
@@ -422,42 +481,6 @@ const PatientForm = ({ patient, setPatient }: PatientFormProps) => {
             />
           </div>
         )}
-        <div className="relative">
-          <label className="block text-sm font-medium text-gray-600 mb-1">
-            Contact Number
-          </label>
-          <div className="relative">
-            <input
-              type="tel"
-              maxLength={10}
-              value={patient.phone}
-              onChange={(e) => handlePhoneChange(e.target.value)}
-              className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 ${
-                phoneTouched && phoneErrors.length > 0 && patient.phone
-                  ? 'border-red-500 focus:ring-red-500'
-                  : phoneTouched && patient.phone && phoneErrors.length === 0
-                  ? 'border-green-500 focus:ring-green-500'
-                  : 'border-gray-300 focus:ring-blue-500'
-              } placeholder-gray-400`}
-              placeholder="e.g., 9876543210"
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-              {getValidationIcon(
-                phoneErrors, 
-                patient.phone || '', 
-                phoneTouched,
-                () => setShowPhoneInfo(true),
-                () => setShowPhoneInfo(false)
-              )}
-            </div>
-          </div>
-          <ValidationPopup 
-            errors={phoneErrors} 
-            checks={phoneValidationChecks} 
-            show={showPhoneInfo}
-            value={patient.phone || ''}
-          />
-        </div>
       </div>
     </section>
   );

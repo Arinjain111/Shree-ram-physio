@@ -71,6 +71,13 @@ export const PatientFormSchema = z.object({
 
 export type PatientForm = z.infer<typeof PatientFormSchema>;
 
+export const ValidDateStringSchema = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+  .refine(val => {
+    const maxDate = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]!;
+    return val >= '2000-01-01' && val <= maxDate;
+  }, { message: "Date must be between year 2000 and today's date" });
+
 /**
  * Invoice Schema - Validates invoice data
  */
@@ -80,10 +87,11 @@ export const InvoiceSchema = z.object({
     .regex(/^\d{4}$/, 'Invoice number must be 4 digits')
     .min(1, 'Invoice number is required'),
   patientId: z.number().int().positive(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+  date: ValidDateStringSchema,
   diagnosis: z.string().max(500).default(''),
   notes: z.string().max(1000).default(''),
   paymentMethod: z.enum(['Cash', 'Card', 'UPI', 'Online', 'Cheque']).default('Cash'),
+  TransactionId: z.string().max(100).optional(),
   total: z.number().min(0, 'Total must be positive'),
   // Sync fields
   cloudId: z.number().int().positive().optional(),
@@ -95,6 +103,8 @@ export const InvoiceSchema = z.object({
 
 export type Invoice = z.infer<typeof InvoiceSchema>;
 
+
+
 /**
  * Treatment Schema - Validates treatment data
  */
@@ -104,8 +114,8 @@ export const TreatmentSchema = z.object({
   name: z.string().min(1, 'Treatment name is required').max(200),
   duration: z.string().max(100).default(''),
   sessions: z.number().int().min(1, 'At least 1 session required'),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be in YYYY-MM-DD format'),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be in YYYY-MM-DD format'),
+  startDate: ValidDateStringSchema,
+  endDate: ValidDateStringSchema,
   amount: z.number().min(0, 'Amount must be positive'),
   // Sync fields
   cloudId: z.number().int().positive().optional(),
@@ -124,8 +134,8 @@ export const TreatmentFormSchema = z.object({
   name: z.string().min(1, 'Treatment name is required').max(200),
   duration: z.string().default(''), // Required string to match TreatmentItem
   sessions: z.number().int().min(1, 'At least 1 session required'),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be in YYYY-MM-DD format'),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be in YYYY-MM-DD format'),
+  startDate: ValidDateStringSchema,
+  endDate: ValidDateStringSchema,
   amount: z.number().min(0, 'Amount must be positive'),
   rate: z.number().optional(), // Deprecated field for backward compatibility
 });
@@ -157,6 +167,7 @@ export const InvoiceDataSchema = z.object({
   diagnosis: z.string().max(500).optional(),
   notes: z.string().max(1000).default(''),
   paymentMethod: z.string().default('Cash'), // Keep as string to match old type
+  TransactionId: z.string().max(100).optional(),
   total: z.string(), // Keep as string to match old InvoiceData type
   timestamp: z.string(), // Required timestamp field
 });

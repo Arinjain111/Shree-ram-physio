@@ -116,6 +116,7 @@ export const syncData = async (req: Request, res: Response) => {
             diagnosis: invoice.diagnosis || '',
             notes: invoice.notes || '',
             paymentMethod: invoice.paymentMethod || 'Cash',
+          TransactionId: invoice.TransactionId || null,
             total: invoice.total,
           },
           create: {
@@ -125,6 +126,7 @@ export const syncData = async (req: Request, res: Response) => {
             diagnosis: invoice.diagnosis || '',
             notes: invoice.notes || '',
             paymentMethod: invoice.paymentMethod || 'Cash',
+          TransactionId: invoice.TransactionId || null,
             total: invoice.total,
           },
         });
@@ -168,6 +170,7 @@ export const syncData = async (req: Request, res: Response) => {
             diagnosis: invoice.diagnosis || '',
             notes: invoice.notes || '',
             paymentMethod: invoice.paymentMethod || 'Cash',
+          TransactionId: invoice.TransactionId || null,
             total: invoice.total,
           },
         });

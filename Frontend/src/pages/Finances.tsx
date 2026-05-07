@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell
 } from 'recharts';
@@ -28,7 +28,7 @@ interface Metrics {
 export default function Finances() {
   const { showToast } = useUI();
   const [invoices, setInvoices] = useState<DatabaseInvoice[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
 
   // Date Range State
   const [preset, setPreset] = useState<DatePreset>('30days');
@@ -123,14 +123,7 @@ export default function Finances() {
     });
 
     // To ensure charts show chronologically, we could initialize empty dates or sort.
-    // For simplicity, we'll sort the map by actual dates
-    const cData = Array.from(trendMap.entries())
-      .map(([date, revenue]) => ({ date, revenue }))
-      .sort((a, b) => {
-        // Simple sort won't perfectly work for string dates 'MMM dd', so we parse them back roughly
-        // or we sort the invoices first before grouping.
-        return 0; // We will sort before grouping instead
-      });
+
 
     // Better Trend Chart generation (sort first)
     const sortedCurrent = [...currentInvoices].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -287,7 +280,7 @@ export default function Finances() {
                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                      />
                      <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={30}>
-                       {treatmentData.map((entry, index) => (
+                       {treatmentData.map((_, index) => (
                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                        ))}
                      </Bar>

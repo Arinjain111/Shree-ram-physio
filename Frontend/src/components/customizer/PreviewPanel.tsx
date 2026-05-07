@@ -24,8 +24,11 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ formData }) => {
   const dims = PAPER_DIMS[paperSize]?.[paperOrientation] ?? PAPER_DIMS.A4.portrait;
   const pageW = dims[0];
 
-  // Larger zoom for smaller paper so it stays readable
-  const zoom = paperSize === 'A5' ? 0.55 : 0.65;
+  // Determine dynamic zoom so that all paper sizes appear roughly the same width on screen
+  const getZoomLevel = () => {
+    const TARGET_WIDTH = 540;
+    return (TARGET_WIDTH / pageW).toFixed(2);
+  };
 
   const previewHTML = useMemo(() => {
     const sampleInvoiceData: InvoiceData = {
@@ -56,14 +59,14 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ formData }) => {
           </h3>
           <span className='text-xs text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200'>Auto-updates</span>
           <span className='text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200 font-medium'>
-            {paperSize} {paperOrientation}
+            {paperSize} {paperOrientation === 'landscape' ? 'Landscape' : 'Portrait'}
           </span>
         </div>
       </div>
       <div className="bg-slate-500/10 rounded-xl overflow-hidden flex justify-center p-8 border border-slate-200/50 shadow-inner">
         <div 
           className="shadow-2xl rounded-sm bg-white transition-all duration-300 ease-in-out" 
-          style={{ zoom, minWidth: `${pageW}px`, transformOrigin: 'top center' }}
+          style={{ zoom: getZoomLevel(), minWidth: `${pageW}px`, transformOrigin: 'top center' }}
         >
           <div dangerouslySetInnerHTML={{ __html: previewHTML }} />
         </div>

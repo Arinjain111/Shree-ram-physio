@@ -9,6 +9,13 @@ import { ApiError } from '../middleware/errorHandler';
 
 const OptionalUhidSchema = z.union([z.string().max(50), z.literal('')]).optional().nullable();
 
+export const ValidDateStringSchema = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+  .refine(val => {
+    const maxDate = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]!;
+    return val >= '2000-01-01' && val <= maxDate;
+  }, { message: "Date must be between year 2000 and today's date" });
+
 // ============================================
 // BASE SCHEMAS - Core data types
 // ============================================
@@ -39,10 +46,11 @@ export const InvoiceSchema = z.object({
     .regex(/^\d{4}$/, 'Invoice number must be 4 digits')
     .min(1, 'Invoice number is required'),
   patientId: z.number().int().positive(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+  date: ValidDateStringSchema,
   diagnosis: z.string().max(500).default(''),
   notes: z.string().max(1000).default(''),
   paymentMethod: z.enum(['Cash', 'Card', 'UPI', 'Online', 'Cheque']).default('Cash'),
+  TransactionId: z.string().max(100).optional(),
   total: z.number().min(0, 'Total must be positive'),
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime().optional(),
@@ -59,8 +67,8 @@ export const TreatmentSchema = z.object({
   invoiceId: z.number().int().positive(),
   duration: z.string().max(100).default(''),
   sessions: z.number().int().min(1, 'At least 1 session required'),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be in YYYY-MM-DD format'),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be in YYYY-MM-DD format'),
+  startDate: ValidDateStringSchema,
+  endDate: ValidDateStringSchema,
   amount: z.number().min(0, 'Amount must be positive'),
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime().optional(),
@@ -100,17 +108,19 @@ export const InvoiceSyncSchema = z.object({
     .regex(/^\d{4}$/, 'Invoice number must be 4 digits')
     .min(1, 'Invoice number is required'),
   patientId: z.number().int().positive(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+  date: ValidDateStringSchema,
   diagnosis: z.string().max(500).nullish(),
   notes: z.string().max(1000).nullish(),
   paymentMethod: z.enum(['Cash', 'Card', 'UPI', 'Online', 'Cheque']).nullish(),
+  TransactionId: z.string().max(100).nullish(),
   total: z.number().min(0, 'Total must be positive'),
   updatedAt: z.iso.datetime().optional(),
 }).transform(data => ({
   ...data,
   diagnosis: data.diagnosis || '',
   notes: data.notes || '',
-  paymentMethod: data.paymentMethod || 'Cash'
+  paymentMethod: data.paymentMethod || 'Cash',
+  TransactionId: data.TransactionId || null,
 }));
 
 export type InvoiceSync = z.infer<typeof InvoiceSyncSchema>;
@@ -126,8 +136,8 @@ export const TreatmentSyncSchema = z.object({
   name: z.string().min(1, 'Treatment name is required').max(100),
   duration: z.string().max(100).nullish(),
   sessions: z.number().int().min(1, 'At least 1 session required'),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be in YYYY-MM-DD format'),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be in YYYY-MM-DD format'),
+  startDate: ValidDateStringSchema,
+  endDate: ValidDateStringSchema,
   amount: z.number().min(0, 'Amount must be positive'),
   updatedAt: z.iso.datetime().optional(),
 }).transform(data => ({
@@ -159,18 +169,19 @@ export type SyncRequest = z.infer<typeof SyncRequestSchema>;
 export const CreateInvoiceRequestSchema = z.object({
   invoiceNumber: z.string().regex(/^\d{4}$/, 'Invoice number must be 4 digits'),
   patientId: z.number().int().positive(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+  date: ValidDateStringSchema,
   diagnosis: z.string().max(500).optional(),
   notes: z.string().max(1000).optional(),
   paymentMethod: z.enum(['Cash', 'Card', 'UPI', 'Online', 'Cheque']).optional(),
+  TransactionId: z.string().max(100).optional(),
   total: z.number().min(0),
   treatments: z.array(
     z.object({
       name: z.string().min(1),
       duration: z.string().optional(),
       sessions: z.number().int().min(1),
-      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      startDate: ValidDateStringSchema,
+      endDate: ValidDateStringSchema,
       amount: z.number().min(0),
     })
   ).optional(),

@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import type { Patient, Invoice, Treatment, SyncPayload, SyncResponse, SyncStatus } from '../types';
+import type { SyncPayload, SyncResponse, SyncStatus } from '../types';
 
 export class SyncEngine {
   private apiClient: AxiosInstance;
@@ -110,7 +110,7 @@ export class SyncEngine {
 
   private applyCloudUpdates(response: SyncResponse) {
     // Mark locally synced records
-    response.synced.patients.forEach(({ localId, cloudId, updated_at }) => {
+    response.synced.patients.forEach(({ localId, cloudId }) => {
       this.db.markAsSynced('patients', localId, cloudId);
       this.db.createSyncLog({
         entity_type: 'patient',
@@ -120,7 +120,7 @@ export class SyncEngine {
       });
     });
 
-    response.synced.invoices.forEach(({ localId, cloudId, updated_at }) => {
+    response.synced.invoices.forEach(({ localId, cloudId }) => {
       this.db.markAsSynced('invoices', localId, cloudId);
       this.db.createSyncLog({
         entity_type: 'invoice',
@@ -130,7 +130,7 @@ export class SyncEngine {
       });
     });
 
-    response.synced.treatments.forEach(({ localId, cloudId, updated_at }) => {
+    response.synced.treatments.forEach(({ localId, cloudId }) => {
       this.db.markAsSynced('treatments', localId, cloudId);
       this.db.createSyncLog({
         entity_type: 'treatment',

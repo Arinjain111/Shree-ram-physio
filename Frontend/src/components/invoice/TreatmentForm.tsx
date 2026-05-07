@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { TreatmentPreset } from '@/types/treatmentPreset.types';
 import type { TreatmentFormProps } from '@/types/component.types';
+import { ValidDateStringSchema } from '@/schemas/validation.schema.ts';
 
 const { ipcRenderer } = window.require('electron');
 
@@ -170,6 +171,12 @@ const TreatmentForm = ({
     setFilteredPresets([]);
   };
 
+  const getDateError = (date: string) => {
+    if (!date) return '';
+    const res = ValidDateStringSchema.safeParse(date);
+    return res.success ? '' : res.error.issues[0].message;
+  };
+
   return (
     <section>
       <h3 className="text-lg font-semibold text-[#5F3794] mb-2">Treatment Details</h3>
@@ -255,9 +262,16 @@ const TreatmentForm = ({
                 <input
                   type="date"
                   value={treatment.startDate}
+                  min="2000-01-01"
+                  max={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
                   onChange={(e) => handleStartDateChange(index, e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-shadow ${
+                    getDateError(treatment.startDate) ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-transparent'
+                  }`}
                 />
+                {getDateError(treatment.startDate) && (
+                  <p className="mt-1 text-xs text-red-500 font-medium">{getDateError(treatment.startDate)}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

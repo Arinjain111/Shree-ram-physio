@@ -81,12 +81,12 @@ export const generateInvoiceHTML = (
   const signatureQualification = (layout.signatureQualification || '').trim() || (layout.doctorQualification || '').trim();
   const signatureImage = (layout.signatureImagePath || '').trim();
   
-  // Helper function to convert yyyy-mm-dd to dd-mm for treatments
+  // Helper function to convert yyyy-mm-dd to dd-mm-yy for treatments
   const formatDate = (dateStr: string): string => {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
     if (parts.length === 3) {
-      return `${parts[2]}-${parts[1]}`;
+      return `${parts[2]}-${parts[1]}-${parts[0].slice(-2)}`;
     }
     return dateStr;
   };
@@ -389,13 +389,7 @@ export const generateInvoiceHTML = (
           background: #000;
         }
 
-        .treatments-table th:nth-child(1) { width: 8%; }
-        .treatments-table th:nth-child(2) { width: 28%; }
-        .treatments-table th:nth-child(3) { width: 12%; }
-        .treatments-table th:nth-child(4) { width: 17%; white-space: nowrap; }
-        .treatments-table th:nth-child(5) { width: 17%; white-space: nowrap; }
-        .treatments-table th:nth-child(6) { width: 11%; }
-        .treatments-table th:nth-child(7) { width: 11%; }
+
         .treatments-table th:first-child {
           border-left: 1px solid #8764b6;
         }
@@ -404,6 +398,7 @@ export const generateInvoiceHTML = (
         }
         .treatments-table thead tr:nth-child(2) th {
           border-top: 1px solid #8764b6;
+          white-space: nowrap;
         }
         .treatments-table tbody tr {
           min-height: ${isCompact ? 24 : 32}px;
@@ -413,16 +408,13 @@ export const generateInvoiceHTML = (
           padding: ${cellPad}px; 
           border-left: 1px solid #8764b6;
           font-weight: 400;
-          overflow: hidden;
-          text-overflow: ellipsis;
         }
         .treatments-table td:nth-child(2) {
           word-wrap: break-word;
           overflow-wrap: break-word;
         }
         .treatments-table td:nth-child(4), .treatments-table td:nth-child(5) {
-          white-space: normal;
-          word-wrap: break-word;
+          white-space: nowrap;
         }
         .treatments-table td:first-child {
           border-left: 1px solid #8764b6;
@@ -567,9 +559,10 @@ export const generateInvoiceHTML = (
                         <p><strong>Sex </strong> : <span>${invoiceData.patient.gender}</span></p>
                       </div>
                       <div class="info-box">
-                        <p><strong>Contact Number</strong> : <span>${invoiceData.patient.phone}</span></p>
-                        ${(invoiceData.patient.uhid || '').trim() ? `<p><strong>UHID No.</strong> : <span>${invoiceData.patient.uhid}</span></p>` : ''}
-                      </div>
+                          <p><strong>Contact Number</strong> : <span>${invoiceData.patient.phone}</span></p>
+                          ${(invoiceData.TransactionId || '').trim() ? `<p><strong>Transaction ID</strong> : <span>${invoiceData.TransactionId}</span></p>` : ''}
+                          ${(invoiceData.patient.uhid || '').trim() ? `<p><strong>UHID No.</strong> : <span>${invoiceData.patient.uhid}</span></p>` : ''}
+                        </div>
                     </div>
 
                     <div class="summary-section">
@@ -603,6 +596,15 @@ export const generateInvoiceHTML = (
 
                   <!-- Treatments Table -->
                   <table class="treatments-table">
+                    <colgroup>
+                      <col style="width: 6%;" />
+                      <col style="width: 32%;" />
+                      <col style="width: 10%;" />
+                      <col style="width: 15%;" />
+                      <col style="width: 15%;" />
+                      <col style="width: 11%;" />
+                      <col style="width: 11%;" />
+                    </colgroup>
                     <thead>
                       <tr>
                         <th class="text-center" rowspan="2">Sr No.</th>

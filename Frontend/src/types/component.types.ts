@@ -7,6 +7,9 @@ import type { LayoutConfig } from './layout.types';
 export interface PatientFormProps {
   patient: PatientForm;
   setPatient: (patient: PatientForm) => void;
+  TransactionId?: string;
+  setTransactionId?: (id: string) => void;
+  paymentMethod?: string;
 }
 
 // Treatment Form Component
@@ -27,8 +30,6 @@ export interface PatientSearchProps {
 export interface AdditionalInfoFormProps {
   invoiceDate: string;
   setInvoiceDate: (date: string) => void;
-  paymentMethod: string;
-  setPaymentMethod: (method: string) => void;
   notes: string;
   setNotes: (notes: string) => void;
 }

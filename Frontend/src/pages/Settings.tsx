@@ -19,6 +19,20 @@ const Settings = () => {
     loadSettings();
   }, []);
 
+  useEffect(() => {
+    if (status === 'checking') {
+      showToast('info', 'Checking for updates, please wait...');
+    } else if (status === 'not-available') {
+      showToast('success', 'No updates found. You are on the latest version.');
+    } else if (status === 'available') {
+      showToast('info', 'Update found! Downloading in the background...');
+    } else if (status === 'downloaded') {
+      showToast('success', 'Update downloaded and ready to install.');
+    } else if (status === 'error') {
+      showToast('error', 'Failed to check for updates. Please try again.');
+    }
+  }, [status, showToast]);
+
   const loadSettings = async () => {
     try {
       const settingsResult = await ipcRenderer.invoke('get-invoice-settings');

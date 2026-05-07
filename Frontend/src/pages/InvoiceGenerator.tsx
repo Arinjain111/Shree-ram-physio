@@ -45,6 +45,7 @@ const InvoiceGenerator = () => {
   const [diagnosis, setDiagnosis] = useState(sampleDiagnosis);
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [TransactionId, setTransactionId] = useState('');
   const [notes, setNotes] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceNumberEdited, setInvoiceNumberEdited] = useState(false);
@@ -128,7 +129,7 @@ const InvoiceGenerator = () => {
     const initialize = async () => {
       try {
         const state = (location.state || {}) as InvoiceGeneratorNavState;
-        const navMode: InvoiceGeneratorMode = state.mode || 'create';
+        const navMode: InvoiceGeneratorMode = mode || 'create';
         setMode(navMode);
 
         // 1. Load Invoices
@@ -171,6 +172,7 @@ const InvoiceGenerator = () => {
             setNotes(inv.notes || '');
             setInvoiceDate(inv.date);
             setPaymentMethod(inv.paymentMethod || 'Cash');
+            setTransactionId(inv.TransactionId || '');
 
             if (navMode === 'edit') {
               if (inv.syncStatus === 'SYNCED') {
@@ -241,7 +243,7 @@ const InvoiceGenerator = () => {
       setPreviewInvoiceData(getCurrentInvoiceData());
     }, 500);
     return () => clearTimeout(timer);
-  }, [patient, treatments, diagnosis, invoiceDate, paymentMethod, notes, invoiceNumber]);
+  }, [patient, treatments, diagnosis, invoiceDate, paymentMethod, notes, invoiceNumber, TransactionId]);
 
   
   // Helpers
@@ -260,6 +262,7 @@ const InvoiceGenerator = () => {
     treatments,
     notes,
     paymentMethod,
+    TransactionId,
     total: calculateTotal(treatments),
     timestamp: new Date().toISOString(),
     diagnosis,
@@ -395,54 +398,86 @@ const InvoiceGenerator = () => {
                 />
               </section>
 
-              {/* Step 2: Invoice Number */}
+              {/* Step 2: Invoice Number & Payment */ }
               <section>
-                <h3 className="text-lg font-semibold text-[#5F3794]">Invoice Number <span className="text-red-500">*</span></h3>
-                <div>
-                  <p className="mb-2 text-xs text-gray-500">
-                    Auto-suggested sequential number (editable)
-                    {isSyncing && <span className="ml-2 text-blue-600 font-semibold animate-pulse">⟳ Syncing...</span>}
-                  </p>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      inputMode="numeric"
-                      maxLength={4}
-                      value={displayInvoiceNumber(invoiceNumber)}
-                      onChange={(e) => {
-                        setInvoiceNumberEdited(true);
-                        setInvoiceNumber(toPaddedInvoiceNumber(e.target.value));
-                      }}
-                      className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg bg-white text-gray-700 font-semibold"
-                      placeholder={isSyncing ? "Syncing..." : "401"}
-                    />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                      <button
-                        type="button"
-                        onClick={refreshInvoiceNumber}
-                        disabled={isRefreshingInvoiceNumber}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-slate-100 text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Refresh invoice number"
-                      >
-                        {isRefreshingInvoiceNumber ? (
-                          <svg className="animate-spin w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        ) : (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 14a8 8 0 00-14.828-3M4 10a8 8 0 0014.828 3" />
-                          </svg>
-                        )}
-                      </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-[#5F3794]">Invoice Number <span className="text-red-500">*</span></h3>
+                    <p className="mb-2 text-xs text-gray-500">
+                      Auto-suggested sequential number (editable)
+                      {isSyncing && <span className="ml-2 text-blue-600 font-semibold animate-pulse">⟳ Syncing...</span>}
+                    </p>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        inputMode="numeric"
+                        maxLength={4}
+                        value={displayInvoiceNumber(invoiceNumber)}
+                        onChange={(e) => {
+                          setInvoiceNumberEdited(true);
+                          setInvoiceNumber(toPaddedInvoiceNumber(e.target.value));
+                        }}
+                        className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg bg-white text-gray-700 font-semibold"
+                        placeholder={isSyncing ? "Syncing..." : "401"}
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                        <button
+                          type="button"
+                          onClick={refreshInvoiceNumber}
+                          disabled={isRefreshingInvoiceNumber}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-slate-100 text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Refresh invoice number"
+                        >
+                          {isRefreshingInvoiceNumber ? (
+                            <svg className="animate-spin w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 14a8 8 0 00-14.828-3M4 10a8 8 0 0014.828 3" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-[#5F3794]">Payment Method</h3>
+                    <p className="mb-2 text-xs text-gray-500">
+                      Select the method of payment
+                    </p>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => {
+                        const newMethod = e.target.value;
+                        setPaymentMethod(newMethod);
+                        if (TransactionId && newMethod !== 'UPI' && newMethod !== 'Card') {
+                          setTransactionId('');
+                          showToast('info', `Payment method changed to ${newMethod}. Transaction ID cleared.`);
+                        }
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 font-semibold"
+                    >
+                      <option>Cash</option>
+                      <option>Card</option>
+                      <option>UPI</option>
+                      <option>Online</option>
+                      <option>Cheque</option>
+                    </select>
                   </div>
                 </div>
               </section>
 
-              <PatientForm patient={patient} setPatient={setPatient} />
+              <PatientForm 
+                patient={patient} 
+                setPatient={setPatient} 
+                TransactionId={TransactionId}
+                setTransactionId={setTransactionId}
+                paymentMethod={paymentMethod}
+              />
 
               <section>
                 <h3 className="text-lg font-semibold text-[#5F3794] mb-2">Diagnosis / Complaint</h3>
@@ -477,8 +512,6 @@ const InvoiceGenerator = () => {
               <AdditionalInfoForm
                 invoiceDate={invoiceDate}
                 setInvoiceDate={setInvoiceDate}
-                paymentMethod={paymentMethod}
-                setPaymentMethod={setPaymentMethod}
                 notes={notes}
                 setNotes={setNotes}
               />

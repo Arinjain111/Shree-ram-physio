@@ -9,6 +9,10 @@ export class PrismaSyncEngine {
   private syncInterval: NodeJS.Timeout | null = null;
   private isSyncing: boolean = false;
 
+  // Azure App Service can cold-start; keep these >5s.
+  private static readonly HEALTH_TIMEOUT_MS = 15_000;
+  private static readonly STATUS_TIMEOUT_MS = 15_000;
+
   constructor(backendUrl: string) {
     this.prisma = getPrismaClient();
     this.backendUrl = backendUrl;
@@ -95,7 +99,9 @@ export class PrismaSyncEngine {
       }
 
       // Start fetching server status
-      const statusResponse = await axios.get(`${this.backendUrl}/api/sync/status`, { timeout: 5000 });
+      const statusResponse = await axios.get(`${this.backendUrl}/api/sync/status`, {
+        timeout: PrismaSyncEngine.STATUS_TIMEOUT_MS
+      });
 
       if (statusResponse.data.success) {
         const serverLastModified = new Date(statusResponse.data.lastModified).getTime();
@@ -204,6 +210,18 @@ export class PrismaSyncEngine {
 
       const patientsWithFilteredUhid = new Set<number>();
 
+      const normalizePaymentMethodForSync = (value: unknown): 'Cash' | 'Card' | 'UPI' | 'Online' | 'Cheque' => {
+        if (typeof value !== 'string') return 'Cash';
+        const v = value.trim().toLowerCase();
+        if (!v) return 'Cash';
+        if (v === 'cash') return 'Cash';
+        if (v === 'card' || v === 'debit' || v === 'credit') return 'Card';
+        if (v === 'upi') return 'UPI';
+        if (v === 'online' || v === 'netbanking' || v === 'bank') return 'Online';
+        if (v === 'cheque' || v === 'check') return 'Cheque';
+        return 'Cash';
+      };
+
       const syncPayload = {
         lastSyncTime,
         patients: pendingPatients.map(p => ({
@@ -232,7 +250,7 @@ export class PrismaSyncEngine {
           date: inv.date,
           diagnosis: inv.diagnosis || '',
           notes: inv.notes || '',
-          paymentMethod: inv.paymentMethod || 'Cash',
+          paymentMethod: normalizePaymentMethodForSync(inv.paymentMethod),
           total: inv.total,
           updatedAt: inv.updatedAt.toISOString()
         })),
@@ -690,7 +708,9 @@ export class PrismaSyncEngine {
    */
   private async checkConnectivity(): Promise<boolean> {
     try {
-      await axios.get(`${this.backendUrl}/health`, { timeout: 5000 });
+      await axios.get(`${this.backendUrl}/health`, {
+        timeout: PrismaSyncEngine.HEALTH_TIMEOUT_MS
+      });
       return true;
     } catch {
       return false;
