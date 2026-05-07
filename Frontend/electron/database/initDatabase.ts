@@ -74,6 +74,20 @@ export async function initializeDatabase(): Promise<void> {
                     }
                 }
 
+                // Lightweight migration: add transaction_id column to invoices if missing.
+                const invoiceCols: Array<{ name: string }> = db.prepare('PRAGMA table_info(invoices);').all() as any;
+                const hasTransactionId = invoiceCols.some(c => c.name === 'transaction_id');
+
+                if (!hasTransactionId) {
+                    console.log('🔧 Migrating local DB: adding transaction_id to invoices...');
+                    try {
+                        db.exec('ALTER TABLE invoices ADD COLUMN transaction_id TEXT;');
+                        console.log('✅ transaction_id column added');
+                    } catch (e) {
+                        console.error('❌ Failed to add transaction_id column:', e);
+                    }
+                }
+
                 console.log('✅ Database already initialized');
                 db.close();
                 return;
@@ -120,6 +134,7 @@ export async function initializeDatabase(): Promise<void> {
         diagnosis TEXT NOT NULL DEFAULT '',
         notes TEXT NOT NULL DEFAULT '',
         payment_method TEXT NOT NULL DEFAULT 'Cash',
+        transaction_id TEXT,
         total REAL NOT NULL,
         cloud_id INTEGER,
         sync_status TEXT NOT NULL DEFAULT 'PENDING',
