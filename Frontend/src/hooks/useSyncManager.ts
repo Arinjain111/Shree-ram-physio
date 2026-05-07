@@ -39,7 +39,14 @@ export const useSyncManager = () => {
                 setTimeout(() => setSyncMessage(''), 3000);
                 return true;
             } else {
-                throw new Error(result.error || 'Sync failed unknown error');
+                // "Sync already in progress" is not a real error — just skip silently
+                const errorMsg = result.error || result.result?.message || '';
+                if (errorMsg.includes('already in progress')) {
+                    console.log('⏳ Sync already in progress, skipping.');
+                    setSyncMessage('');
+                    return true;
+                }
+                throw new Error(errorMsg || 'Sync failed unknown error');
             }
         } catch (error) {
             console.error('Error syncing:', error);

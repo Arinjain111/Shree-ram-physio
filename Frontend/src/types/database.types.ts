@@ -42,6 +42,7 @@ export interface DatabaseInvoice {
   diagnosis?: string;
   notes?: string;
   paymentMethod: string;
+  TransactionId?: string;
   total: number;
   syncStatus?: string;
   cloudId?: number;

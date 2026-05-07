@@ -48,7 +48,7 @@ const InvoiceCustomizer = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-8">
+    <div className="w-full max-w-400 min-h-screen bg-slate-50/50 px-6 pb-6 mx-auto">
       <div className="max-w-450 mx-auto">
         {/* Header Section */}
         <PageHeader 

@@ -46,6 +46,11 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
             <p className="text-xs text-slate-500 font-medium">
               {new Date(invoice.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
+            {invoice.TransactionId && (
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                TX ID: <span className="font-bold text-slate-700">{invoice.TransactionId}</span>
+              </p>
+            )}
           </div>
         </div>
         

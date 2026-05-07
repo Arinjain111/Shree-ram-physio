@@ -31,7 +31,7 @@ type InvoiceGeneratorNavState = {
 
 const InvoiceGenerator = () => {
   const { showToast, showModal } = useUI();
-  const { isSyncing, syncNow } = useSyncManager(); // Use central sync state
+  const { isSyncing } = useSyncManager(); // Use central sync state
   const { handleError } = useErrorHandler();
   const { printInvoice, previewInvoice } = useInvoicePrinter();
   const location = useLocation();
@@ -195,12 +195,6 @@ const InvoiceGenerator = () => {
         // 2. Fetch Initial Number (create/duplicate only)
         await fetchInvoiceNumber(true);
 
-        // 3. Trigger Sync (Background)
-        // We use the central syncNow to ensure global state is updated
-        // But we don't await blocking UI unless necessary. 
-        // Actually, syncNow returns success/fail.
-        await syncNow();
-
       } catch (error) {
         handleError(error, 'Error initializing invoice generator');
       }
@@ -349,7 +343,7 @@ const InvoiceGenerator = () => {
   };
 
   return (
-    <div className="w-full max-w-400 mx-auto p-6">
+    <div className="w-full max-w-400 min-h-fit bg-slate-50/50 px-6  mx-auto">
       <PageHeader 
         title="Invoice Generator"
         icon={<div className="p-2 bg-blue-100 text-blue-700 rounded-lg"><FileTextIcon /></div>}
