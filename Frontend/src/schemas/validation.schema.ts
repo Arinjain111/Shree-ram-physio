@@ -36,8 +36,8 @@ export type Patient = z.infer<typeof PatientSchema>;
  * Patient Form Schema - For user input validation
  */
 export const PatientFormSchema = z.object({
-  id: z.number().int().optional(),
-  cloudId: z.number().int().optional(),
+  id: z.number().int().nullish(),
+  cloudId: z.number().int().nullish(),
   firstName: z.string()
     .min(1, 'First name is required')
     .max(100, 'First name must be less than 100 characters')
@@ -88,7 +88,7 @@ export const ValidFutureDateStringSchema = z.string()
  * Invoice Schema - Validates invoice data
  */
 export const InvoiceSchema = z.object({
-  id: z.number().int().positive().optional(),
+  id: z.number().int().positive().nullish(),
   invoiceNumber: z.string()
     .regex(/^\d{4}$/, 'Invoice number must be 4 digits')
     .min(1, 'Invoice number is required'),
@@ -97,14 +97,14 @@ export const InvoiceSchema = z.object({
   diagnosis: z.string().max(500).default(''),
   notes: z.string().max(1000).default(''),
   paymentMethod: z.enum(['Cash', 'Card', 'UPI', 'Online', 'Cheque']).default('Cash'),
-  TransactionId: z.string().max(100).optional(),
+  TransactionId: z.string().max(100).nullish(),
   total: z.number().min(0, 'Total must be positive'),
   // Sync fields
-  cloudId: z.number().int().positive().optional(),
+  cloudId: z.number().int().positive().nullish(),
   syncStatus: z.enum(['PENDING', 'SYNCED', 'CONFLICT']).default('PENDING'),
-  lastSyncAt: z.date().optional().or(z.string().datetime().optional()),
-  createdAt: z.date().optional().or(z.string().datetime().optional()),
-  updatedAt: z.date().optional().or(z.string().datetime().optional()),
+  lastSyncAt: z.date().nullish().or(z.string().datetime().nullish()),
+  createdAt: z.date().nullish().or(z.string().datetime().nullish()),
+  updatedAt: z.date().nullish().or(z.string().datetime().nullish()),
 });
 
 export type Invoice = z.infer<typeof InvoiceSchema>;
@@ -137,13 +137,15 @@ export type Treatment = z.infer<typeof TreatmentSchema>;
  * Treatment Form Schema - For user input
  */
 export const TreatmentFormSchema = z.object({
+  id: z.number().int().nullish(),
+  cloudId: z.number().int().nullish(),
   name: z.string().min(1, 'Treatment name is required').max(200),
   duration: z.string().default(''), // Required string to match TreatmentItem
   sessions: z.number().int().min(1, 'At least 1 session required'),
   startDate: ValidFutureDateStringSchema,
   endDate: ValidFutureDateStringSchema,
   amount: z.number().min(0, 'Amount must be positive'),
-  rate: z.number().optional(), // Deprecated field for backward compatibility
+  rate: z.number().nullish(), // Deprecated field for backward compatibility
 });
 
 export type TreatmentForm = z.infer<typeof TreatmentFormSchema>;
@@ -172,10 +174,10 @@ export const InvoiceDataSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   patient: PatientFormSchema,
   treatments: z.array(TreatmentFormSchema).min(1, 'At least one treatment is required'),
-  diagnosis: z.string().max(500).optional(),
+  diagnosis: z.string().max(500).nullish(),
   notes: z.string().max(1000).default(''),
   paymentMethod: z.string().default('Cash'), // Keep as string to match old type
-  TransactionId: z.string().max(100).optional(),
+  TransactionId: z.string().max(100).nullish(),
   total: z.string(), // Keep as string to match old InvoiceData type
   timestamp: z.string(), // Required timestamp field
 });
