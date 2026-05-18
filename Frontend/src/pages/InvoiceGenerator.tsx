@@ -51,7 +51,7 @@ const InvoiceGenerator = () => {
   const [invoiceNumberEdited, setInvoiceNumberEdited] = useState(false);
   const [isRefreshingInvoiceNumber, setIsRefreshingInvoiceNumber] = useState(false);
 
-  const [mode, setMode] = useState<InvoiceGeneratorMode>('create');
+  const [, setMode] = useState<InvoiceGeneratorMode>('create');
   const [editingInvoiceId, setEditingInvoiceId] = useState<number | null>(null);
   
   // Data State
@@ -129,7 +129,7 @@ const InvoiceGenerator = () => {
     const initialize = async () => {
       try {
         const state = (location.state || {}) as InvoiceGeneratorNavState;
-        const navMode: InvoiceGeneratorMode = mode || 'create';
+        const navMode: InvoiceGeneratorMode = state.mode || 'create';
         setMode(navMode);
 
         // 1. Load Invoices
@@ -149,16 +149,18 @@ const InvoiceGenerator = () => {
             setPatient({
               id: inv.patient?.id,
               cloudId: inv.patient?.cloudId,
-              firstName: inv.patient?.firstName,
-              lastName: inv.patient?.lastName,
-              age: inv.patient?.age,
-              gender: inv.patient?.gender,
-              phone: inv.patient?.phone,
-              uhid: inv.patient?.uhid || undefined
+              firstName: inv.patient?.firstName || '',
+              lastName: inv.patient?.lastName || '',
+              age: inv.patient?.age || 0,
+              gender: inv.patient?.gender || '',
+              phone: inv.patient?.phone || '',
+              uhid: inv.patient?.uhid || ''
             } as any);
 
             setTreatments(
               (inv.treatments || []).map((t: any) => ({
+                id: t.id,
+                cloudId: t.cloudId,
                 name: t.name,
                 duration: t.duration || '',
                 startDate: t.startDate,
@@ -193,7 +195,10 @@ const InvoiceGenerator = () => {
         }
 
         // 2. Fetch Initial Number (create/duplicate only)
-        await fetchInvoiceNumber(true);
+        const currentMode = state.mode || 'create';
+        if (currentMode !== 'edit') {
+          await fetchInvoiceNumber(true);
+        }
 
       } catch (error) {
         handleError(error, 'Error initializing invoice generator');
@@ -250,16 +255,17 @@ const InvoiceGenerator = () => {
   };
 
   const getCurrentInvoiceData = (): InvoiceData => ({
+    id: editingInvoiceId || null,
     invoiceNumber,
     date: invoiceDate,
     patient: { ...patient },
     treatments,
     notes,
     paymentMethod,
-    TransactionId,
+    TransactionId: TransactionId || undefined,
     total: calculateTotal(treatments),
     timestamp: new Date().toISOString(),
-    diagnosis,
+    diagnosis: diagnosis || undefined,
   });
 
   const validateInvoice = (data: InvoiceData) => {

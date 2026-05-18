@@ -166,6 +166,8 @@ export type InvoiceWithPatient = z.infer<typeof InvoiceWithPatientSchema>;
  * Complete Invoice Data Schema - For invoice generation
  */
 export const InvoiceDataSchema = z.object({
+  id: z.number().int().positive().nullable().optional(),
+  cloudId: z.number().int().positive().nullable().optional(),
   invoiceNumber: z.string().min(1, 'Invoice number is required'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   patient: PatientFormSchema,
