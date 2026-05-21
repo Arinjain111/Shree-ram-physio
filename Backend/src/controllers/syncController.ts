@@ -258,30 +258,20 @@ export const syncData = async (req: Request, res: Response) => {
 };
 
 export const getSyncStatus = async (req: Request, res: Response) => {
-  /**
-   * Prisma Accelerate cacheStrategy option.
-   * Not yet typed in the Prisma client, so we pass it via a spread object.
-   * @see https://www.prisma.io/data-platform/accelerate
-   */
-  const cacheOpts = { ttl: 60, swr: 60 };
-
   try {
     const [lastPatient, lastInvoice, lastTreatment] = await Promise.all([
       prisma.patient.findFirst({
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
-        ...cacheOpts,
-      } as any),
+      }),
       prisma.invoice.findFirst({
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
-        ...cacheOpts,
-      } as any),
+      }),
       prisma.treatment.findFirst({
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
-        ...cacheOpts,
-      } as any),
+      }),
     ]);
 
     const timestamps = [
