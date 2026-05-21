@@ -281,19 +281,33 @@ export const deleteInvoice = async (req: Request, res: Response) => {
     throw new ApiError(400, 'Invalid invoice ID', { code: 'INVALID_INVOICE_ID' });
   }
 
-  // Check if invoice exists
+  // Check if invoice exists and get patientId
   const existingInvoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
+    select: { id: true, patientId: true },
   });
 
   if (!existingInvoice) {
     throw new ApiError(404, 'Invoice not found', { code: 'INVOICE_NOT_FOUND' });
   }
 
+  const patientId = existingInvoice.patientId;
+
   // Delete invoice and associated treatments (cascade)
   await prisma.invoice.delete({
     where: { id: invoiceId },
   });
+
+  // If this was the patient's last invoice, delete the orphaned patient record
+  const remainingInvoices = await prisma.invoice.count({
+    where: { patientId },
+  });
+
+  if (remainingInvoices === 0) {
+    await prisma.patient.delete({
+      where: { id: patientId },
+    });
+  }
 
   res.json({
     success: true,
