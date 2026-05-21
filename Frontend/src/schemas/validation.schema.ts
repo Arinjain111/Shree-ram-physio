@@ -64,8 +64,7 @@ export const PatientFormSchema = z.object({
   ),
   uhid: z.literal('').or(
     z.string()
-      .max(50, 'UHID must be less than 50 characters')
-      .regex(/^[a-zA-Z0-9]+$/, 'UHID can only contain letters and numbers'),
+      .max(50, 'UHID must be less than 50 characters'),
   ),
 });
 

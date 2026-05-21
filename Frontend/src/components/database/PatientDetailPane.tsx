@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useUI } from '@/context/UIContext';
 import type { DatabaseInvoice } from '@/types/database.types';
 import { InvoiceHistoryCard } from './InvoiceHistoryCard';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 interface PatientDetailPaneProps {
     invoices: DatabaseInvoice[] | null;

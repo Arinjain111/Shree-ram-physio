@@ -1,15 +1,14 @@
 import { useCallback } from 'react';
 
-import { useInvoiceLayout } from './useInvoiceLayout';
+import { useLayoutContext } from '@/context/LayoutContext';
 import { generateInvoiceHTML } from '@/utils/invoiceGenerator';
 import { useErrorHandler } from './useErrorHandler';
 import type { InvoiceData } from '@/schemas/validation.schema';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 export const useInvoicePrinter = () => {
 
-    const { layout } = useInvoiceLayout();
+    const { layout } = useLayoutContext();
     const { handleError } = useErrorHandler();
 
     const printInvoice = useCallback(async (invoiceData: InvoiceData) => {

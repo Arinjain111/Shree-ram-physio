@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error' | 'not-available';
 
@@ -22,8 +21,9 @@ export function useAutoUpdater() {
   const [state, setState] = useState<UpdateState>({ status: 'idle' });
 
   useEffect(() => {
-    const handler = (_event: any, data: UpdateState) => {
-      setState(data);
+    const handler = (...args: unknown[]) => {
+      const data = args[0] as UpdateState | undefined;
+      if (data) setState(data);
     };
     
     // Listen to update status events

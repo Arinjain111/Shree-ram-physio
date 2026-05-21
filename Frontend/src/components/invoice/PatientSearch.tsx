@@ -37,7 +37,7 @@ const PatientSearch = ({ invoices, onPatientSelect }: PatientSearchProps) => {
       setIsSearching(true);
       try {
         // Use the external search algorithm
-        const results = searchAlgo(searchQuery, invoices);
+        const results = searchAlgo(searchQuery, invoices as any);
 				
         setSearchResults(results.slice(0, 10)); // Limit to 10 results
         setShowDropdown(results.length > 0);

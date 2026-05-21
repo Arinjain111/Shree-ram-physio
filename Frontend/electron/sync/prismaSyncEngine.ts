@@ -1,4 +1,4 @@
-import axios from 'axios';
+import http from '../services/http';
 import { PrismaClient } from '@prisma/client';
 import { getPrismaClient } from '../database/prisma';
 import { BrowserWindow } from 'electron';
@@ -99,7 +99,7 @@ export class PrismaSyncEngine {
       }
 
       // Start fetching server status
-      const statusResponse = await axios.get(`${this.backendUrl}/api/sync/status`, {
+      const statusResponse = await http.get(`${this.backendUrl}/api/sync/status`, {
         timeout: PrismaSyncEngine.STATUS_TIMEOUT_MS
       });
 
@@ -277,7 +277,7 @@ export class PrismaSyncEngine {
           : '📅 Full sync: No previous sync found (or reset). Fetching ALL cloud data'
       );
 
-      const response = await axios.post(
+      const response = await http.post(
         `${this.backendUrl}/api/sync`,
         syncPayload,
         {
@@ -584,7 +584,7 @@ export class PrismaSyncEngine {
       let presetStats: { fetched: number; created: number; updated: number; unchanged: number; error?: string } = { fetched: 0, created: 0, updated: 0, unchanged: 0 };
       try {
         console.log(`📋 Fetching treatment presets from ${this.backendUrl}/api/presets`);
-        const presetsResponse = await axios.get(`${this.backendUrl}/api/presets`, {
+        const presetsResponse = await http.get(`${this.backendUrl}/api/presets`, {
           timeout: 10000
         });
 
@@ -708,7 +708,7 @@ export class PrismaSyncEngine {
    */
   private async checkConnectivity(): Promise<boolean> {
     try {
-      await axios.get(`${this.backendUrl}/health`, {
+      await http.get(`${this.backendUrl}/health`, {
         timeout: PrismaSyncEngine.HEALTH_TIMEOUT_MS
       });
       return true;

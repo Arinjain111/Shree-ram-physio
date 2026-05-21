@@ -22,7 +22,7 @@ export interface TreatmentFormProps {
 
 // Patient Search Component
 export interface PatientSearchProps {
-  invoices: any[]; // Using any for now to avoid circular dependencies
+  invoices: Array<{ invoiceNumber: string; date?: string; patient: { id?: number | null; cloudId?: number | null; firstName?: string; lastName?: string; name?: string; age?: number; gender?: string; phone?: string; uhid?: string | null } }>;
   onPatientSelect: (patient: PatientForm) => void;
 }
 

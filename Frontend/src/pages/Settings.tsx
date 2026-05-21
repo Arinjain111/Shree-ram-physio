@@ -4,8 +4,7 @@ import PageHeader from '@/components/layout/PageHeader';
 import { handleFrontendError } from '@/services/errorHandler';
 import { useAutoUpdater } from '@/hooks/useAutoUpdater';
 import packageJson from '../../package.json';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 const Settings = () => {
   const { showToast } = useUI();

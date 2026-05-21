@@ -8,8 +8,7 @@ import { SearchIcon, RefreshIcon } from '@/components/icons';
 import { PatientDetailPane } from '@/components/database/PatientDetailPane';
 import type { DatabaseInvoice } from '@/types/database.types';
 import type { InvoiceData } from '@/schemas/validation.schema';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 // Helper for colors
 const COLORS = [
@@ -46,7 +45,7 @@ export const SyncStatusDot = ({ status }: { status?: string }) => {
 type SortOption = 'Name A-Z' | 'Name Z-A' | 'Recent' | 'Highest Paid';
 
 const DatabaseFind = () => {
-  const { showToast, showModal } = useUI();
+  const { showToast } = useUI();
   const { handleError } = useErrorHandler();
   const { isSyncing, syncMessage, lastSyncTime, syncNow } = useSyncManager();
   const { printInvoice } = useInvoicePrinter();
@@ -62,50 +61,6 @@ const DatabaseFind = () => {
   // New States
   const [sortOption, setSortOption] = useState<SortOption>('Name A-Z');
   const [alphabetFilter, setAlphabetFilter] = useState<string | null>(null);
-
-  const handleReset = (type: 'local' | 'cloud' | 'all') => {
-      const confirmTitle = type === 'all' ? 'Reset Everywhere' : `Reset ${type.charAt(0).toUpperCase() + type.slice(1)} Database`;
-      const confirmMsg = type === 'all' 
-          ? 'Are you sure you want to PERMANENTLY DELETE ALL DATA from BOTH local and cloud databases?\nThis cannot be undone.'
-          : `Are you sure you want to reset the ${type} database?\nThis will delete all data in ${type}.`;
-      
-      showModal({
-          type: 'danger',
-          title: confirmTitle,
-          message: confirmMsg,
-          confirmText: 'Yes, Delete',
-          cancelText: 'Cancel',
-          onConfirm: async () => {
-              const cmd = type === 'local' ? 'reset-local-database' 
-                        : type === 'cloud' ? 'reset-cloud-database' 
-                        : 'reset-all-databases';
-
-              try {
-                  showToast('info', `Resetting ${type} database...`);
-                  const result = await ipcRenderer.invoke(cmd);
-                  if (result.success) {
-                      showToast('success', `${type.toUpperCase()} database reset successfully`);
-                      const reloadResult = await ipcRenderer.invoke('load-invoices');
-                      if (reloadResult.success) {
-                          setInvoices(reloadResult.invoices);
-                      }
-                      window.dispatchEvent(new CustomEvent('invoices-updated')); 
-                  } else {
-                      showModal({
-                          title: 'Reset Failed',
-                          message: result.error,
-                          type: 'danger',
-                          confirmText: 'Close'
-                      });
-                  }
-              } catch (error) {
-                  handleError(error, 'Reset failed');
-              } finally {
-                  setShowManageOptions(false);
-              }
-          }
-      });
-  };
 
   const loadInvoices = async () => {
     try {
@@ -287,27 +242,6 @@ const DatabaseFind = () => {
                                   className="text-left px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors flex items-center gap-2"
                               >
                                   <span>🔄 Force Full Sync</span>
-                              </button>
-                              <div className="h-px bg-slate-100 my-1"></div>
-                              <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Reset Actions</div>
-                              <button 
-                                  onClick={() => handleReset('local')} 
-                                  className="text-left px-3 py-2 text-sm text-slate-700 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors flex items-center gap-2"
-                              >
-                                  <span>💻 Reset Local DB</span>
-                              </button>
-                              <button 
-                                  onClick={() => handleReset('cloud')} 
-                                  className="text-left px-3 py-2 text-sm text-slate-700 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors flex items-center gap-2"
-                              >
-                                  <span>☁️ Reset Cloud DB</span>
-                              </button>
-                              <div className="h-px bg-slate-100 my-1"></div>
-                              <button 
-                                  onClick={() => handleReset('all')} 
-                                  className="text-left px-3 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-2"
-                              >
-                                  <span>⚠ Reset Everything</span>
                               </button>
                           </div>
                       )}

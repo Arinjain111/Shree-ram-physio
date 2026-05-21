@@ -7,7 +7,7 @@ const UIContext = createContext<UIContextType | undefined>(undefined);
 
 export const UIProvider = ({ children }: { children: ReactNode }) => {
   const [toasts, setToasts] = useState<ToastProps[]>([]);
-  const [modalProps, setModalProps] = useState<Omit<ModalProps, 'onConfirm' | 'onCancel'> | null>(null);
+  const [modalProps, setModalProps] = useState<ModalProps | null>(null);
   const [modalCallbacks, setModalCallbacks] = useState<{ onConfirm?: () => void; onCancel?: () => void }>({});
 
   const showToast = useCallback((type: ToastType, message: string, duration = 3000) => {
@@ -20,7 +20,7 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const showModal = useCallback((props: Omit<ModalProps, 'isOpen' | 'onConfirm' | 'onCancel'> & { onConfirm?: () => void; onCancel?: () => void }) => {
-    setModalProps({ ...props, isOpen: true } as any);
+    setModalProps({ ...props, isOpen: true, onConfirm: props.onConfirm ?? (() => {}), onCancel: props.onCancel ?? (() => {}) });
     setModalCallbacks({ onConfirm: props.onConfirm, onCancel: props.onCancel });
   }, []);
 
@@ -57,8 +57,7 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
       {/* Modal Container */}
       {modalProps && (
         <Modal
-          {...(modalProps as any)}
-          isOpen={!!modalProps}
+          {...modalProps}
           onConfirm={handleConfirm}
           onCancel={handleCancel}
         />

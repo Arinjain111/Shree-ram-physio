@@ -74,7 +74,7 @@ const Modal = ({
   };
 
   const formatMessage = (msg: string) => {
-    if (!msg.includes('\n')) return <p className="text-sm text-slate-500 wrap-break-words">{msg}</p>;
+    if (!msg.includes('\n')) return <p className="text-sm text-slate-500 break-words">{msg}</p>;
 
     const lines = msg.split('\n').filter(line => line.trim().length > 0);
     
@@ -99,12 +99,12 @@ const Modal = ({
             return (
               <div key={i} className="flex items-start gap-2">
                 <span className="mt-2 w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                <span className="wrap-break-words">{cleanLine}</span>
+                <span className="break-words">{cleanLine}</span>
               </div>
             );
           }
 
-          return <p key={i} className="wrap-break-words">{cleanLine}</p>;
+          return <p key={i} className="break-words">{cleanLine}</p>;
         })}
       </div>
     );

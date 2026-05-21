@@ -10,8 +10,7 @@ import { useUI } from '@/context/UIContext';
 import PageHeader from '@/components/layout/PageHeader';
 import { ChartBarIcon } from '@/components/icons';
 import type { DatabaseInvoice } from '@/types/database.types';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 // Color palette for charts
 const COLORS = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'];
@@ -28,7 +27,7 @@ interface Metrics {
 export default function Finances() {
   const { showToast } = useUI();
   const [invoices, setInvoices] = useState<DatabaseInvoice[]>([]);
-  const [, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Date Range State
   const [preset, setPreset] = useState<DatePreset>('30days');
@@ -112,30 +111,19 @@ export default function Finances() {
     const previousM = calculateMetrics(previousInvoices);
 
     // Chart Data (Group by Day or Month depending on preset)
-    const trendMap = new Map<string, number>();
     const formatStr = preset === '30days' || preset === 'custom' && daysDiff <= 60 ? 'MMM dd' : 'MMM yyyy';
     
-    currentInvoices.forEach(inv => {
-      const date = parseISO(inv.date);
-      if (!isValid(date)) return;
-      const key = format(date, formatStr);
-      trendMap.set(key, (trendMap.get(key) || 0) + Number(inv.total));
-    });
-
-    // To ensure charts show chronologically, we could initialize empty dates or sort.
-
-
-    // Better Trend Chart generation (sort first)
+    // Sort invoices chronologically before grouping
     const sortedCurrent = [...currentInvoices].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const betterTrendMap = new Map<string, number>();
+    const trendMap = new Map<string, number>();
     sortedCurrent.forEach(inv => {
       const date = parseISO(inv.date);
       if (isValid(date)) {
-         const key = format(date, formatStr);
-         betterTrendMap.set(key, (betterTrendMap.get(key) || 0) + Number(inv.total));
+        const key = format(date, formatStr);
+        trendMap.set(key, (trendMap.get(key) || 0) + Number(inv.total));
       }
     });
-    const finalChartData = Array.from(betterTrendMap.entries()).map(([date, revenue]) => ({ date, revenue }));
+    const finalChartData = Array.from(trendMap.entries()).map(([date, revenue]) => ({ date, revenue }));
 
     // Treatment Breakdown
     const tMap = new Map<string, number>();
@@ -164,7 +152,18 @@ export default function Finances() {
     const isPositive = diff >= 0;
     const displayCurrent = isCurrency ? `₹${current.toLocaleString()}` : current.toLocaleString();
     
+  if (isLoading) {
     return (
+      <div className="min-h-screen bg-slate-50/50 px-6 pb-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading financial data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
         <h3 className="text-sm font-semibold text-slate-500 mb-2">{title}</h3>
         <div className="text-3xl font-bold text-slate-800 mb-2">{displayCurrent}</div>
@@ -244,7 +243,7 @@ export default function Finances() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-6">Revenue Trend</h3>
-            <div className="h-[300px]">
+            <div className="h-75">
               {chartData.length > 0 ? (
                  <ResponsiveContainer width="100%" height="100%">
                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
@@ -267,7 +266,7 @@ export default function Finances() {
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-6">Revenue by Treatment</h3>
-            <div className="h-[300px]">
+            <div className="h-75">
               {treatmentData.length > 0 ? (
                  <ResponsiveContainer width="100%" height="100%">
                    <BarChart layout="vertical" data={treatmentData} margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>

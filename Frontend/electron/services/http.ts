@@ -1,4 +1,11 @@
 import axios from 'axios/dist/node/axios.cjs';
+import { getApiKey } from '../config/backend';
 
-// Export the default instance or a configured instance
-export default axios;
+const http = axios.create({
+  headers: {
+    'X-API-Key': getApiKey(),
+  },
+});
+
+export default http;
+

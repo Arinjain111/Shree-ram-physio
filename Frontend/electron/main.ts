@@ -63,9 +63,10 @@ function createWindow() {
     height: 800,
     show: false,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      webSecurity: false, // Allow ES modules from file:// protocol
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+      webSecurity: false,
     },
   });
 

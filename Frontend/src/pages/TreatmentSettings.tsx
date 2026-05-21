@@ -4,8 +4,7 @@ import PageHeader from '@/components/layout/PageHeader';
 import type { TreatmentPreset } from '@/types/treatmentPreset.types';
 import { handleFrontendError } from '@/services/errorHandler';
 import { PlusIcon, EditIcon, TrashIcon, SaveIcon, XIcon, SettingsIcon } from '@/components/icons';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 const TreatmentSettings = () => {
   const { showToast, showModal } = useUI();

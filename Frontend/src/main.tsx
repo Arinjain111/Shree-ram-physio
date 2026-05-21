@@ -2,6 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import { UIProvider } from '@/context/UIContext';
+import { LayoutProvider } from '@/context/LayoutContext';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import App from './App';
 import './index.css'
 
@@ -20,14 +22,13 @@ window.onerror = function(message, source, lineno, colno, error) {
   document.body.appendChild(errDiv);
 };
 
-// Check for electron integration
+// Check for electron integration (via preload script with contextIsolation)
 try {
   console.log('Checking Electron Integration...');
-  if (typeof window.require !== 'function') {
-    throw new Error('window.require is NOT a function. Node integration failed?');
+  if (!window.electronAPI) {
+    throw new Error('window.electronAPI is not defined. Preload script not loaded?');
   }
-  const electron = window.require('electron');
-  console.log('Electron required successfully:', electron);
+  console.log('Electron API available:', typeof window.electronAPI.invoke, typeof window.electronAPI.on);
 } catch (e: any) {
   console.error('Electron integration check failed:', e);
   window.onerror(e.message, 'main.tsx', 0, 0, e);
@@ -37,7 +38,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <HashRouter>
       <UIProvider>
-        <App />
+        <LayoutProvider>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </LayoutProvider>
       </UIProvider>
     </HashRouter>
   </React.StrictMode>,

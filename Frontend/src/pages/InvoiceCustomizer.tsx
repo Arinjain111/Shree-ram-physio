@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useInvoiceLayout, LayoutConfig } from '@/hooks/useInvoiceLayout';
+import { useLayoutContext } from '@/context/LayoutContext';
+import type { LayoutConfig } from '@/types/layout.types';
 import { useUI } from '@/context/UIContext';
 import PageHeader from '@/components/layout/PageHeader';
 import HeaderDetailsSection from '@/components/customizer/HeaderDetailsSection';
@@ -10,7 +11,7 @@ import { SaveIcon, RotateCcwIcon, LayoutIcon } from '@/components/icons';
 
 const InvoiceCustomizer = () => {
   const { showToast, showModal } = useUI();
-  const { layout: savedLayout, loading: layoutLoading, saveLayout, resetLayout } = useInvoiceLayout();
+  const { layout: savedLayout, loading: layoutLoading, saveLayout, resetLayout } = useLayoutContext();
   
   const [formData, setFormData] = useState<LayoutConfig>(savedLayout);
 

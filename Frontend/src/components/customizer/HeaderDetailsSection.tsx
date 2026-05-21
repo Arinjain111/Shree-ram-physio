@@ -1,7 +1,6 @@
 // import { LayoutConfig } from '@/hooks/useInvoiceLayout';
 import type { HeaderDetailsSectionProps } from '@/types/component.types';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 const HeaderDetailsSection = ({ formData, onChange }: HeaderDetailsSectionProps) => {
   const logoUrl = formData.logoPath || '';

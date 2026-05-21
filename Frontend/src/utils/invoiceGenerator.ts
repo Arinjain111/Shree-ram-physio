@@ -1,5 +1,5 @@
 import type { InvoiceData } from '@/schemas/validation.schema.ts';
-import { LayoutConfig } from '@/hooks/useInvoiceLayout';
+import type { LayoutConfig } from '@/types/layout.types';
 
 // Normalize a local filesystem path or return data URL as-is
 const toFileUrl = (p: string): string => {
@@ -15,6 +15,16 @@ const toFileUrl = (p: string): string => {
   } catch {
     return p;
   }
+};
+
+const escapeHtml = (value: unknown): string => {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 };
 
 export const generateInvoiceHTML = (
@@ -69,7 +79,7 @@ export const generateInvoiceHTML = (
   const titleHeight = isCompact ? 24 : 30;
   const titleFontSize = isCompact ? 14 : 16;
 
-  const titleText = (layout.title || 'PHYSIOTHERAPY RECIEPT').trim();
+  const titleText = (layout.title || 'PHYSIOTHERAPY RECEIPT').trim();
   const clinicTagline = (layout.clinicTagline || '').trim();
   const footerNoteTitle = (layout.footerNoteTitle || 'Note:').trim();
   const footerNotesLines = (layout.footerNotes || '')
@@ -554,14 +564,14 @@ export const generateInvoiceHTML = (
                     
                     <div class="info-section">
                       <div class="info-box">
-                        <p><strong>Patient Name</strong> : <span>${displayPatientName}</span></p>
+                        <p><strong>Patient Name</strong> : <span>${escapeHtml(displayPatientName)}</span></p>
                         <p><strong>Age </strong> : <span>${invoiceData.patient.age} Y</span></p>
                         <p><strong>Sex </strong> : <span>${invoiceData.patient.gender}</span></p>
                       </div>
                       <div class="info-box">
-                          <p><strong>Contact Number</strong> : <span>${invoiceData.patient.phone}</span></p>
-                          ${(invoiceData.TransactionId || '').trim() ? `<p><strong>Transaction ID</strong> : <span>${invoiceData.TransactionId}</span></p>` : ''}
-                          ${(invoiceData.patient.uhid || '').trim() ? `<p><strong>UHID No.</strong> : <span>${invoiceData.patient.uhid}</span></p>` : ''}
+                          <p><strong>Contact Number</strong> : <span>${escapeHtml(invoiceData.patient.phone)}</span></p>
+                          ${(invoiceData.TransactionId || '').trim() ? `<p><strong>Transaction ID</strong> : <span>${escapeHtml(invoiceData.TransactionId)}</span></p>` : ''}
+                          ${(invoiceData.patient.uhid || '').trim() ? `<p><strong>UHID No.</strong> : <span>${escapeHtml(invoiceData.patient.uhid)}</span></p>` : ''}
                         </div>
                     </div>
 
@@ -588,7 +598,7 @@ export const generateInvoiceHTML = (
                   <!-- Diagnosis -->
                   <div class="diagnosis">
                     <strong>Diagnosis / Complaint:</strong>
-                    <span style="margin-left: 10px; font-weight: 400;">${invoiceData.diagnosis || ''}</span>
+                    <span style="margin-left: 10px; font-weight: 400;">${escapeHtml(invoiceData.diagnosis || '')}</span>
                   </div>
 
                   <!-- Treatment Provided -->

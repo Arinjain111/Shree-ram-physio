@@ -8,10 +8,10 @@ import type { InvoiceData } from '@/schemas/validation.schema';
 /**
  * Generate the next invoice number from existing invoices
  * @param invoices - Array of existing invoices
+ * @param minimumInvoiceNumber - Starting invoice number (default: 401)
  * @returns Next invoice number in format 0001, 0002, etc.
  */
-export function generateNextInvoiceNumber(invoices: InvoiceData[]): string {
-  const minimumInvoiceNumber = 401;
+export function generateNextInvoiceNumber(invoices: InvoiceData[], minimumInvoiceNumber = 401): string {
 
   if (invoices.length === 0) {
     return minimumInvoiceNumber.toString().padStart(4, '0');

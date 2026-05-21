@@ -3,8 +3,7 @@ import type { DatabaseInvoice } from '@/types/database.types';
 import TreatmentCalendar, { COLORS } from './TreatmentCalendar';
 import { useNavigate } from 'react-router-dom';
 import { useUI } from '@/context/UIContext';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 // Utils
 const getSyncStatusBadge = (status?: string) => {

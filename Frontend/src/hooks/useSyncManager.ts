@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useErrorHandler } from './useErrorHandler';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 export const useSyncManager = () => {
     const { handleError } = useErrorHandler();

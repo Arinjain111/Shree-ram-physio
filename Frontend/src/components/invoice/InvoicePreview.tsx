@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
-import { useInvoiceLayout } from '@/hooks/useInvoiceLayout';
+import { useLayoutContext } from '@/context/LayoutContext';
 import { generateInvoiceHTML } from '@/utils/invoiceGenerator';
 import type { InvoicePreviewProps } from '@/types/component.types';
 
 const InvoicePreview: React.FC<InvoicePreviewProps> = ({ invoiceData }) => {
-  const { layout } = useInvoiceLayout();
+  const { layout } = useLayoutContext();
 
   const invoiceHTML = useMemo(() => {
     return generateInvoiceHTML(invoiceData, layout);

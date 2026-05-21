@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { TreatmentPreset } from '@/types/treatmentPreset.types';
 import type { TreatmentFormProps } from '@/types/component.types';
 import { ValidDateStringSchema } from '@/schemas/validation.schema.ts';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 const TreatmentForm = ({ 
   treatments, 

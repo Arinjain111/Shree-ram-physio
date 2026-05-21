@@ -1,6 +1,5 @@
 import type { FooterDetailsSectionProps } from '@/types/component.types';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 const FooterDetailsSection = ({ formData, onChange }: FooterDetailsSectionProps) => {
   const signatureUrl = formData.signatureImagePath || '';

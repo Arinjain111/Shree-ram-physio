@@ -93,12 +93,11 @@ const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, pay
   };
 
   const handleUhidChange = (value: string) => {
-    // Only allow alphanumeric characters
-    const alphanumericOnly = value.replace(/[^a-zA-Z0-9]/g, '');
-    setPatient({ ...patient, uhid: alphanumericOnly });
-    if (alphanumericOnly.length >= 1) {
+    // Allow special characters; validation only enforces max length.
+    setPatient({ ...patient, uhid: value });
+    if (value.length >= 1) {
       setUhidTouched(true);
-      const errors = validateField('uhid', alphanumericOnly);
+      const errors = validateField('uhid', value);
       setUhidErrors(errors);
     } else {
       setUhidTouched(false);
@@ -233,7 +232,6 @@ const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, pay
 
   const uhidValidationChecks = [
     'Maximum 50 characters',
-    'Only letters and numbers',
   ];
 
   return (

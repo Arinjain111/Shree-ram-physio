@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useUI } from '@/context/UIContext';
 import { useSyncManager } from '@/hooks/useSyncManager';
@@ -19,8 +19,7 @@ import { samplePatient, sampleDiagnosis } from '@/data/sampleInvoiceData';
 import { InvoiceDataSchema, validateForm, type PatientForm as PatientInfo, type TreatmentForm as TreatmentItem, type InvoiceData } from '@/schemas/validation.schema.ts';
 import { generateNextInvoiceNumber } from '@/utils/invoiceUtils';
 import { calculateTotal } from '@/utils/calculationUtils';
-
-const { ipcRenderer } = window.require('electron');
+import { ipcRenderer } from '@/lib/ipc';
 
 type InvoiceGeneratorMode = 'create' | 'edit' | 'duplicate';
 
@@ -58,36 +57,48 @@ const InvoiceGenerator = () => {
   const [existingInvoices, setExistingInvoices] = useState<InvoiceData[]>([]);
   const [previewInvoiceData, setPreviewInvoiceData] = useState<InvoiceData | null>(null);
 
-  // Helper to fetch invoice number (Logic refactored to be cleaner)
-  const fetchInvoiceNumber = async (force = false) => {
-    if (editingInvoiceId) {
+  // Refs for values accessed inside fetchInvoiceNumber to avoid stale closures
+  const editingInvoiceIdRef = useRef(editingInvoiceId);
+  const invoiceNumberEditedRef = useRef(invoiceNumberEdited);
+  const existingInvoicesRef = useRef(existingInvoices);
+  const patientRef = useRef(patient);
+
+  useEffect(() => { editingInvoiceIdRef.current = editingInvoiceId; }, [editingInvoiceId]);
+  useEffect(() => { invoiceNumberEditedRef.current = invoiceNumberEdited; }, [invoiceNumberEdited]);
+  useEffect(() => { existingInvoicesRef.current = existingInvoices; }, [existingInvoices]);
+  useEffect(() => { patientRef.current = patient; }, [patient]);
+
+  // Helper to fetch invoice number
+  const fetchInvoiceNumber = useCallback(async (force = false) => {
+    if (editingInvoiceIdRef.current) {
       return;
     }
-    if (!force && invoiceNumberEdited) {
+    if (!force && invoiceNumberEditedRef.current) {
       return;
     }
 
+    const currentPatient = patientRef.current;
+    const currentInvoices = existingInvoicesRef.current;
+
     try {
-      // Pass patient data (local and cloud IDs) to get per-patient invoice number
       const result = await ipcRenderer.invoke('get-next-invoice-number', {
-        id: patient?.id,
-        cloudId: patient?.cloudId
+        id: currentPatient?.id,
+        cloudId: currentPatient?.cloudId
       });
       if (result.success && result.invoiceNumber) {
         setInvoiceNumber(result.invoiceNumber);
         setInvoiceNumberEdited(false);
-        console.log(`📋 Next invoice number for patient ${patient?.firstName}: ${result.invoiceNumber} (source: ${result.source})`);
+        console.log(`📋 Next invoice number for patient ${currentPatient?.firstName}: ${result.invoiceNumber} (source: ${result.source})`);
       } else {
-        // Fallback
-        setInvoiceNumber(generateNextInvoiceNumber(existingInvoices));
+        setInvoiceNumber(generateNextInvoiceNumber(currentInvoices));
         setInvoiceNumberEdited(false);
       }
     } catch (error) {
        console.error('Failed to fetch invoice number', error);
-       setInvoiceNumber(generateNextInvoiceNumber(existingInvoices));
+       setInvoiceNumber(generateNextInvoiceNumber(currentInvoices));
        setInvoiceNumberEdited(false);
     }
-  };
+  }, []);
 
   const refreshInvoiceNumber = async () => {
     setIsRefreshingInvoiceNumber(true);
@@ -147,20 +158,20 @@ const InvoiceGenerator = () => {
 
             // Populate form with invoice data
             setPatient({
-              id: inv.patient?.id,
-              cloudId: inv.patient?.cloudId,
+              id: inv.patient?.id ?? null,
+              cloudId: inv.patient?.cloudId ?? null,
               firstName: inv.patient?.firstName || '',
               lastName: inv.patient?.lastName || '',
               age: inv.patient?.age || 0,
               gender: inv.patient?.gender || '',
               phone: inv.patient?.phone || '',
               uhid: inv.patient?.uhid || ''
-            } as any);
+            });
 
             setTreatments(
-              (inv.treatments || []).map((t: any) => ({
-                id: t.id,
-                cloudId: t.cloudId,
+              (inv.treatments || []).map((t: { id?: number; cloudId?: number; name: string; duration?: string; startDate: string; endDate: string; sessions: number; amount: number }) => ({
+                id: t.id ?? null,
+                cloudId: t.cloudId ?? null,
                 name: t.name,
                 duration: t.duration || '',
                 startDate: t.startDate,
@@ -206,19 +217,16 @@ const InvoiceGenerator = () => {
     };
 
     initialize();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchInvoiceNumber, handleError, showToast]);
 
-  // Refresh invoice number when patient changes (no loop: depends only on patient IDs)
+  // Refresh invoice number when patient changes
   useEffect(() => {
     if (editingInvoiceId) {
       return;
     }
-    // If patient changes, any previous manual edit should not block fetching
     setInvoiceNumberEdited(false);
     fetchInvoiceNumber(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patient?.id, patient?.cloudId]);
+  }, [patient?.id, patient?.cloudId, editingInvoiceId, fetchInvoiceNumber]);
 
   // Sync Completion Listener (Handled by useSyncManager globally, but we might want to refresh invoices here)
   useEffect(() => {
@@ -393,7 +401,7 @@ const InvoiceGenerator = () => {
                   Start by searching with contact number or invoice number to instantly fetch an existing patient's details.
                 </p>
                 <PatientSearch
-                  invoices={existingInvoices as any}
+                  invoices={existingInvoices}
                   onPatientSelect={setPatient}
                 />
               </section>

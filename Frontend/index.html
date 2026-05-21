@@ -28,11 +28,11 @@
 
       // Check Environment
       window.addEventListener('DOMContentLoaded', () => {
-        if (typeof window.require !== 'function') {
-          console.error('window.require is missing!');
-          document.body.innerHTML += '<div style="color:red; font-size: 24px;">FATAL: window.require is NOT defined. Electron integration failed.</div>';
+        if (typeof window.electronAPI !== 'object' || !window.electronAPI.invoke) {
+          console.error('window.electronAPI is missing!');
+          document.body.innerHTML += '<div style="color:red; font-size: 24px;">FATAL: window.electronAPI is NOT defined. Electron preload script not loaded.</div>';
         } else {
-          console.log('window.require is available.');
+          console.log('Electron API is available.');
         }
       });
     </script>

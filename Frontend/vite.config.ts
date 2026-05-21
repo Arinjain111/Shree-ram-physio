@@ -1,7 +1,6 @@
 import { defineConfig, UserConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron';
-import renderer from 'vite-plugin-electron-renderer';
 import path from 'path';
 
 export default defineConfig(async (): Promise<UserConfig> => {
@@ -18,7 +17,6 @@ export default defineConfig(async (): Promise<UserConfig> => {
             build: {
               outDir: 'dist-electron',
               rollupOptions: {
-                // Do NOT bundle native/db clients; let Electron/Node load them at runtime
                 external: [
                   'electron',
                   '@prisma/client',
@@ -30,9 +28,19 @@ export default defineConfig(async (): Promise<UserConfig> => {
               }
             }
           }
+        },
+        {
+          entry: 'electron/preload.ts',
+          vite: {
+            build: {
+              outDir: 'dist-electron',
+              rollupOptions: {
+                external: ['electron']
+              }
+            }
+          }
         }
-      ]),
-      renderer()
+      ])
     ],
     resolve: {
       alias: {

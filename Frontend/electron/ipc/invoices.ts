@@ -379,6 +379,13 @@ export function registerInvoiceHandlers() {
           await prisma.$transaction(async (tx) => {
             await tx.treatment.deleteMany({ where: { invoiceId: invoice.id } });
             await tx.invoice.delete({ where: { id: invoice.id } });
+
+            // If this was the patient's last invoice, delete the orphaned patient
+            const patientId = invoice.patientId;
+            const remainingInvoices = await tx.invoice.count({ where: { patientId } });
+            if (remainingInvoices === 0) {
+              await tx.patient.delete({ where: { id: patientId } });
+            }
           });
           result.local = true;
         } catch (e: any) {
