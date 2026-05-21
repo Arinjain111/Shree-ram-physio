@@ -3,23 +3,26 @@ import prisma from '../lib/prisma';
 import { ApiError } from '../middleware/errorHandler';
 
 // Get all patients
-export const getAllPatients = async (_req: Request, res: Response) => {
+export const getAllPatients = async (req: Request, res: Response) => {
+  const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+  const pageSize = req.query.pageSize ? parseInt(req.query.pageSize as string, 10) : undefined;
+
   const patients = await prisma.patient.findMany({
-    orderBy: {
-      createdAt: 'desc',
-    },
-    include: {
-      invoices: {
-        include: {
-          treatments: true,
-        },
-      },
-    },
+    orderBy: { createdAt: 'desc' },
+    include: { invoices: { include: { treatments: true } } },
+    ...(page !== undefined && pageSize !== undefined
+      ? { skip: (page - 1) * pageSize, take: pageSize }
+      : {}),
   });
+
+  const total = await prisma.patient.count();
 
   res.json({
     success: true,
     patients,
+    pagination: page !== undefined && pageSize !== undefined
+      ? { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+      : undefined,
   });
 };
 
@@ -63,6 +66,10 @@ export const searchPatients = async (req: Request, res: Response) => {
 
   if (!query || typeof query !== 'string') {
     throw new ApiError(400, 'Search query is required', { code: 'SEARCH_QUERY_REQUIRED' });
+  }
+
+  if (query.length > 100) {
+    throw new ApiError(400, 'Search query must be 100 characters or less', { code: 'SEARCH_QUERY_TOO_LONG' });
   }
 
   const patients = await prisma.patient.findMany({
@@ -133,7 +140,7 @@ export const createPatient = async (req: Request, res: Response) => {
 // Update patient
 export const updatePatient = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, age, gender, phone, uhid } = req.body;
+  const { age, gender, phone, uhid } = req.body;
 
   const normalizedUhid = typeof uhid === 'string' ? uhid.trim() : undefined;
   const isUhidProvided = uhid !== undefined;
@@ -169,8 +176,7 @@ export const updatePatient = async (req: Request, res: Response) => {
     }
   }
 
-  const updateData: any = {};
-  if (name) updateData.name = name;
+  const updateData: Record<string, unknown> = {};
   if (age) {
     const numericAge = parseInt(age, 10);
     if (Number.isNaN(numericAge) || numericAge < 0) {

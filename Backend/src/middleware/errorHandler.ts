@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { ZodError, z } from 'zod';
+import { ZodError, type ZodIssue } from 'zod';
 import type { ApiErrorOptions } from '../types';
 
 /**
@@ -36,7 +36,7 @@ export const asyncHandler = <TRequest extends Request = Request, TResponse exten
   };
 };
 
-function mapZodIssues(issues: z.core.$ZodIssue[]) {
+function mapZodIssues(issues: ZodIssue[]) {
   return issues.map((issue) => ({
     path: issue.path.join('.'),
     message: issue.message,
@@ -83,7 +83,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
       payload.details = err.details;
     }
 
-    if (process.env.NODE_ENV !== 'production' && (err as Error).stack) {
+    if (process.env.NODE_ENV === 'development' && (err as Error).stack) {
       payload.stack = (err as Error).stack;
     }
 

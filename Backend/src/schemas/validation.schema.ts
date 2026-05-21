@@ -4,7 +4,7 @@
  * These schemas validate data coming from external sources (Frontend sync, API requests)
  */
 
-import { z } from 'zod';
+import { z, type ZodIssue } from 'zod';
 import { ApiError } from '../middleware/errorHandler';
 
 const OptionalUhidSchema = z.union([z.string().max(50), z.literal('')]).optional().nullable();
@@ -162,9 +162,9 @@ export type TreatmentSync = z.infer<typeof TreatmentSyncSchema>;
  */
 export const SyncRequestSchema = z.object({
   lastSyncTime: z.union([z.iso.datetime(), z.null()]).optional(),
-  patients: z.array(PatientSyncSchema).optional(),
-  invoices: z.array(InvoiceSyncSchema).optional(),
-  treatments: z.array(TreatmentSyncSchema).optional(),
+  patients: z.array(PatientSyncSchema).max(500, 'Maximum 500 patients per sync batch').optional(),
+  invoices: z.array(InvoiceSyncSchema).max(1000, 'Maximum 1000 invoices per sync batch').optional(),
+  treatments: z.array(TreatmentSyncSchema).max(2000, 'Maximum 2000 treatments per sync batch').optional(),
 });
 
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;
@@ -172,6 +172,17 @@ export type SyncRequest = z.infer<typeof SyncRequestSchema>;
 /**
  * Create Invoice Request Schema
  */
+export const TreatmentInputSchema = z.object({
+  name: z.string().min(1, 'Treatment name is required'),
+  duration: z.string().optional(),
+  sessions: z.number().int().min(1, 'At least 1 session required'),
+  startDate: ValidFutureDateStringSchema,
+  endDate: ValidFutureDateStringSchema,
+  amount: z.number().min(0, 'Amount must be positive'),
+});
+
+export type TreatmentInput = z.infer<typeof TreatmentInputSchema>;
+
 export const CreateInvoiceRequestSchema = z.object({
   invoiceNumber: z.string().regex(/^\d{4}$/, 'Invoice number must be 4 digits'),
   patientId: z.number().int().positive(),
@@ -181,16 +192,7 @@ export const CreateInvoiceRequestSchema = z.object({
   paymentMethod: z.enum(['Cash', 'Card', 'UPI', 'Online', 'Cheque']).optional(),
   TransactionId: z.string().max(100).optional(),
   total: z.number().min(0),
-  treatments: z.array(
-    z.object({
-      name: z.string().min(1),
-      duration: z.string().optional(),
-      sessions: z.number().int().min(1),
-      startDate: ValidFutureDateStringSchema,
-      endDate: ValidFutureDateStringSchema,
-      amount: z.number().min(0),
-    })
-  ).optional(),
+  treatments: z.array(TreatmentInputSchema).optional(),
 });
 
 export type CreateInvoiceRequest = z.infer<typeof CreateInvoiceRequestSchema>;
@@ -208,6 +210,21 @@ export const CreatePatientRequestSchema = z.object({
 });
 
 export type CreatePatientRequest = z.infer<typeof CreatePatientRequestSchema>;
+
+/**
+ * Preset Sync Schema - Validates bulk preset sync items
+ */
+export const PresetSyncSchema = z.object({
+  name: z.string().min(1, 'Preset name is required').max(200),
+  defaultSessions: z.number().int().min(1, 'At least 1 session required'),
+  pricePerSession: z.number().min(0, 'Price must be positive'),
+});
+
+export const PresetSyncRequestSchema = z.object({
+  presets: z.array(PresetSyncSchema).max(200, 'Maximum 200 presets per sync batch'),
+});
+
+export type PresetSyncRequest = z.infer<typeof PresetSyncRequestSchema>;
 
 // ============================================
 // RESPONSE SCHEMAS - API response validation
@@ -280,7 +297,7 @@ export function validateData<T>(schema: z.ZodSchema<T>, data: unknown): { succes
     return { success: true, data: result.data };
   }
   
-  const errors = result.error.issues.map((err: z.core.$ZodIssue) => 
+  const errors = result.error.issues.map((err: ZodIssue) => 
     `${err.path.join('.')}: ${err.message}`
   );
   
@@ -294,7 +311,7 @@ export function validateOrThrow<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = schema.safeParse(data);
 
   if (!result.success) {
-    const errors = result.error.issues.map((err: z.core.$ZodIssue) =>
+    const errors = result.error.issues.map((err: ZodIssue) =>
       `${err.path.join('.')}: ${err.message}`
     );
 

@@ -91,32 +91,3 @@ model TreatmentPreset {
   
   @@map("treatment_presets")
 }
-
-// Sync logs for tracking sync operations
-model SyncLog {
-  id            Int       @id @default(autoincrement())
-  tableName     String    @map("table_name")
-  recordId      Int       @map("record_id")
-  operation     String    // CREATE, UPDATE, DELETE
-  status        String    // pending, success, failed
-  errorMessage  String?   @map("error_message")
-  
-  createdAt     DateTime  @default(now()) @map("created_at")
-  syncedAt      DateTime? @map("synced_at")
-  
-  @@map("sync_logs")
-  @@index([tableName, recordId])
-}
-
-// Sync metadata for tracking sync operations
-model SyncMetadata {
-  id            Int       @id @default(autoincrement())
-  tableName     String    @map("table_name")
-  recordId      Int       @map("record_id")
-  operation     String    // CREATE, UPDATE, DELETE
-  syncedAt      DateTime  @default(now()) @map("synced_at")
-  clientId      String?   @map("client_id") // To identify which device synced
-  
-  @@map("sync_metadata")
-  @@index([tableName, recordId])
-}

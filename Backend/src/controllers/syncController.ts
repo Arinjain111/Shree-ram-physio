@@ -1,6 +1,20 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
-import { SyncRequestSchema, validateOrThrow, type SyncRequest } from '../schemas/validation.schema';
+import { SyncRequestSchema, validateOrThrow, type SyncRequest, type PatientSync, type InvoiceSync, type TreatmentSync } from '../schemas/validation.schema';
+
+interface SyncResult {
+  synced: {
+    patients: Array<{ localId?: number; cloudId: number }>;
+    invoices: Array<{ localId?: number; cloudId: number; originalNumber?: string; newNumber?: string }>;
+    treatments: Array<{ localId?: number; cloudId: number }>;
+  };
+  updates: {
+    patients: Array<{ id: number; firstName: string; lastName: string; age: number; gender: string; phone: string; uhid: string | null; createdAt: Date; updatedAt: Date }>;
+    invoices: Array<{ id: number; invoiceNumber: string; patientId: number; date: string; diagnosis: string; notes: string; paymentMethod: string; TransactionId: string | null; total: number; createdAt: Date; updatedAt: Date; patient: { id: number; firstName: string; lastName: string; age: number; gender: string; phone: string; uhid: string | null; createdAt: Date; updatedAt: Date }; treatments: Array<{ id: number; invoiceId: number; name: string; duration: string; sessions: number; startDate: string; endDate: string; amount: number; createdAt: Date; updatedAt: Date }> }>;
+    treatments: Array<{ id: number; invoiceId: number; name: string; duration: string; sessions: number; startDate: string; endDate: string; amount: number; createdAt: Date; updatedAt: Date }>;
+  };
+  conflicts: Array<{ localId?: number; originalNumber: string; newNumber: string; reason: string }>;
+}
 
 function normalizeUhid(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -13,7 +27,6 @@ export const syncData = async (req: Request, res: Response) => {
   console.log(`📥 Request received at ${new Date().toISOString()}`);
   
   try {
-    // Validate incoming sync request at schema level
     const { lastSyncTime, patients, invoices, treatments } = validateOrThrow<SyncRequest>(
       SyncRequestSchema,
       req.body
@@ -21,80 +34,59 @@ export const syncData = async (req: Request, res: Response) => {
 
     console.log(`📋 Received ${patients?.length || 0} patients, ${invoices?.length || 0} invoices, ${treatments?.length || 0} treatments to sync`);
 
-    const result = {
+    const result: SyncResult = {
       synced: {
-        patients: [] as Array<{ localId?: number; cloudId: number }>,
-        invoices: [] as Array<{ localId?: number; cloudId: number; originalNumber?: string; newNumber?: string }>,
-        treatments: [] as Array<{ localId?: number; cloudId: number }>
+        patients: [],
+        invoices: [],
+        treatments: []
       },
       updates: {
-        patients: [] as any[],
-        invoices: [] as any[],
-        treatments: [] as any[]
+        patients: [],
+        invoices: [],
+        treatments: []
       },
-      conflicts: [] as Array<{ localId?: number; originalNumber: string; newNumber: string; reason: string }>
-    };    // Map to track local ID -> cloud ID
-  const patientIdMap = new Map<number, number>();
-  const invoiceIdMap = new Map<number, number>();
+      conflicts: []
+    };
+    const patientIdMap = new Map<number, number>();
+    const invoiceIdMap = new Map<number, number>();
 
-  // === SYNC PATIENTS ===
-  if (patients && patients.length > 0) {
-    for (const patient of patients) {
-      let cloudPatient;
+    // === SYNC PATIENTS ===
+    if (patients && patients.length > 0) {
+      for (const patient of patients) {
+        const p = patient as PatientSync;
+        const uhid = normalizeUhid(p.uhid);
+        const patientData = {
+          firstName: p.firstName,
+          lastName: p.lastName,
+          age: p.age,
+          gender: p.gender,
+          phone: p.phone,
+          ...(uhid ? { uhid } : {}),
+        };
 
-      const uhid = normalizeUhid((patient as any).uhid);
-      const patientUpdateData: any = {
-        firstName: patient.firstName,
-        lastName: patient.lastName,
-        age: patient.age,
-        gender: patient.gender,
-        phone: patient.phone,
-        ...(uhid ? { uhid } : {}),
-      };
+        const cloudPatient = p.cloudId
+          ? await prisma.patient.upsert({
+              where: { id: p.cloudId },
+              update: patientData,
+              create: patientData,
+            })
+          : await prisma.patient.create({ data: patientData });
 
-      const patientCreateData: any = {
-        firstName: patient.firstName,
-        lastName: patient.lastName,
-        age: patient.age,
-        gender: patient.gender,
-        phone: patient.phone,
-        ...(uhid ? { uhid } : {}),
-      };
+        if (p.id) {
+          patientIdMap.set(p.id, cloudPatient.id);
+        }
 
-      if (patient.cloudId) {
-        // Update existing patient
-        cloudPatient = await prisma.patient.upsert({
-          where: { id: patient.cloudId },
-          update: patientUpdateData,
-          create: patientCreateData,
-        });
-      } else {
-        // Create new patient
-        cloudPatient = await prisma.patient.create({
-          data: {
-            ...patientCreateData,
-          },
+        result.synced.patients.push({
+          cloudId: cloudPatient.id,
+          ...(p.id !== undefined ? { localId: p.id } : {}),
         });
       }
-
-      if (patient.id) {
-        patientIdMap.set(patient.id, cloudPatient.id);
-      }
-
-      const syncedPatient: { localId?: number; cloudId: number } = {
-        cloudId: cloudPatient.id,
-      };
-      if (patient.id !== undefined) {
-        syncedPatient.localId = patient.id;
-      }
-      result.synced.patients.push(syncedPatient);
     }
-  }
 
   // === SYNC INVOICES ===
   if (invoices && invoices.length > 0) {
-    for (const invoice of invoices) {
-      // Resolve patient ID (use cloud ID or map from local ID)
+    for (const inv of invoices) {
+      const invoice = inv as InvoiceSync;
       const resolvedPatientId =
         invoice.patientCloudId || (invoice.patientId ? patientIdMap.get(invoice.patientId) : undefined);
 
@@ -103,36 +95,26 @@ export const syncData = async (req: Request, res: Response) => {
         continue;
       }
 
-      let cloudInvoice;
+      const invoiceData = {
+        invoiceNumber: invoice.invoiceNumber,
+        patientId: resolvedPatientId,
+        date: invoice.date,
+        diagnosis: invoice.diagnosis || '',
+        notes: invoice.notes || '',
+        paymentMethod: invoice.paymentMethod || 'Cash',
+        TransactionId: invoice.TransactionId || null,
+        total: invoice.total,
+      };
 
       if (invoice.cloudId) {
-        // Update existing invoice
-        cloudInvoice = await prisma.invoice.upsert({
+        const cloudInvoice = await prisma.invoice.upsert({
           where: { id: invoice.cloudId },
-          update: {
-            invoiceNumber: invoice.invoiceNumber,
-            patientId: resolvedPatientId,
-            date: invoice.date,
-            diagnosis: invoice.diagnosis || '',
-            notes: invoice.notes || '',
-            paymentMethod: invoice.paymentMethod || 'Cash',
-          TransactionId: invoice.TransactionId || null,
-            total: invoice.total,
-          },
-          create: {
-            invoiceNumber: invoice.invoiceNumber,
-            patientId: resolvedPatientId,
-            date: invoice.date,
-            diagnosis: invoice.diagnosis || '',
-            notes: invoice.notes || '',
-            paymentMethod: invoice.paymentMethod || 'Cash',
-          TransactionId: invoice.TransactionId || null,
-            total: invoice.total,
-          },
+          update: invoiceData,
+          create: invoiceData,
         });
+
+        invoiceIdMap.set(invoice.id!, cloudInvoice.id);
       } else {
-        // Check for duplicate invoice number FOR THIS PATIENT
-        // Invoice numbers are unique per patient, not globally
         const existingInvoice = await prisma.invoice.findFirst({
           where: {
             invoiceNumber: invoice.invoiceNumber,
@@ -141,59 +123,34 @@ export const syncData = async (req: Request, res: Response) => {
         });
 
         if (existingInvoice) {
-          // CONFLICT: This patient already has an invoice with this number
-          // This should never happen in normal operation (user generates unique numbers per patient)
-          // But if it does, keep the existing one and log as unresolvable conflict
           console.warn(`⚠️ CONFLICT: Patient ${resolvedPatientId} already has Invoice #${invoice.invoiceNumber}`);
           
           const conflict: { localId?: number; originalNumber: string; newNumber: string; reason: string } = {
             reason: 'DUPLICATE_INVOICE_FOR_PATIENT',
             originalNumber: invoice.invoiceNumber,
-            newNumber: invoice.invoiceNumber,  // Invoice number NEVER changes
+            newNumber: invoice.invoiceNumber,
           };
           if (invoice.id !== undefined) {
             conflict.localId = invoice.id;
           }
           result.conflicts.push(conflict);
-          
-          // DON'T create a new invoice, just skip this one
-          // Invoice numbers are immutable and sacred (user printed it!)
           continue;
         }
 
-        // Safe to create: This invoice number is unique for this patient
-        const cloudInvoice = await prisma.invoice.create({
-          data: {
-            invoiceNumber: invoice.invoiceNumber,
-            patientId: resolvedPatientId,
-            date: invoice.date,
-            diagnosis: invoice.diagnosis || '',
-            notes: invoice.notes || '',
-            paymentMethod: invoice.paymentMethod || 'Cash',
-          TransactionId: invoice.TransactionId || null,
-            total: invoice.total,
-          },
-        });
+        const cloudInvoice = await prisma.invoice.create({ data: invoiceData });
 
-        const syncedInvoice: { localId?: number; cloudId: number } = {
+        result.synced.invoices.push({
           cloudId: cloudInvoice.id,
-        };
-        if (invoice.id !== undefined) {
-          syncedInvoice.localId = invoice.id;
-        }
-        result.synced.invoices.push(syncedInvoice);
-      }
-
-      if (invoice.id && cloudInvoice) {
-        invoiceIdMap.set(invoice.id, cloudInvoice.id);
+          ...(invoice.id !== undefined ? { localId: invoice.id } : {}),
+        });
+        invoiceIdMap.set(invoice.id!, cloudInvoice.id);
       }
     }
   }
-
   // === SYNC TREATMENTS ===
   if (treatments && treatments.length > 0) {
-    for (const treatment of treatments) {
-      // Resolve invoice ID (use cloud ID or map from local ID)
+    for (const tr of treatments) {
+      const treatment = tr as TreatmentSync;
       const resolvedInvoiceId =
         treatment.invoiceCloudId || (treatment.invoiceId ? invoiceIdMap.get(treatment.invoiceId) : undefined);
 
@@ -202,53 +159,28 @@ export const syncData = async (req: Request, res: Response) => {
         continue;
       }
 
-      let cloudTreatment;
-
-      if (treatment.cloudId) {
-        // Update existing treatment
-        cloudTreatment = await prisma.treatment.upsert({
-          where: { id: treatment.cloudId },
-          update: {
-            invoiceId: resolvedInvoiceId,
-            name: treatment.name,
-            duration: treatment.duration || '',
-            sessions: treatment.sessions,
-            startDate: treatment.startDate,
-            endDate: treatment.endDate,
-            amount: treatment.amount,
-          },
-          create: {
-            invoiceId: resolvedInvoiceId,
-            name: treatment.name,
-            duration: treatment.duration || '',
-            sessions: treatment.sessions,
-            startDate: treatment.startDate,
-            endDate: treatment.endDate,
-            amount: treatment.amount,
-          },
-        });
-      } else {
-        // Create new treatment
-        cloudTreatment = await prisma.treatment.create({
-          data: {
-            invoiceId: resolvedInvoiceId,
-            name: treatment.name,
-            duration: treatment.duration || '',
-            sessions: treatment.sessions,
-            startDate: treatment.startDate,
-            endDate: treatment.endDate,
-            amount: treatment.amount,
-          },
-        });
-      }
-
-      const syncedTreatment: { localId?: number; cloudId: number } = {
-        cloudId: cloudTreatment.id,
+      const treatmentData = {
+        invoiceId: resolvedInvoiceId,
+        name: treatment.name,
+        duration: treatment.duration || '',
+        sessions: treatment.sessions,
+        startDate: treatment.startDate,
+        endDate: treatment.endDate,
+        amount: treatment.amount,
       };
-      if (treatment.id !== undefined) {
-        syncedTreatment.localId = treatment.id;
-      }
-      result.synced.treatments.push(syncedTreatment);
+
+      const cloudTreatment = treatment.cloudId
+        ? await prisma.treatment.upsert({
+            where: { id: treatment.cloudId },
+            update: treatmentData,
+            create: treatmentData,
+          })
+        : await prisma.treatment.create({ data: treatmentData });
+
+      result.synced.treatments.push({
+        cloudId: cloudTreatment.id,
+        ...(treatment.id !== undefined ? { localId: treatment.id } : {}),
+      });
     }
   }
 
@@ -326,31 +258,30 @@ export const syncData = async (req: Request, res: Response) => {
 };
 
 export const getSyncStatus = async (req: Request, res: Response) => {
-  // Use cacheStrategy with Prisma Accelerate to reduce DB load
-  // TTL: 60 seconds (results cached for 1 min)
-  // SWR: 60 seconds (serve stale result for another 1 min while fetching new)
-  const cacheStrategy = { ttl: 60, swr: 60 };
+  /**
+   * Prisma Accelerate cacheStrategy option.
+   * Not yet typed in the Prisma client, so we pass it via a spread object.
+   * @see https://www.prisma.io/data-platform/accelerate
+   */
+  const cacheOpts = { ttl: 60, swr: 60 };
 
   try {
     const [lastPatient, lastInvoice, lastTreatment] = await Promise.all([
       prisma.patient.findFirst({
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
-        // @ts-ignore
-        cacheStrategy,
-      }),
+        ...cacheOpts,
+      } as any),
       prisma.invoice.findFirst({
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
-        // @ts-ignore
-        cacheStrategy,
-      }),
+        ...cacheOpts,
+      } as any),
       prisma.treatment.findFirst({
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
-        // @ts-ignore
-        cacheStrategy,
-      }),
+        ...cacheOpts,
+      } as any),
     ]);
 
     const timestamps = [

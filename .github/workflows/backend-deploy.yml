@@ -67,7 +67,8 @@ jobs:
               WEBSITES_PORT=3000 \
               NODE_ENV=production \
               DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-              ALLOWED_ORIGINS="*" \
+              API_KEY="${{ secrets.API_KEY || 'not-set' }}" \
+              ALLOWED_ORIGINS="${{ secrets.ALLOWED_ORIGINS || '' }}" \
               DOCKER_REGISTRY_SERVER_URL=https://index.docker.io/v1/ \
               DOCKER_REGISTRY_SERVER_USERNAME=${{ secrets.DOCKERHUB_USERNAME }} \
               DOCKER_REGISTRY_SERVER_PASSWORD=${{ secrets.DOCKERHUB_TOKEN }}
@@ -94,7 +95,7 @@ jobs:
       - name: Apply Prisma schema (migrations or push)
         run: |
           cd Backend
-          echo "🔍 DATABASE_URL configured: ${DATABASE_URL:0:20}..."
+          echo "DATABASE_URL is configured"
           
           if [ -d "prisma/migrations" ] && [ "$(ls -A prisma/migrations)" ]; then
             echo "Migrations found; running prisma migrate deploy"

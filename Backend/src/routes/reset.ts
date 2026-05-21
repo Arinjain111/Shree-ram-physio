@@ -1,12 +1,25 @@
 import { Router } from 'express';
-import { resetDatabase, getDatabaseStats } from '../controllers/resetController';
+import { asyncHandler } from '../middleware/errorHandler';
+import prisma from '../lib/prisma';
 
 const router = Router();
 
 // Get database statistics
-router.get('/stats', getDatabaseStats);
+router.get('/stats', asyncHandler(async (_req, res) => {
+  const [patients, invoices, treatments, treatmentPresets] = await Promise.all([
+    prisma.patient.count(),
+    prisma.invoice.count(),
+    prisma.treatment.count(),
+    prisma.treatmentPreset.count(),
+  ]);
 
-// Reset database (DANGEROUS - requires confirmation)
-router.post('/reset', resetDatabase);
+  res.json({
+    success: true,
+    stats: { patients, invoices, treatments, treatmentPresets },
+  });
+}));
+
+// NOTE: Database reset endpoint has been removed for security reasons.
+// If you need to reset the database, do it manually via Prisma CLI or direct database access.
 
 export default router;

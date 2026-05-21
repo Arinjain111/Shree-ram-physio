@@ -1,24 +1,29 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
-import { ApiError } from '../middleware/errorHandler';
+import { ApiError, asyncHandler } from '../middleware/errorHandler';
+import { PresetSyncRequestSchema, validateOrThrow, type PresetSyncRequest } from '../schemas/validation.schema';
 
 // Get all treatment presets
-export const getAllPresets = async (_req: Request, res: Response) => {
-  try {
-    const presets = await prisma.treatmentPreset.findMany({
-      orderBy: {
-        name: 'asc',
-      },
-    });
+export const getAllPresets = async (req: Request, res: Response) => {
+  const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+  const pageSize = req.query.pageSize ? parseInt(req.query.pageSize as string, 10) : undefined;
 
-    res.json({
-      success: true,
-      presets,
-    });
-  } catch (error) {
-    console.error('❌ Error fetching presets:', error instanceof Error ? error.message : String(error));
-    throw error;
-  }
+  const presets = await prisma.treatmentPreset.findMany({
+    orderBy: { name: 'asc' },
+    ...(page !== undefined && pageSize !== undefined
+      ? { skip: (page - 1) * pageSize, take: pageSize }
+      : {}),
+  });
+
+  const total = await prisma.treatmentPreset.count();
+
+  res.json({
+    success: true,
+    presets,
+    pagination: page !== undefined && pageSize !== undefined
+      ? { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+      : undefined,
+  });
 };
 
 // Get preset by ID
@@ -168,11 +173,7 @@ export const deletePreset = async (req: Request, res: Response) => {
 
 // Bulk sync presets (for initial sync from client and upserts)
 export const syncPresets = async (req: Request, res: Response) => {
-  const { presets } = req.body;
-
-  if (!Array.isArray(presets)) {
-    throw new ApiError(400, 'Failed to sync presets: format invalid', { code: 'INVALID_FORMAT' });
-  }
+  const { presets } = validateOrThrow<PresetSyncRequest>(PresetSyncRequestSchema, req.body);
 
   const results = {
     created: 0,

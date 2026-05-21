@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { ApiError } from '../middleware/errorHandler';
-import { CreateInvoiceRequestSchema, validateOrThrow, type CreateInvoiceRequest } from '../schemas/validation.schema';
+import { CreateInvoiceRequestSchema, TreatmentSchema, validateOrThrow, type CreateInvoiceRequest, type TreatmentInput } from '../schemas/validation.schema';
 
 // Get next available invoice number for a patient
 export const getNextInvoiceNumber = async (req: Request, res: Response) => {
@@ -46,20 +46,26 @@ export const getNextInvoiceNumber = async (req: Request, res: Response) => {
 };
 
 // Get all invoices
-export const getAllInvoices = async (_req: Request, res: Response) => {
+export const getAllInvoices = async (req: Request, res: Response) => {
+  const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+  const pageSize = req.query.pageSize ? parseInt(req.query.pageSize as string, 10) : undefined;
+
   const invoices = await prisma.invoice.findMany({
-    orderBy: {
-      createdAt: 'desc'
-    },
-    include: {
-      patient: true,
-      treatments: true
-    }
+    orderBy: { createdAt: 'desc' },
+    include: { patient: true, treatments: true },
+    ...(page !== undefined && pageSize !== undefined
+      ? { skip: (page - 1) * pageSize, take: pageSize }
+      : {}),
   });
+
+  const total = await prisma.invoice.count();
 
   res.json({
     success: true,
-    invoices
+    invoices,
+    pagination: page !== undefined && pageSize !== undefined
+      ? { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+      : undefined,
   });
 };
 
@@ -119,7 +125,7 @@ export const getInvoicesByPatient = async (req: Request, res: Response) => {
 // Create invoice with treatments
 export const createInvoice = async (req: Request, res: Response) => {
   // Validate request body using shared Zod schema
-  const { invoiceNumber, patientId, date, diagnosis, total, treatments } = validateOrThrow<CreateInvoiceRequest>(
+  const { invoiceNumber, patientId, date, diagnosis, notes, paymentMethod, TransactionId, total, treatments } = validateOrThrow<CreateInvoiceRequest>(
     CreateInvoiceRequestSchema,
     req.body
   );
@@ -133,41 +139,46 @@ export const createInvoice = async (req: Request, res: Response) => {
     throw new ApiError(404, 'Patient not found', { code: 'PATIENT_NOT_FOUND' });
   }
 
-  // Check if invoice number already exists for this patient
-  const existingInvoice = await prisma.invoice.findUnique({
-    where: { patientId_invoiceNumber: { patientId, invoiceNumber } }
-  });
+  // Wrap uniqueness check + create in a transaction to prevent race conditions
+  const invoice = await prisma.$transaction(async (tx) => {
+    // Check if invoice number already exists for this patient (inside transaction)
+    const existingInvoice = await tx.invoice.findUnique({
+      where: { patientId_invoiceNumber: { patientId, invoiceNumber } }
+    });
 
-  if (existingInvoice) {
-    throw new ApiError(409, 'Invoice with this number already exists', { code: 'DUPLICATE_INVOICE_NUMBER' });
-  }
+    if (existingInvoice) {
+      throw new ApiError(409, 'Invoice with this number already exists', { code: 'DUPLICATE_INVOICE_NUMBER' });
+    }
 
-  // Create invoice with treatments
-  const invoice = await prisma.invoice.create({
-    data: {
-      invoiceNumber,
-      patientId,
-      date,
-      diagnosis: diagnosis || '',
-      total,
-      ...(treatments && treatments.length > 0
-        ? {
-            treatments: {
-              create: treatments.map((t) => ({
-                name: t.name,
-                sessions: t.sessions,
-                startDate: t.startDate,
-                endDate: t.endDate,
-                amount: t.amount,
-              })),
-            },
-          }
-        : {}),
-    },
-    include: {
-      patient: true,
-      treatments: true,
-    },
+    return tx.invoice.create({
+      data: {
+        invoiceNumber,
+        patientId,
+        date,
+        diagnosis: diagnosis || '',
+        notes: notes || '',
+        paymentMethod: paymentMethod || 'Cash',
+        TransactionId: TransactionId || null,
+        total,
+        ...(treatments && treatments.length > 0
+          ? {
+              treatments: {
+                create: treatments.map((t) => ({
+                  name: t.name,
+                  sessions: t.sessions,
+                  startDate: t.startDate,
+                  endDate: t.endDate,
+                  amount: t.amount,
+                })),
+              },
+            }
+          : {}),
+      },
+      include: {
+        patient: true,
+        treatments: true,
+      },
+    });
   });
 
   res.status(201).json({
@@ -221,17 +232,19 @@ export const updateInvoice = async (req: Request, res: Response) => {
       },
     });
 
-    // If treatments are provided, replace them
+    // If treatments are provided, validate and replace them
     if (treatments) {
+      const validatedTreatments = treatments.map((t: unknown) => TreatmentSchema.parse(t));
+
       // Delete existing treatments
       await tx.treatment.deleteMany({
         where: { invoiceId },
       });
 
       // Create new treatments
-      if (treatments.length > 0) {
+      if (validatedTreatments.length > 0) {
         await tx.treatment.createMany({
-          data: treatments.map((t: any) => ({
+          data: validatedTreatments.map((t: TreatmentInput) => ({
             invoiceId,
             name: t.name,
             sessions: Number(t.sessions),
