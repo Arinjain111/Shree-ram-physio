@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { PageHeaderProps } from '@/types/ui.types';
 
-const PageHeader = ({ title, icon, actions, description }: PageHeaderProps) => {
+const PageHeader = ({ title, breadcrumb, icon, actions }: PageHeaderProps) => {
   const [leftContainer, setLeftContainer] = useState<Element | null>(null);
   const [rightContainer, setRightContainer] = useState<Element | null>(null);
 
@@ -22,13 +22,15 @@ const PageHeader = ({ title, icon, actions, description }: PageHeaderProps) => {
               {icon}
             </div>
           )}
-          <div className="flex flex-col justify-center min-w-0">
-            <h1 className="text-xl font-extrabold tracking-tight text-slate-800 leading-tight truncate">{title}</h1>
-            {description && (
-              <div className="text-xs font-medium text-slate-500 hidden md:block mt-0.5 truncate max-w-[280px] xl:max-w-[400px]" title={typeof description === 'string' ? description : undefined}>
-                {description}
-              </div>
+          <div className="flex flex-col justify-center min-w-0 gap-0.5">
+            {breadcrumb && (
+              <span className="text-[11px] font-semibold text-indigo-500/80 uppercase tracking-widest leading-none">
+                {breadcrumb}
+              </span>
             )}
+            <h1 className="text-2xl font-semibold text-slate-800 leading-none truncate">
+              {title}
+            </h1>
           </div>
         </div>,
         leftContainer

@@ -74,7 +74,7 @@ const Modal = ({
   };
 
   const formatMessage = (msg: string) => {
-    if (!msg.includes('\n')) return <p className="text-sm text-slate-500 break-words">{msg}</p>;
+    if (!msg.includes('\n')) return <p className="text-sm text-slate-500 wrap-break-words">{msg}</p>;
 
     const lines = msg.split('\n').filter(line => line.trim().length > 0);
     
@@ -99,12 +99,12 @@ const Modal = ({
             return (
               <div key={i} className="flex items-start gap-2">
                 <span className="mt-2 w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                <span className="break-words">{cleanLine}</span>
+                <span className="wrap-break-words">{cleanLine}</span>
               </div>
             );
           }
 
-          return <p key={i} className="break-words">{cleanLine}</p>;
+          return <p key={i} className="wrap-break-words">{cleanLine}</p>;
         })}
       </div>
     );
@@ -112,34 +112,34 @@ const Modal = ({
 
   return createPortal(
     <div className="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"></div>
+      <div className="fixed inset-0 bg-slate-900/50 transition-opacity"></div>
 
-      <div className="fixed inset-0 z-10 overflow-y-auto">
+      <div className="fixed inset-0 z-10 w-screen overflow-y-auto">
         <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
           <div 
             ref={modalRef}
-            className="relative transform overflow-hidden rounded-xl bg-white/95 backdrop-blur-sm text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl animate-in zoom-in-95 duration-200 border border-white/20"
+            className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-slate-100"
           >
-            <div className="px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+            <div className="px-6 pb-6 pt-6 sm:p-8 sm:pb-6">
               <div className="sm:flex sm:items-start">
                 {getIcon()}
-                <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
-                  <h3 className="text-lg font-semibold leading-6 text-slate-900" id="modal-title">
+                <div className="mt-4 text-center sm:ml-5 sm:mt-0 sm:text-left w-full">
+                  <h3 className="text-xl font-semibold leading-6 text-slate-800" id="modal-title">
                     {title}
                   </h3>
-                  <div className="mt-3">
+                  <div className="mt-4">
                     {formatMessage(message)}
                   </div>
                 </div>
               </div>
             </div>
-            <div className="bg-slate-50/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 border-t border-slate-100">
+            <div className="bg-slate-50/50 px-6 py-4 sm:flex sm:flex-row-reverse sm:px-8 border-t border-slate-100 rounded-b-3xl gap-3">
               <button
                 type="button"
-                className={`inline-flex w-full justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm sm:ml-3 sm:w-auto ${
-                  type === 'danger' ? 'bg-red-600 hover:bg-red-500' : 
-                  type === 'warning' ? 'bg-amber-600 hover:bg-amber-500' :
-                  'bg-teal-600 hover:bg-teal-500'
+                className={`inline-flex w-full justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all sm:w-auto ${
+                  type === 'danger' ? 'bg-red-600 hover:bg-red-500 shadow-red-500/20' : 
+                  type === 'warning' ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-500/20' :
+                  'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20'
                 }`}
                 onClick={onConfirm}
               >
@@ -148,7 +148,7 @@ const Modal = ({
               {type !== 'info' && (
                 <button
                   type="button"
-                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto"
+                  className="mt-3 inline-flex w-full justify-center rounded-xl bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 transition-colors sm:mt-0 sm:w-auto"
                   onClick={onCancel}
                 >
                   {cancelText}

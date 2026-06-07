@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PatientFormSchema } from '@/schemas/validation.schema.ts';
 import type { PatientFormProps } from '@/types/component.types';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, paymentMethod }: PatientFormProps) => {
   const [firstNameErrors, setFirstNameErrors] = useState<string[]>([]);
@@ -351,16 +352,17 @@ const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, pay
           <label className="block text-sm font-medium text-gray-600 mb-1">
             Gender <span className="text-red-500">*</span>
           </label>
-          <select
-            value={patient.gender}
-            onChange={(e) => setPatient({ ...patient, gender: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-          >
-            <option value="">Select Gender</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Other">Other</option>
-          </select>
+          <CustomSelect
+            value={patient.gender || ''}
+            onChange={(val) => setPatient({ ...patient, gender: String(val) })}
+            placeholder="Select Gender"
+            options={[
+              { value: 'Male', label: 'Male' },
+              { value: 'Female', label: 'Female' },
+              { value: 'Other', label: 'Other' },
+            ]}
+            className="w-full"
+          />
         </div>
         
         {/* Contact Number placed here */}

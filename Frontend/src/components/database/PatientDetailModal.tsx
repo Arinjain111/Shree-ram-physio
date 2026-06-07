@@ -71,11 +71,11 @@ export const PatientDetailModal = ({ invoices, onClose, onPrintInvoice }: Patien
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <div 
-        className="absolute inset-0 bg-slate-900/30 transition-opacity"
+        className="absolute inset-0 bg-slate-900/50 transition-opacity"
         onClick={onClose}
       />
       
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-white rounded-3xl shadow-xl border border-slate-100 w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Modal Header */}
         <div className="bg-white border-b border-slate-100 px-8 py-6 flex justify-between items-start shrink-0 z-10">
           <div className="flex items-center gap-5">
@@ -196,7 +196,7 @@ export const PatientDetailModal = ({ invoices, onClose, onPrintInvoice }: Patien
               <div className="flex justify-center pt-4 pb-2">
                 <button
                   onClick={() => setModalVisibleCount(prev => prev + 5)}
-                  className="px-6 py-2 bg-white text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 font-medium shadow-sm transition-all"
+                  className="px-6 py-2.5 bg-white text-slate-600 ring-1 ring-inset ring-slate-200 rounded-xl hover:bg-slate-50 font-medium shadow-sm transition-colors"
                 >
                   Load More History (Showing {modalVisibleCount} of {invoices.length})
                 </button>

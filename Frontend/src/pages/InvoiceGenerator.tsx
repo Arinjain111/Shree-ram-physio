@@ -1,4 +1,5 @@
 import { useUI } from '@/context/UIContext';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 /* Components */
 import PageHeader from '@/components/layout/PageHeader';
@@ -44,6 +45,7 @@ const InvoiceGenerator = () => {
   return (
     <div className="w-full max-w-400 min-h-fit bg-slate-50/50 px-6  mx-auto">
       <PageHeader 
+        breadcrumb="Billing"
         title="Invoice Generator"
         icon={<div className="p-2 bg-blue-100 text-blue-700 rounded-lg"><FileTextIcon /></div>}
         actions={
@@ -142,24 +144,24 @@ const InvoiceGenerator = () => {
                     <p className="mb-2 text-xs text-gray-500">
                       Select the method of payment
                     </p>
-                    <select
+                    <CustomSelect
                       value={paymentMethod}
-                      onChange={(e) => {
-                        const newMethod = e.target.value;
-                        setPaymentMethod(newMethod);
-                        if (TransactionId && newMethod !== 'UPI' && newMethod !== 'Card') {
+                      onChange={(newMethod) => {
+                        const methodStr = String(newMethod);
+                        setPaymentMethod(methodStr);
+                        if (TransactionId && methodStr !== 'UPI' && methodStr !== 'Card') {
                           setTransactionId('');
-                          showToast('info', `Payment method changed to ${newMethod}. Transaction ID cleared.`);
+                          showToast('info', `Payment method changed to ${methodStr}. Transaction ID cleared.`);
                         }
                       }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 font-semibold"
-                    >
-                      <option>Cash</option>
-                      <option>Card</option>
-                      <option>UPI</option>
-                      <option>Online</option>
-                      <option>Cheque</option>
-                    </select>
+                      options={[
+                        { value: 'Cash', label: 'Cash' },
+                        { value: 'Card', label: 'Card' },
+                        { value: 'UPI', label: 'UPI' },
+                        { value: 'Online', label: 'Online' },
+                        { value: 'Cheque', label: 'Cheque' },
+                      ]}
+                    />
                   </div>
                 </div>
               </section>

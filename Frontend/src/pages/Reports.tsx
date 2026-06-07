@@ -14,7 +14,7 @@ import type { DatabaseInvoice } from '@/types/database.types';
 import type { InventoryTransaction } from '@/types/inventory.types';
 import { ipcRenderer } from '@/lib/ipc';
 
-const PIE_COLORS = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'];
+const PIE_COLORS = ['#6366f1', '#8b5cf6', '#0ea5e9', '#14b8a6', '#f59e0b', '#ec4899'];
 
 type DatePreset = '7days' | '30days' | 'thisMonth' | 'lastMonth' | 'custom';
 
@@ -248,10 +248,16 @@ export default function Reports() {
             ))}
             <button onClick={() => setPreset('custom')} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${preset === 'custom' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Custom</button>
           </div>
-          <div className="flex items-center gap-2">
-            <input type="date" value={format(startDate, 'yyyy-MM-dd')} onChange={e => { setPreset('custom'); setStartDate(new Date(e.target.value)); }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500" />
-            <span className="text-slate-400">to</span>
-            <input type="date" value={format(endDate, 'yyyy-MM-dd')} onChange={e => { setPreset('custom'); setEndDate(new Date(e.target.value)); }} className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500" />
+          <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-xl border border-slate-200/60 shadow-inner">
+            <div className="relative flex items-center">
+              <input type="date" value={format(startDate, 'yyyy-MM-dd')} onChange={e => { setPreset('custom'); setStartDate(new Date(e.target.value)); }} className="pl-4 pr-10 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-shadow appearance-none cursor-pointer outline-none hover:border-slate-300 shadow-sm [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer" />
+              <svg className="w-5 h-5 text-slate-400 absolute right-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            </div>
+            <span className="text-slate-400 font-medium text-sm">to</span>
+            <div className="relative flex items-center">
+              <input type="date" value={format(endDate, 'yyyy-MM-dd')} onChange={e => { setPreset('custom'); setEndDate(new Date(e.target.value)); }} className="pl-4 pr-10 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-shadow appearance-none cursor-pointer outline-none hover:border-slate-300 shadow-sm [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer" />
+              <svg className="w-5 h-5 text-slate-400 absolute right-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            </div>
           </div>
           <button onClick={exportCSV} className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>Export CSV</button>
         </div>
@@ -267,7 +273,7 @@ export default function Reports() {
           ].map(c => (
             <div key={c.label} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
               <p className="text-xs font-semibold text-slate-500 uppercase mb-1">{c.label}</p>
-              <p className={`text-xl font-bold ${c.color}`}>{c.value}</p>
+              <p className={`text-xl font-semibold ${c.color}`}>{c.value}</p>
             </div>
           ))}
         </div>
@@ -277,21 +283,39 @@ export default function Reports() {
 
           {/* Daily Revenue */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-sm font-bold text-slate-800 mb-4">Daily Revenue</h3>
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">Daily Revenue</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyData}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} /><YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={v => `₹${v}`} /><RechartsTooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(v: any) => [`₹${Number(v).toLocaleString()}`, 'Revenue']} /><Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} /></BarChart>
+                <BarChart data={dailyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.9}/>
+                      <stop offset="95%" stopColor="#818cf8" stopOpacity={0.4}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} axisLine={false} tickLine={false} dy={10} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} tickFormatter={v => `₹${v}`} axisLine={false} tickLine={false} dx={-10} />
+                  <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.05)', fontWeight: 500, color: '#334155' }} formatter={(v: any) => [`₹${Number(v).toLocaleString()}`, 'Revenue']} />
+                  <Bar dataKey="revenue" fill="url(#colorRev)" radius={[6, 6, 0, 0]} maxBarSize={32} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Payment Method Breakdown */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-sm font-bold text-slate-800 mb-4">Payment Method Breakdown</h3>
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">Payment Method Breakdown</h3>
             <div className="h-64 flex items-center">
               {paymentData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart><Pie data={paymentData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={3} dataKey="value">{paymentData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}</Pie><RechartsTooltip formatter={(v: any) => `₹${Number(v).toLocaleString()}`} /><Legend /></PieChart>
+                  <PieChart>
+                    <Pie data={paymentData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={4} dataKey="value" stroke="none">
+                      {paymentData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    </Pie>
+                    <RechartsTooltip contentStyle={{ borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.05)', fontWeight: 500 }} formatter={(v: any) => `₹${Number(v).toLocaleString()}`} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 500, color: '#64748b' }} />
+                  </PieChart>
                 </ResponsiveContainer>
               ) : <p className="text-slate-400 text-center w-full">No payment data</p>}
             </div>
@@ -299,20 +323,49 @@ export default function Reports() {
 
           {/* Monthly Revenue vs Expenses */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-sm font-bold text-slate-800 mb-4">Monthly Revenue vs Expenses</h3>
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">Monthly Revenue vs Expenses</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={monthlyData}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} /><YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={v => `₹${v}`} /><RechartsTooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} /><Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} name="Revenue" /><Bar dataKey="expenses" fill="#ef4444" radius={[4, 4, 0, 0]} name="Expenses" /></ComposedChart>
+                <ComposedChart data={monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorMonthlyRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.9}/>
+                      <stop offset="95%" stopColor="#34d399" stopOpacity={0.4}/>
+                    </linearGradient>
+                    <linearGradient id="colorMonthlyExp" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.9}/>
+                      <stop offset="95%" stopColor="#fb7185" stopOpacity={0.4}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} axisLine={false} tickLine={false} dy={10} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} tickFormatter={v => `₹${v}`} axisLine={false} tickLine={false} dx={-10} />
+                  <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.05)', fontWeight: 500 }} />
+                  <Bar dataKey="revenue" fill="url(#colorMonthlyRev)" radius={[6, 6, 0, 0]} name="Revenue" maxBarSize={40} />
+                  <Bar dataKey="expenses" fill="url(#colorMonthlyExp)" radius={[6, 6, 0, 0]} name="Expenses" maxBarSize={40} />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Patient Visit Trends */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-sm font-bold text-slate-800 mb-4">Patient Visit Trends</h3>
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">Patient Visit Trends</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={visitData}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} /><YAxis tick={{ fill: '#64748b', fontSize: 11 }} allowDecimals={false} /><RechartsTooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} /><Line type="monotone" dataKey="visits" stroke="#06b6d4" strokeWidth={2} dot={{ r: 3 }} name="Visits" /></LineChart>
+                <LineChart data={visitData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorVisits" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} axisLine={false} tickLine={false} dy={10} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} allowDecimals={false} axisLine={false} tickLine={false} dx={-10} />
+                  <RechartsTooltip cursor={{ fill: '#f8fafc', strokeWidth: 2, strokeDasharray: '4 4' }} contentStyle={{ borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.05)', fontWeight: 500 }} />
+                  <Line type="monotone" dataKey="visits" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6, strokeWidth: 0, fill: '#0ea5e9' }} name="Visits" />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -323,16 +376,22 @@ export default function Reports() {
 
           {/* Treatment Frequency */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-sm font-bold text-slate-800 mb-4">Top Treatments by Frequency</h3>
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">Top Treatments by Frequency</h3>
             <div className="h-64">
               {treatmentFrequency.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart layout="vertical" data={treatmentFrequency} margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
-                    <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" tick={{ fill: '#64748b', fontSize: 10 }} width={100} />
-                    <RechartsTooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(v: any) => [v, 'Prescriptions']} />
-                    <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} maxBarSize={24} />
+                  <BarChart layout="vertical" data={treatmentFrequency} margin={{ top: 0, right: 20, left: 20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorFreq" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.9}/>
+                        <stop offset="95%" stopColor="#a78bfa" stopOpacity={0.7}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="4 4" horizontal={true} vertical={false} stroke="#f1f5f9" />
+                    <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} allowDecimals={false} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }} width={120} axisLine={false} tickLine={false} />
+                    <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.05)', fontWeight: 500 }} formatter={(v: any) => [v, 'Prescriptions']} />
+                    <Bar dataKey="count" fill="url(#colorFreq)" radius={[0, 6, 6, 0]} maxBarSize={20} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : <p className="text-slate-400 text-center mt-20">No treatment data</p>}
@@ -341,11 +400,16 @@ export default function Reports() {
 
           {/* Patient Age Groups */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-sm font-bold text-slate-800 mb-4">Patient Age Groups</h3>
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">Patient Age Groups</h3>
             <div className="h-64">
               {ageGroups.age.some(a => a.value > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart><Pie data={ageGroups.age} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={({ name, value }) => value > 0 ? `${name}: ${value}` : ''}>{ageGroups.age.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}</Pie><RechartsTooltip /></PieChart>
+                  <PieChart>
+                    <Pie data={ageGroups.age} cx="50%" cy="50%" innerRadius={40} outerRadius={85} paddingAngle={3} dataKey="value" nameKey="name" stroke="none" labelLine={false} label={(props: any) => (props.percent && props.percent > 0.05) ? `${props.name}` : ''}>
+                      {ageGroups.age.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    </Pie>
+                    <RechartsTooltip contentStyle={{ borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.05)', fontWeight: 500 }} />
+                  </PieChart>
                 </ResponsiveContainer>
               ) : <p className="text-slate-400 text-center mt-20">No patient data</p>}
             </div>
@@ -353,15 +417,21 @@ export default function Reports() {
 
           {/* Day of Week */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-sm font-bold text-slate-800 mb-4">Revenue by Day of Week</h3>
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">Revenue by Day of Week</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dayOfWeekData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 10 }} />
-                  <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={v => `₹${v}`} />
-                  <RechartsTooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(v: any) => [`₹${Number(v).toLocaleString()}`, 'Revenue']} />
-                  <Bar dataKey="revenue" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <BarChart data={dayOfWeekData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorDow" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.9}/>
+                      <stop offset="95%" stopColor="#fbbf24" stopOpacity={0.4}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} axisLine={false} tickLine={false} dy={10} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} tickFormatter={v => `₹${v}`} axisLine={false} tickLine={false} dx={-10} />
+                  <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.05)', fontWeight: 500 }} formatter={(v: any) => [`₹${Number(v).toLocaleString()}`, 'Revenue']} />
+                  <Bar dataKey="revenue" fill="url(#colorDow)" radius={[6, 6, 0, 0]} maxBarSize={32} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -370,7 +440,7 @@ export default function Reports() {
 
         {/* Weekly Summary Table */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100"><h3 className="font-bold text-slate-800">Weekly Summary</h3></div>
+          <div className="px-6 py-4 border-b border-slate-100"><h3 className="font-semibold text-slate-800">Weekly Summary</h3></div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead><tr className="border-b border-slate-100 bg-slate-50/50">{['Week', 'Revenue', 'Expenses', 'Profit', 'Patients', 'Invoices'].map(h => <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{h}</th>)}</tr></thead>

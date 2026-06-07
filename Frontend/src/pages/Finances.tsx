@@ -11,6 +11,7 @@ import { useLogger } from '@/utils/logger';
 import PageHeader from '@/components/layout/PageHeader';
 import PaymentModal from '@/components/billing/PaymentModal';
 import { ChartBarIcon } from '@/components/icons';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import type { DatabaseInvoice } from '@/types/database.types';
 import type { InventoryTransaction } from '@/types/inventory.types';
 import { ipcRenderer } from '@/lib/ipc';
@@ -92,6 +93,11 @@ export default function Finances() {
   const [expAmt, setExpAmt] = useState(0);
   const [expNotes, setExpNotes] = useState('');
 
+  // Bulk payment state
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<number[]>([]);
+  const [bulkPaymentMethod, setBulkPaymentMethod] = useState('Cash');
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -125,6 +131,37 @@ export default function Finances() {
     await refreshBilling();
     showToast('success', 'Payment recorded successfully');
     ipcRenderer.invoke('sync-now').catch(() => {});
+  };
+
+  const handleBulkPayment = async () => {
+    if (selectedInvoiceIds.length === 0) return;
+    setIsBulkSubmitting(true);
+    let successCount = 0;
+    
+    try {
+      for (const invId of selectedInvoiceIds) {
+        const inv = billingData?.invoices.find(i => i.id === invId);
+        if (inv && inv.total > inv.amountPaid) {
+          const due = inv.total - inv.amountPaid;
+          const result = await ipcRenderer.invoke('record-payment', inv.id, due, bulkPaymentMethod);
+          if (result.success) successCount++;
+        }
+      }
+      
+      if (successCount > 0) {
+        showToast('success', `Successfully recorded payments for ${successCount} invoice(s)`);
+        setSelectedInvoiceIds([]);
+        await refreshBilling();
+        ipcRenderer.invoke('sync-now').catch(() => {});
+      } else {
+        showToast('error', 'Failed to process bulk payments');
+      }
+    } catch (error) {
+      log.error('finances', 'Bulk payment failed', { error: error instanceof Error ? error.message : String(error) });
+      showToast('error', 'Bulk payment failed. Some invoices may not have been updated.');
+    } finally {
+      setIsBulkSubmitting(false);
+    }
   };
 
   // Analytics
@@ -244,6 +281,29 @@ export default function Finances() {
     if (billingTab === 'overdue') return inv.paymentStatus !== 'paid' && new Date(inv.date) < new Date(today);
     return inv.paymentStatus === billingTab;
   }) ?? [];
+
+  const selectableInvoices = filteredInvoices.filter(inv => inv.total > inv.amountPaid);
+  const isAllSelected = selectableInvoices.length > 0 && selectableInvoices.every(inv => selectedInvoiceIds.includes(inv.id));
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedInvoiceIds(selectedInvoiceIds.filter(id => !selectableInvoices.some(inv => inv.id === id)));
+    } else {
+      const newIds = [...selectedInvoiceIds];
+      selectableInvoices.forEach(inv => {
+        if (!newIds.includes(inv.id)) newIds.push(inv.id);
+      });
+      setSelectedInvoiceIds(newIds);
+    }
+  };
+
+  const toggleSelectInvoice = (id: number) => {
+    if (selectedInvoiceIds.includes(id)) {
+      setSelectedInvoiceIds(selectedInvoiceIds.filter(i => i !== id));
+    } else {
+      setSelectedInvoiceIds([...selectedInvoiceIds, id]);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -437,20 +497,78 @@ export default function Finances() {
 
         {/* Expenses */}
         {!showExpenseForm ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex items-center justify-between">
-            <div><span className="text-sm font-medium text-slate-700">Expenses</span><span className="text-xs text-slate-400 ml-2">{expenses.length} recorded</span></div>
-            <button onClick={() => setShowExpenseForm(true)} className="px-4 py-2 text-sm font-medium text-white bg-rose-500 rounded-lg hover:bg-rose-600">+ Record Expense</button>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center justify-between">
+            <div>
+              <span className="text-base font-semibold text-slate-800">Expenses</span>
+              <span className="text-sm font-medium text-slate-500 ml-3 bg-slate-100 px-2.5 py-0.5 rounded-full">{expenses.length} recorded</span>
+            </div>
+            <button onClick={() => setShowExpenseForm(true)} className="px-5 py-2.5 text-sm font-medium text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors shadow-sm ring-1 ring-inset ring-rose-100">
+              + Record Expense
+            </button>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
-            <div className="flex items-center justify-between"><h3 className="font-semibold text-slate-800">Record Expense</h3><button onClick={() => setShowExpenseForm(false)} className="text-slate-400 hover:text-slate-600 text-sm">Cancel</button></div>
-            <div className="flex gap-3 flex-wrap items-end">
-              <select value={expCat} onChange={e => setExpCat(e.target.value)} className="px-3 py-2 border rounded-lg text-sm">
-                {['Rent','Salary','Utilities','Supplies','Equipment','Marketing','Other'].map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <div className="relative"><span className="absolute left-3 top-2 text-slate-400 text-sm">₹</span><input type="number" min="1" value={expAmt || ''} onChange={e => setExpAmt(Number(e.target.value))} className="pl-8 w-32 px-3 py-2 border rounded-lg text-sm" /></div>
-              <input type="text" placeholder="Notes (optional)" value={expNotes} onChange={e => setExpNotes(e.target.value)} className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[150px]" />
-              <button onClick={async () => { if (!expAmt) return; const r = await ipcRenderer.invoke('add-expense', { category: expCat, amount: expAmt, notes: expNotes }); if (r.success) { showToast('success','Expense recorded'); setShowExpenseForm(false); setExpAmt(0); setExpNotes(''); const er = await ipcRenderer.invoke('get-expenses'); if (er.success) setExpenses(er.expenses); } else showToast('error', r.error); }} className="px-4 py-2 text-sm font-medium text-white bg-rose-500 rounded-lg hover:bg-rose-600">Save</button>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-800">Record Expense</h3>
+              <button onClick={() => setShowExpenseForm(false)} className="text-slate-400 hover:text-slate-600 text-sm font-medium transition-colors">
+                Cancel
+              </button>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+              <div className="w-full sm:w-48">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Category</label>
+                <CustomSelect 
+                  value={expCat} 
+                  onChange={(val) => setExpCat(String(val))} 
+                  themeColor="teal"
+                  options={['Rent','Salary','Utilities','Supplies','Equipment','Marketing','Other'].map(c => ({ value: c, label: c }))}
+                />
+              </div>
+              
+              <div className="w-full sm:w-32">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Amount</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-2.5 text-slate-400 font-medium">₹</span>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    value={expAmt || ''} 
+                    onChange={e => setExpAmt(Number(e.target.value))} 
+                    className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 transition-all outline-none shadow-sm" 
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex-1 w-full">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Notes (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="What was this for?" 
+                  value={expNotes} 
+                  onChange={e => setExpNotes(e.target.value)} 
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 transition-all outline-none shadow-sm" 
+                />
+              </div>
+              
+              <button 
+                onClick={async () => { 
+                  if (!expAmt) return; 
+                  const r = await ipcRenderer.invoke('add-expense', { category: expCat, amount: expAmt, notes: expNotes }); 
+                  if (r.success) { 
+                    showToast('success','Expense recorded'); 
+                    setShowExpenseForm(false); 
+                    setExpAmt(0); 
+                    setExpNotes(''); 
+                    const er = await ipcRenderer.invoke('get-expenses'); 
+                    if (er.success) setExpenses(er.expenses); 
+                  } else showToast('error', r.error); 
+                }} 
+                className="w-full sm:w-auto px-6 py-2.5 text-sm font-semibold text-white bg-rose-500 rounded-xl hover:bg-rose-600 shadow-sm shadow-rose-500/20 transition-all mt-2 sm:mt-0"
+              >
+                Save
+              </button>
             </div>
           </div>
         )}
@@ -493,7 +611,7 @@ export default function Finances() {
 
             {/* Invoice Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
+              <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex gap-2">
                   {(['overdue', 'all', 'unpaid', 'partial', 'paid'] as StatusTab[]).map(tab => (
                     <button
@@ -508,10 +626,52 @@ export default function Finances() {
                   ))}
                 </div>
               </div>
+
+              {/* Bulk Action Bar */}
+              {selectedInvoiceIds.length > 0 && (
+                <div className="bg-teal-50/50 px-6 py-3 border-b border-teal-100 flex flex-col sm:flex-row justify-between items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-semibold text-teal-800">
+                      {selectedInvoiceIds.length} invoice(s) selected
+                    </span>
+                    <button 
+                      onClick={() => setSelectedInvoiceIds([])}
+                      className="text-xs font-medium text-teal-600 hover:text-teal-800 transition-colors"
+                    >
+                      Clear Selection
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <CustomSelect 
+                      value={bulkPaymentMethod}
+                      onChange={(val) => setBulkPaymentMethod(String(val))}
+                      themeColor="teal"
+                      options={['Cash', 'Card', 'UPI', 'Online', 'Cheque'].map(m => ({ value: m, label: m }))}
+                    />
+                    <button
+                      onClick={handleBulkPayment}
+                      disabled={isBulkSubmitting}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-sm transition-all whitespace-nowrap"
+                    >
+                      {isBulkSubmitting ? 'Processing...' : 'Mark as Paid'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100">
+                      <th className="px-6 py-3 w-12 text-center">
+                        <input 
+                          type="checkbox" 
+                          checked={isAllSelected}
+                          onChange={toggleSelectAll}
+                          disabled={selectableInvoices.length === 0}
+                          className="w-4 h-4 text-teal-600 border-slate-300 rounded focus:ring-teal-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </th>
                       <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Invoice</th>
                       <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Patient</th>
                       <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Date</th>
@@ -525,14 +685,26 @@ export default function Finances() {
                   <tbody>
                     {filteredInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="text-center py-12 text-slate-400">No invoices found</td>
+                        <td colSpan={9} className="text-center py-12 text-slate-400">No invoices found</td>
                       </tr>
                     ) : (
                       filteredInvoices.map(inv => {
                         const due = inv.total - inv.amountPaid;
                         const isOverdue = inv.paymentStatus !== 'paid' && new Date(inv.date) < new Date(today);
+                        const isFullyPaid = inv.paymentStatus === 'paid';
+                        const isSelected = selectedInvoiceIds.includes(inv.id);
+                        
                         return (
-                          <tr key={inv.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                          <tr key={inv.id} className={`border-b border-slate-50 transition-colors ${isSelected ? 'bg-teal-50/50' : 'hover:bg-slate-50/50'}`}>
+                            <td className="px-6 py-4 text-center">
+                              <input 
+                                type="checkbox" 
+                                checked={isSelected}
+                                onChange={() => toggleSelectInvoice(inv.id)}
+                                disabled={isFullyPaid}
+                                className="w-4 h-4 text-teal-600 border-slate-300 rounded focus:ring-teal-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
+                              />
+                            </td>
                             <td className="px-6 py-4 text-sm font-medium text-slate-800">{inv.invoiceNumber}</td>
                             <td className="px-6 py-4 text-sm text-slate-600">{inv.patientName}</td>
                             <td className="px-6 py-4 text-sm text-slate-600">{format(new Date(inv.date), 'PP')}</td>

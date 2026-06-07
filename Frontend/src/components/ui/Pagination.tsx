@@ -1,3 +1,5 @@
+import { CustomSelect } from './CustomSelect';
+
 interface PaginationProps {
   page: number;
   totalPages: number;
@@ -25,67 +27,78 @@ const Pagination = ({ page, totalPages, total, pageSize, onPageChange, onPageSiz
   const end = Math.min(page * pageSize, total);
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-slate-200">
-      <div className="flex items-center gap-4 text-sm text-slate-500">
-        <span>{start}–{end} of {total}</span>
-        {onPageSizeChange && (
-          <select
-            value={pageSize}
-            onChange={e => onPageSizeChange(Number(e.target.value))}
-            className="text-xs border border-slate-200 rounded px-2 py-1 bg-white"
-          >
-            <option value={20}>20 / page</option>
-            <option value={50}>50 / page</option>
-            <option value={100}>100 / page</option>
-          </select>
-        )}
-      </div>
-      <div className="flex items-center gap-1">
+    <div className="flex flex-col items-center justify-center py-2 gap-3">
+      <div className="flex items-center gap-1.5">
         <button
           onClick={() => onPageChange(1)}
           disabled={page === 1}
-          className="px-2 py-1 text-xs font-medium rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600"
+          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+          title="First Page"
         >
-          ««
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
         </button>
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
-          className="px-2 py-1 text-xs font-medium rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600"
+          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+          title="Previous Page"
         >
-          «
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </button>
-        {pages.map((p, i) =>
-          p === '...' ? (
-            <span key={`e-${i}`} className="px-2 py-1 text-xs text-slate-400">...</span>
-          ) : (
-            <button
-              key={p}
-              onClick={() => onPageChange(p)}
-              className={`px-3 py-1 text-xs font-medium rounded ${
-                p === page
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {p}
-            </button>
-          )
-        )}
+        
+        <div className="flex items-center gap-1 px-2">
+          {pages.map((p, i) =>
+            p === '...' ? (
+              <span key={`e-${i}`} className="px-1 text-slate-300 font-bold tracking-widest">...</span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => onPageChange(p)}
+                className={`w-8 h-8 flex items-center justify-center text-xs font-bold rounded-lg transition-all ${
+                  p === page
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                }`}
+              >
+                {p}
+              </button>
+            )
+          )}
+        </div>
+
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page === totalPages}
-          className="px-2 py-1 text-xs font-medium rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600"
+          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+          title="Next Page"
         >
-          »
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
         </button>
         <button
           onClick={() => onPageChange(totalPages)}
           disabled={page === totalPages}
-          className="px-2 py-1 text-xs font-medium rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600"
+          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+          title="Last Page"
         >
-          »»
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
         </button>
+      </div>
+      
+      <div className="flex items-center gap-2 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+        <span>{start}–{end} of {total}</span>
+        {onPageSizeChange && (
+          <CustomSelect
+            value={pageSize}
+            onChange={(val) => onPageSizeChange(Number(val))}
+            size="sm"
+            className="w-32"
+            options={[
+              { value: 20, label: '20 / page' },
+              { value: 50, label: '50 / page' },
+              { value: 100, label: '100 / page' },
+            ]}
+          />
+        )}
       </div>
     </div>
   );

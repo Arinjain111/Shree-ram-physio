@@ -53,16 +53,12 @@ const InvoiceCustomizer = () => {
       <div className="max-w-450 mx-auto">
         {/* Header Section */}
         <PageHeader 
+          breadcrumb="Billing"
           title="Invoice Customizer"
           icon={
             <div className="p-2 bg-teal-100 text-teal-700 rounded-lg">
               <LayoutIcon />
             </div>
-          }
-          description={
-            <p className="text-slate-500 text-sm">
-              Customize your invoice template, header details, and branding.
-            </p>
           }
           actions={
             <>

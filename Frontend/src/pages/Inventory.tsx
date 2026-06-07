@@ -4,6 +4,7 @@ import { BoxIcon, PlusIcon, EditIcon } from '@/components/icons';
 import { ipcRenderer } from '@/lib/ipc';
 import { useUI } from '@/context/UIContext';
 import { format } from 'date-fns';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import type { InventoryItem, InventoryTransaction } from '@/types/inventory.types';
 
 export default function Inventory() {
@@ -126,27 +127,28 @@ export default function Inventory() {
     <div className="min-h-screen bg-slate-50/50 px-6 pb-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <PageHeader
+          breadcrumb="Management"
           title="Inventory Management"
           icon={<div className="p-2 bg-indigo-100 text-indigo-700 rounded-lg"><BoxIcon /></div>}
         />
 
         {/* Tabs */}
-        <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+        <div className="bg-slate-100/50 p-1 rounded-[20px] flex items-center w-fit shadow-inner ring-1 ring-slate-200/50 backdrop-blur-md">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === 'overview' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            className={`px-6 py-2 rounded-[16px] text-sm font-medium transition-all duration-300 ${
+              activeTab === 'overview' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/60' : 'text-slate-500 hover:bg-white/60 hover:text-indigo-600'
             }`}
           >
             Stock Overview
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === 'history' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            className={`px-6 py-2 rounded-[16px] text-sm font-medium transition-all duration-300 ${
+              activeTab === 'history' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/60' : 'text-slate-500 hover:bg-white/60 hover:text-indigo-600'
             }`}
           >
-            Transaction History
+            History & Logs
           </button>
         </div>
 
@@ -261,35 +263,37 @@ export default function Inventory() {
 
       {/* Item Modal */}
       {isItemModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800">{editingItem ? 'Edit Product' : 'Add New Product'}</h3>
-              <button onClick={() => setItemModalOpen(false)} className="text-slate-400 hover:text-slate-600">&times;</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity">
+          <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white/50">
+              <h3 className="font-semibold text-slate-800 text-lg">{editingItem ? 'Edit Product' : 'Add New Product'}</h3>
+              <button onClick={() => setItemModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
-                <input type="text" value={itemName} onChange={e => setItemName(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" />
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Name</label>
+                <input type="text" value={itemName} onChange={e => setItemName(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all outline-none" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label>
-                <input type="text" value={itemDesc} onChange={e => setItemDesc(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" />
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Description (Optional)</label>
+                <input type="text" value={itemDesc} onChange={e => setItemDesc(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all outline-none" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Cost Price (₹)</label>
-                  <input type="number" value={costPrice} onChange={e => setCostPrice(Number(e.target.value))} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Cost Price (₹)</label>
+                  <input type="number" value={costPrice} onChange={e => setCostPrice(Number(e.target.value))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Selling Price (₹)</label>
-                  <input type="number" value={sellingPrice} onChange={e => setSellingPrice(Number(e.target.value))} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Selling Price (₹)</label>
+                  <input type="number" value={sellingPrice} onChange={e => setSellingPrice(Number(e.target.value))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all outline-none" />
                 </div>
               </div>
             </div>
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setItemModalOpen(false)} className="px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-200">Cancel</button>
-              <button onClick={saveItem} disabled={!itemName} className="px-4 py-2 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">Save</button>
+            <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-end gap-3 rounded-b-3xl">
+              <button onClick={() => setItemModalOpen(false)} className="px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
+              <button onClick={saveItem} disabled={!itemName} className="px-5 py-2.5 rounded-xl font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-500/20 transition-all disabled:opacity-50">Save Product</button>
             </div>
           </div>
         </div>
@@ -297,41 +301,46 @@ export default function Inventory() {
 
       {/* Transaction Modal */}
       {isTransactionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800">Record {transactionType === 'PURCHASE' ? 'Purchase (Restock)' : 'Sale (Outflow)'}</h3>
-              <button onClick={() => setTransactionModalOpen(false)} className="text-slate-400 hover:text-slate-600">&times;</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity">
+          <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white/50">
+              <h3 className="font-semibold text-slate-800 text-lg">Record {transactionType === 'PURCHASE' ? 'Purchase (Restock)' : 'Sale (Outflow)'}</h3>
+              <button onClick={() => setTransactionModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Product</label>
-                <select value={selectedItemId} onChange={e => handleItemIdChange(Number(e.target.value))} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500">
-                  {items.map(i => <option key={i.id} value={i.id}>{i.name} (Stock: {i.stock})</option>)}
-                </select>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Product</label>
+                <CustomSelect
+                  value={selectedItemId || ''}
+                  onChange={(val) => handleItemIdChange(Number(val))}
+                  placeholder="Select a product..."
+                  options={items.map(i => ({ value: i.id, label: `${i.name} (Stock: ${i.stock})` }))}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Quantity</label>
-                  <input type="number" min="1" value={quantity} onChange={e => setQuantity(Number(e.target.value))} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Quantity</label>
+                  <input type="number" min="1" value={quantity} onChange={e => setQuantity(Number(e.target.value))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Price per Unit (₹)</label>
-                  <input type="number" value={pricePerUnit} onChange={e => setPricePerUnit(Number(e.target.value))} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Price per Unit (₹)</label>
+                  <input type="number" value={pricePerUnit} onChange={e => setPricePerUnit(Number(e.target.value))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all outline-none" />
                 </div>
               </div>
-              <div className="bg-slate-50 p-3 rounded-lg flex justify-between items-center">
+              <div className="bg-slate-50/80 p-4 rounded-2xl flex justify-between items-center border border-slate-100 shadow-inner">
                 <span className="text-sm font-medium text-slate-500">Total Amount</span>
-                <span className="font-bold text-lg text-slate-800">₹{(quantity * pricePerUnit).toLocaleString()}</span>
+                <span className="font-semibold text-xl text-slate-800">₹{(quantity * pricePerUnit).toLocaleString()}</span>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Notes (Optional)</label>
-                <input type="text" value={notes} onChange={e => setNotes(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" />
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes (Optional)</label>
+                <input type="text" value={notes} onChange={e => setNotes(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all outline-none" />
               </div>
             </div>
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setTransactionModalOpen(false)} className="px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-200">Cancel</button>
-              <button onClick={saveTransaction} disabled={!selectedItemId || quantity < 1} className={`px-4 py-2 rounded-lg font-medium text-white ${transactionType === 'PURCHASE' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-indigo-600 hover:bg-indigo-700'} disabled:opacity-50`}>
+            <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-end gap-3 rounded-b-3xl">
+              <button onClick={() => setTransactionModalOpen(false)} className="px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
+              <button onClick={saveTransaction} disabled={!selectedItemId || quantity < 1} className={`px-5 py-2.5 rounded-xl font-semibold text-white shadow-md transition-all disabled:opacity-50 ${transactionType === 'PURCHASE' ? 'bg-teal-600 hover:bg-teal-500 shadow-teal-500/20' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20'}`}>
                 Record {transactionType}
               </button>
             </div>

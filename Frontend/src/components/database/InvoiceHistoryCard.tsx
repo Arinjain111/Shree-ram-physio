@@ -6,23 +6,22 @@ import { useUI } from '@/context/UIContext';
 import { useLogger } from '@/utils/logger';
 import { ipcRenderer } from '@/lib/ipc';
 
-// Utils
+// Icons
+const EditIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.586-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.414-8.414z" /></svg>;
+const CopyIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8m-8 4h8m-8 4h5M7 21h10a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-2.414-2.414A2 2 0 0014.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>;
+const PrintIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>;
+const DeleteIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
+
 const getSyncStatusBadge = (status?: string) => {
     if (!status) return null;
-    
-    const statusConfig: any = {
-      SYNCED: { color: 'bg-emerald-500', text: '✓ Synced', textColor: 'text-white' },
-      PENDING: { color: 'bg-amber-500', text: '⏳ Pending', textColor: 'text-white' },
-      CONFLICT: { color: 'bg-rose-500', text: '⚠ Conflict', textColor: 'text-white' }
-    };
-    
-    const config = statusConfig[status] || 
-                   { color: 'bg-slate-500', text: status, textColor: 'text-white' };
-    
+    const isSynced = status === 'SYNCED';
+    const isConflict = status === 'CONFLICT';
+    const colorClass = isSynced ? 'bg-emerald-500' : isConflict ? 'bg-rose-500' : 'bg-amber-500';
     return (
-      <span className={`${config.color} ${config.textColor} px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm`}>
-        {config.text}
-      </span>
+        <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-slate-200 rounded-lg shadow-xs" title={status}>
+            <span className={`w-2 h-2 rounded-full ${colorClass}`}></span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{isSynced ? 'Synced' : isConflict ? 'Conflict' : 'Pending'}</span>
+        </div>
     );
 };
 
@@ -88,76 +87,76 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
       {/* Invoice Header */}
-      <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-100 flex flex-wrap justify-between items-center gap-4">
+      <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100 flex flex-wrap justify-between items-center gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center font-bold text-slate-600 text-sm shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center font-bold text-slate-500 text-sm shadow-xs">
             #{totalCount - index}
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-800">{invoice.invoiceNumber}</p>
-            <p className="text-xs text-slate-500 font-medium">
-              {new Date(invoice.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
-            {invoice.TransactionId && (
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                TX ID: <span className="font-bold text-slate-700">{invoice.TransactionId}</span>
-              </p>
-            )}
+            <div className="flex items-center gap-3 mb-0.5">
+              <p className="text-base font-bold text-slate-800 tracking-tight">{invoice.invoiceNumber}</p>
+              {getSyncStatusBadge(invoice.syncStatus)}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mt-1">
+              <span>{new Date(invoice.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+              
+              <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 font-bold text-slate-600 border border-slate-200 shadow-xs uppercase tracking-wider text-[10px]">
+                {invoice.paymentMethod || 'Cash'}
+              </span>
+
+              {invoice.TransactionId && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                  <span>TX: <span className="font-bold text-slate-700">{invoice.TransactionId}</span></span>
+                </>
+              )}
+            </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
-          {getSyncStatusBadge(invoice.syncStatus)}
-
+        {/* Actions Row - Minimal Icons */}
+        <div className="flex items-center gap-1">
           {canEdit ? (
             <button
               onClick={() => navigate('/invoice-generator', { state: { mode: 'edit', invoiceId: invoice.id } })}
               disabled={!invoice.id}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-amber-300 hover:text-amber-700 text-slate-600 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
               title={!invoice.id ? 'Missing invoice id' : 'Edit this invoice (not synced yet)'}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.586-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.414-8.414z" />
-              </svg>
-              Edit
+              <EditIcon />
             </button>
           ) : (
             <button
               onClick={() => navigate('/invoice-generator', { state: { mode: 'duplicate', invoiceId: invoice.id } })}
               disabled={!invoice.id}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-amber-300 hover:text-amber-700 text-slate-600 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
               title={!invoice.id ? 'Missing invoice id' : 'Reissue: creates a new invoice based on this one'}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8m-8 4h8m-8 4h5M7 21h10a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-2.414-2.414A2 2 0 0014.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              Reissue
+              <CopyIcon />
             </button>
           )}
 
           <button
             onClick={() => onPrint(invoice)}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 text-slate-600 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
+            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+            title="Print Invoice"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Print Invoice
+            <PrintIcon />
           </button>
           
           <div className="relative" ref={deleteRef}>
             <button
               onClick={() => setShowDeleteOptions(!showDeleteOptions)}
-              className="flex items-center gap-2 px-3 py-2 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
+              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
               title="Delete Invoice"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              Delete
+              <DeleteIcon />
             </button>
             {showDeleteOptions && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-60 overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 overflow-hidden">
                 <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Delete from:</div>
                 <button 
                   onClick={() => handleDelete('local')} 
@@ -189,49 +188,47 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
         </div>
       </div>
 
-      <div className="p-6 grid lg:grid-cols-3 gap-8">
-        {/* Left Column: Diagnosis & Notes */}
-        <div className="lg:col-span-1 space-y-6">
+      <div className="p-6 grid lg:grid-cols-5 gap-8">
+        {/* Left Column: Diagnosis, Notes & Treatments */}
+        <div className="lg:col-span-2 space-y-6">
           {invoice.diagnosis && (
-            <div className="bg-amber-50/50 rounded-xl p-5 border border-amber-100">
-              <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-2">Diagnosis</h4>
-              <p className="text-slate-700 font-medium leading-relaxed">{invoice.diagnosis}</p>
+            <div>
+              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Diagnosis</h4>
+              <p className="text-slate-700 text-sm font-medium leading-relaxed bg-amber-50/50 p-4 rounded-2xl border border-amber-100/50">{invoice.diagnosis}</p>
             </div>
           )}
           
           {invoice.notes && (
-            <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Notes</h4>
-              <p className="text-slate-600 text-sm leading-relaxed">{invoice.notes}</p>
+            <div>
+              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Notes</h4>
+              <p className="text-slate-600 text-sm leading-relaxed bg-slate-50/50 p-4 rounded-2xl border border-slate-100">{invoice.notes}</p>
             </div>
           )}
 
-          <div className="flex flex-col gap-3">
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Treatments</h4>
-            {invoice.treatments.map((t, idx) => {
-              const color = COLORS[idx % COLORS.length];
-              return (
-                <div key={idx} className={`flex flex-col gap-1 px-4 py-3 rounded-xl border ${color.bg} ${color.border}`}>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${color.dot}`} />
-                    <span className={`text-sm font-bold ${color.text}`}>{t.name}</span>
-                    <span className={`text-xs ${color.text} opacity-75`}>({t.sessions} sessions)</span>
+          <div>
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Treatments</h4>
+            <div className="flex flex-col gap-2">
+              {invoice.treatments.map((t, idx) => {
+                const color = COLORS[idx % COLORS.length];
+                return (
+                  <div key={idx} className="flex flex-col gap-0.5 px-4 py-3 rounded-2xl border border-slate-100 bg-white shadow-xs">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${color.dot}`} />
+                      <span className="text-sm font-bold text-slate-800">{t.name}</span>
+                    </div>
+                    <div className="text-[11px] font-medium text-slate-400 pl-4">
+                      {t.sessions} sessions &bull; {new Date(t.startDate).toLocaleDateString()} to {new Date(t.endDate).toLocaleDateString()}
+                    </div>
                   </div>
-                  <div className={`text-xs ${color.text} pl-4 opacity-90`}>
-                    {new Date(t.startDate).toLocaleDateString()} - {new Date(t.endDate).toLocaleDateString()}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
 
         {/* Right Column: Treatment Calendar */}
-        <div className="lg:col-span-2">
-          <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-            Treatment Schedule
-          </h4>
+        <div className="lg:col-span-3">
+          <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Treatment Schedule</h4>
           <TreatmentCalendar treatments={invoice.treatments} />
         </div>
       </div>

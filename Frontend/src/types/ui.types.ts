@@ -36,8 +36,8 @@ export interface UIContextType {
 
 export interface PageHeaderProps {
   title: string;
+  breadcrumb?: string;
   icon?: ReactNode;
-  description?: ReactNode;
   actions?: ReactNode;
   backUrl?: string;
   className?: string;

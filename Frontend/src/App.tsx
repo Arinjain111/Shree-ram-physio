@@ -20,7 +20,7 @@ function App() {
           <Route path="/" element={<Home />} />
 
           {/* Billing & Invoicing Hub */}
-          <Route element={<HubLayout hubName="Billing" tabs={[
+          <Route element={<HubLayout tabs={[
             { label: 'Generator', path: '/invoice-generator' },
             { label: 'Customizer', path: '/invoice-customizer' }
           ]} />}>
@@ -29,7 +29,7 @@ function App() {
           </Route>
 
           {/* Clinic Management Hub */}
-          <Route element={<HubLayout hubName="Management" tabs={[
+          <Route element={<HubLayout tabs={[
             { label: 'Finances', path: '/finances' },
             { label: 'Inventory', path: '/inventory' },
             { label: 'Reports', path: '/reports' }
@@ -40,7 +40,7 @@ function App() {
           </Route>
 
           {/* Configuration Hub */}
-          <Route element={<HubLayout hubName="Config" tabs={[
+          <Route element={<HubLayout tabs={[
             { label: 'App Settings', path: '/settings' },
             { label: 'Presets', path: '/treatment-settings' }
           ]} />}>
@@ -49,7 +49,7 @@ function App() {
           </Route>
 
           {/* Patient Database Hub (Single Tab for now) */}
-          <Route element={<HubLayout hubName="Database" tabs={[
+          <Route element={<HubLayout tabs={[
             { label: 'Patient Search', path: '/database-find' }
           ]} />}>
             <Route path="/database-find" element={<DatabaseFind />} />
