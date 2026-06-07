@@ -12,15 +12,19 @@ import PageHeader from '@/components/layout/PageHeader';
 import PaymentModal from '@/components/billing/PaymentModal';
 import { ChartBarIcon } from '@/components/icons';
 import type { DatabaseInvoice } from '@/types/database.types';
+import type { InventoryTransaction } from '@/types/inventory.types';
 import { ipcRenderer } from '@/lib/ipc';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'];
 
 type DatePreset = '30days' | '3months' | '6months' | '1year' | 'custom';
 type Tab = 'overview' | 'billing';
+type FinanceFilter = 'all' | 'treatments' | 'inventory';
 
 interface Metrics {
   revenue: number;
+  expenses: number;
+  profit: number;
   patients: number;
   invoices: number;
   avgRevenue: number;
@@ -63,8 +67,10 @@ type StatusTab = 'all' | 'unpaid' | 'partial' | 'paid' | 'overdue';
 export default function Finances() {
   const { showToast } = useUI();
   const [invoices, setInvoices] = useState<DatabaseInvoice[]>([]);
+  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [financeFilter, setFinanceFilter] = useState<FinanceFilter>('all');
   const log = useLogger();
 
   // Analytics State
@@ -85,12 +91,14 @@ export default function Finances() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [invResult, billResult] = await Promise.all([
+        const [invResult, billResult, transResult] = await Promise.all([
           ipcRenderer.invoke('load-invoices'),
           ipcRenderer.invoke('get-billing-summary'),
+          ipcRenderer.invoke('get-inventory-transactions', 5000) // load many
         ]);
         if (invResult.success) setInvoices(invResult.invoices);
         if (billResult.success) setBillingData(billResult);
+        if (transResult?.success) setInventoryTransactions(transResult.transactions);
       } catch (error) {
         log.error('finances', 'Failed to load finance data', { error: error instanceof Error ? error.message : String(error) });
         showToast('error', 'Failed to load data');
@@ -128,15 +136,6 @@ export default function Finances() {
   };
 
   const { currentMetrics, previousMetrics, chartData, treatmentData } = useMemo(() => {
-    if (!invoices.length) {
-      return {
-        currentMetrics: { revenue: 0, patients: 0, invoices: 0, avgRevenue: 0 },
-        previousMetrics: { revenue: 0, patients: 0, invoices: 0, avgRevenue: 0 },
-        chartData: [],
-        treatmentData: []
-      };
-    }
-
     const currentInterval = { start: startOfDay(startDate), end: endOfDay(endDate) };
     const daysDiff = differenceInDays(currentInterval.end, currentInterval.start) + 1;
     const previousInterval = {
@@ -146,7 +145,7 @@ export default function Finances() {
 
     const currentInvoices: DatabaseInvoice[] = [];
     const previousInvoices: DatabaseInvoice[] = [];
-
+    
     invoices.forEach(inv => {
       const date = new Date(inv.date);
       if (!isValid(date)) return;
@@ -154,33 +153,90 @@ export default function Finances() {
       if (isWithinInterval(date, previousInterval)) previousInvoices.push(inv);
     });
 
-    const calculateMetrics = (invs: DatabaseInvoice[]): Metrics => {
-      const revenue = invs.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
-      const uniquePatients = new Set(invs.map(inv => inv.patient.id || `${inv.patient.firstName} ${inv.patient.lastName}`));
-      return { revenue, patients: uniquePatients.size, invoices: invs.length, avgRevenue: invs.length ? revenue / invs.length : 0 };
+    const currentTrans: InventoryTransaction[] = [];
+    const previousTrans: InventoryTransaction[] = [];
+    
+    inventoryTransactions.forEach(t => {
+      const date = new Date(t.date);
+      if (!isValid(date)) return;
+      if (isWithinInterval(date, currentInterval)) currentTrans.push(t);
+      if (isWithinInterval(date, previousInterval)) previousTrans.push(t);
+    });
+
+    const calculateMetrics = (invs: DatabaseInvoice[], trans: InventoryTransaction[]): Metrics => {
+      let revenue = 0;
+      let expenses = 0;
+      
+      if (financeFilter === 'all' || financeFilter === 'treatments') {
+        revenue += invs.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
+      }
+      
+      if (financeFilter === 'all' || financeFilter === 'inventory') {
+        trans.forEach(t => {
+          if (t.type === 'SALE') revenue += Number(t.totalAmount) || 0;
+          if (t.type === 'PURCHASE') expenses += Number(t.totalAmount) || 0;
+        });
+      }
+
+      const uniquePatients = new Set(invs.map(inv => inv.patient?.id || `${inv.patient?.firstName} ${inv.patient?.lastName}`));
+      return { 
+        revenue, 
+        expenses,
+        profit: revenue - expenses,
+        patients: uniquePatients.size, 
+        invoices: invs.length, 
+        avgRevenue: invs.length ? revenue / invs.length : 0 
+      };
     };
 
-    const currentM = calculateMetrics(currentInvoices);
-    const previousM = calculateMetrics(previousInvoices);
+    const currentM = calculateMetrics(currentInvoices, currentTrans);
+    const previousM = calculateMetrics(previousInvoices, previousTrans);
 
     const formatStr = preset === '30days' || preset === 'custom' && daysDiff <= 60 ? 'MMM dd' : 'MMM yyyy';
-    const sortedCurrent = [...currentInvoices].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const trendMap = new Map<string, number>();
-    sortedCurrent.forEach(inv => {
-      const date = new Date(inv.date);
-      if (isValid(date)) {
-        const key = format(date, formatStr);
-        trendMap.set(key, (trendMap.get(key) || 0) + Number(inv.total));
-      }
-    });
-    const finalChartData = Array.from(trendMap.entries()).map(([date, revenue]) => ({ date, revenue }));
+    
+    if (financeFilter === 'all' || financeFilter === 'treatments') {
+      [...currentInvoices].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(inv => {
+        const date = new Date(inv.date);
+        if (isValid(date)) {
+          const key = format(date, formatStr);
+          trendMap.set(key, (trendMap.get(key) || 0) + Number(inv.total));
+        }
+      });
+    }
+
+    if (financeFilter === 'all' || financeFilter === 'inventory') {
+      [...currentTrans].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(t => {
+        const date = new Date(t.date);
+        if (isValid(date) && t.type === 'SALE') {
+          const key = format(date, formatStr);
+          trendMap.set(key, (trendMap.get(key) || 0) + Number(t.totalAmount));
+        }
+      });
+    }
+    
+    // Sort keys based on date
+    const sortedKeys = Array.from(trendMap.keys()).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    const finalChartData = sortedKeys.map(date => ({ date, revenue: trendMap.get(date) || 0 }));
 
     const tMap = new Map<string, number>();
-    currentInvoices.forEach(inv => {
-      inv.treatments.forEach(t => {
-        tMap.set(t.name, (tMap.get(t.name) || 0) + Number(t.amount));
+    if (financeFilter === 'all' || financeFilter === 'treatments') {
+      currentInvoices.forEach(inv => {
+        inv.treatments.forEach(t => {
+          tMap.set(t.name, (tMap.get(t.name) || 0) + Number(t.amount));
+        });
       });
-    });
+    }
+
+    if (financeFilter === 'all' || financeFilter === 'inventory') {
+      currentTrans.forEach(t => {
+        if (t.type === 'SALE') {
+          const name = `Item: ${t.item?.name || 'Unknown'}`;
+          tMap.set(name, (tMap.get(name) || 0) + Number(t.totalAmount));
+        }
+      });
+    }
+
     const tData = Array.from(tMap.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
@@ -188,7 +244,7 @@ export default function Finances() {
       .reverse();
 
     return { currentMetrics: currentM, previousMetrics: previousM, chartData: finalChartData, treatmentData: tData };
-  }, [invoices, startDate, endDate, preset]);
+  }, [invoices, inventoryTransactions, startDate, endDate, preset, financeFilter]);
 
   const renderMetricCard = (title: string, current: number, previous: number, isCurrency: boolean = false) => {
     const diff = current - previous;
@@ -232,6 +288,21 @@ export default function Finances() {
         <PageHeader
           title="Finance"
           icon={<div className="p-2 bg-indigo-100 text-indigo-700 rounded-lg"><ChartBarIcon /></div>}
+          actions={
+            <div className="flex bg-slate-200 p-1 rounded-xl">
+              {(['all', 'treatments', 'inventory'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setFinanceFilter(f)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    financeFilter === f ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {f === 'all' ? 'All Finances' : f === 'treatments' ? 'Treatments Only' : 'Inventory Only'}
+                </button>
+              ))}
+            </div>
+          }
         />
 
         {/* Tabs */}
@@ -288,10 +359,12 @@ export default function Finances() {
 
             {/* Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {renderMetricCard("Total Revenue", currentMetrics.revenue, previousMetrics.revenue, true)}
-              {renderMetricCard("Patients Treated", currentMetrics.patients, previousMetrics.patients, false)}
-              {renderMetricCard("Invoices Generated", currentMetrics.invoices, previousMetrics.invoices, false)}
-              {renderMetricCard("Avg. Invoice Value", currentMetrics.avgRevenue, previousMetrics.avgRevenue, true)}
+              {renderMetricCard("Total Revenue (Inflow)", currentMetrics.revenue, previousMetrics.revenue, true)}
+              {renderMetricCard("Total Expenses (Outflow)", currentMetrics.expenses, previousMetrics.expenses, true)}
+              {renderMetricCard("Net Profit", currentMetrics.profit, previousMetrics.profit, true)}
+              {financeFilter !== 'inventory' 
+                ? renderMetricCard("Patients Treated", currentMetrics.patients, previousMetrics.patients, false)
+                : renderMetricCard("Avg. Revenue", currentMetrics.avgRevenue, previousMetrics.avgRevenue, true)}
             </div>
 
             {/* Charts */}
@@ -319,7 +392,7 @@ export default function Finances() {
                 </div>
               </div>
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-bold text-slate-800 mb-6">Revenue by Treatment</h3>
+                <h3 className="text-lg font-bold text-slate-800 mb-6">Revenue by Source</h3>
                 <div className="h-80">
                   {treatmentData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">

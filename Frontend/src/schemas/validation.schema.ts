@@ -215,6 +215,33 @@ export const SyncPayloadSchema = z.object({
       updatedAt: z.string().datetime(),
     })
   ).optional(),
+  inventoryItems: z.array(
+    z.object({
+      id: z.number().int().positive().optional(),
+      cloudId: z.number().int().positive().nullish(),
+      name: z.string().min(1).max(200),
+      description: z.string().max(500).nullish(),
+      stock: z.number().int().min(0),
+      costPrice: z.number().min(0),
+      sellingPrice: z.number().min(0),
+      updatedAt: z.string().datetime(),
+    })
+  ).optional(),
+  inventoryTransactions: z.array(
+    z.object({
+      id: z.number().int().positive().optional(),
+      cloudId: z.number().int().positive().nullish(),
+      itemCloudId: z.number().int().positive().nullish(),
+      itemId: z.number().int().positive(),
+      type: z.enum(['PURCHASE', 'SALE', 'ADJUSTMENT']),
+      quantity: z.number().int().min(1),
+      pricePerUnit: z.number().min(0),
+      totalAmount: z.number().min(0),
+      date: z.string(),
+      notes: z.string().max(500).nullish(),
+      updatedAt: z.string().datetime(),
+    })
+  ).optional(),
 });
 
 export type SyncPayload = z.infer<typeof SyncPayloadSchema>;
@@ -244,11 +271,25 @@ export const SyncResponseSchema = z.object({
         cloudId: z.number().int(),
       })
     ),
+    inventoryItems: z.array(
+      z.object({
+        localId: z.number().int().optional(),
+        cloudId: z.number().int(),
+      })
+    ),
+    inventoryTransactions: z.array(
+      z.object({
+        localId: z.number().int().optional(),
+        cloudId: z.number().int(),
+      })
+    ),
   }),
   updates: z.object({
     patients: z.array(PatientSchema),
     invoices: z.array(InvoiceSchema),
     treatments: z.array(TreatmentSchema),
+    inventoryItems: z.array(z.any()),
+    inventoryTransactions: z.array(z.any()),
   }),
   conflicts: z.array(
     z.object({
@@ -328,6 +369,46 @@ export const InvoiceLayoutSchema = z.object({
 });
 
 export type InvoiceLayout = z.infer<typeof InvoiceLayoutSchema>;
+
+// ============================================
+// INVENTORY SCHEMAS
+// ============================================
+
+export const AddInventoryItemSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(200),
+  description: z.string().max(500).nullish(),
+  costPrice: z.number().min(0, 'Cost price cannot be negative'),
+  sellingPrice: z.number().min(0, 'Selling price cannot be negative'),
+});
+
+export type AddInventoryItemInput = z.infer<typeof AddInventoryItemSchema>;
+
+export const UpdateInventoryItemSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(200),
+  description: z.string().max(500).nullish(),
+  costPrice: z.number().min(0, 'Cost price cannot be negative'),
+  sellingPrice: z.number().min(0, 'Selling price cannot be negative'),
+});
+
+export type UpdateInventoryItemInput = z.infer<typeof UpdateInventoryItemSchema>;
+
+export const RecordPurchaseSchema = z.object({
+  itemId: z.number().int().positive(),
+  quantity: z.number().int().min(1, 'Quantity must be at least 1'),
+  pricePerUnit: z.number().min(0, 'Price cannot be negative'),
+  notes: z.string().max(500).nullish(),
+});
+
+export type RecordPurchaseInput = z.infer<typeof RecordPurchaseSchema>;
+
+export const RecordSaleSchema = z.object({
+  itemId: z.number().int().positive(),
+  quantity: z.number().int().min(1, 'Quantity must be at least 1'),
+  pricePerUnit: z.number().min(0, 'Price cannot be negative'),
+  notes: z.string().max(500).nullish(),
+});
+
+export type RecordSaleInput = z.infer<typeof RecordSaleSchema>;
 
 // ============================================
 // UTILITY FUNCTIONS

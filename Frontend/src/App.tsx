@@ -7,6 +7,7 @@ import TreatmentSettings from './pages/TreatmentSettings';
 import Settings from './pages/Settings';
 import Finances from './pages/Finances';
 import Reports from './pages/Reports';
+import Inventory from './pages/Inventory';
 import UpdateBanner from './components/layout/UpdateBanner';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/finances" element={<Finances />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/inventory" element={<Inventory />} />
         </Routes>
       </div>
     </div>

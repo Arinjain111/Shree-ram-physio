@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
-import { SyncRequestSchema, validateOrThrow, type SyncRequest, type PatientSync, type InvoiceSync, type TreatmentSync } from '../schemas/validation.schema';
+import { SyncRequestSchema, validateOrThrow, type SyncRequest, type PatientSync, type InvoiceSync, type TreatmentSync, type InventoryItemSync, type InventoryTransactionSync } from '../schemas/validation.schema';
 import { logger } from '../utils/logger';
 
 interface SyncResult {
@@ -8,11 +8,15 @@ interface SyncResult {
     patients: Array<{ localId?: number; cloudId: number }>;
     invoices: Array<{ localId?: number; cloudId: number; originalNumber?: string; newNumber?: string }>;
     treatments: Array<{ localId?: number; cloudId: number }>;
+    inventoryItems: Array<{ localId?: number; cloudId: number }>;
+    inventoryTransactions: Array<{ localId?: number; cloudId: number }>;
   };
   updates: {
     patients: Array<{ id: number; firstName: string; lastName: string; age: number; gender: string; phone: string; uhid: string | null; createdAt: Date; updatedAt: Date }>;
     invoices: Array<{ id: number; invoiceNumber: string; patientId: number; date: Date; diagnosis: string; notes: string; paymentMethod: string; TransactionId: string | null; total: number; createdAt: Date; updatedAt: Date; patient: { id: number; firstName: string; lastName: string; age: number; gender: string; phone: string; uhid: string | null; createdAt: Date; updatedAt: Date }; treatments: Array<{ id: number; invoiceId: number; name: string; duration: string; sessions: number; startDate: Date; endDate: Date; amount: number; createdAt: Date; updatedAt: Date }> }>;
     treatments: Array<{ id: number; invoiceId: number; name: string; duration: string; sessions: number; startDate: Date; endDate: Date; amount: number; createdAt: Date; updatedAt: Date }>;
+    inventoryItems: Array<{ id: number; name: string; description: string | null; stock: number; costPrice: number; sellingPrice: number; createdAt: Date; updatedAt: Date }>;
+    inventoryTransactions: Array<{ id: number; itemId: number; type: string; quantity: number; pricePerUnit: number; totalAmount: number; date: Date; notes: string | null; createdAt: Date; updatedAt: Date }>;
   };
   conflicts: Array<{ localId?: number; originalNumber: string; newNumber: string; reason: string }>;
 }
@@ -28,7 +32,7 @@ export const syncData = async (req: Request, res: Response) => {
   log.debug('sync', 'Request received');
 
   try {
-    const { lastSyncTime, patients, invoices, treatments } = validateOrThrow<SyncRequest>(
+    const { lastSyncTime, patients, invoices, treatments, inventoryItems, inventoryTransactions } = validateOrThrow<SyncRequest>(
       SyncRequestSchema,
       req.body
     );
@@ -38,6 +42,8 @@ export const syncData = async (req: Request, res: Response) => {
         patients: patients?.length || 0,
         invoices: invoices?.length || 0,
         treatments: treatments?.length || 0,
+        inventoryItems: inventoryItems?.length || 0,
+        inventoryTransactions: inventoryTransactions?.length || 0,
       },
       mode: lastSyncTime ? 'incremental' : 'full',
     });
@@ -46,17 +52,22 @@ export const syncData = async (req: Request, res: Response) => {
       synced: {
         patients: [],
         invoices: [],
-        treatments: []
+        treatments: [],
+        inventoryItems: [],
+        inventoryTransactions: []
       },
       updates: {
         patients: [],
         invoices: [],
-        treatments: []
+        treatments: [],
+        inventoryItems: [],
+        inventoryTransactions: []
       },
       conflicts: []
     };
     const patientIdMap = new Map<number, number>();
     const invoiceIdMap = new Map<number, number>();
+    const inventoryItemIdMap = new Map<number, number>();
 
     // === SYNC PATIENTS ===
     if (patients && patients.length > 0) {
@@ -273,6 +284,121 @@ export const syncData = async (req: Request, res: Response) => {
     }
   }
 
+  // === SYNC INVENTORY ITEMS ===
+  if (inventoryItems && inventoryItems.length > 0) {
+    for (const it of inventoryItems) {
+      try {
+        const item = it as InventoryItemSync;
+        const itemData = {
+          name: item.name,
+          description: item.description ?? null,
+          stock: item.stock ?? 0,
+          costPrice: item.costPrice,
+          sellingPrice: item.sellingPrice,
+        };
+
+        let cloudItem;
+        if (item.cloudId) {
+          cloudItem = await prisma.inventoryItem.upsert({
+            where: { id: item.cloudId },
+            update: itemData,
+            create: itemData,
+          });
+        } else {
+          const existingByName = await prisma.inventoryItem.findFirst({
+            where: { name: item.name },
+          });
+          if (existingByName) {
+            cloudItem = await prisma.inventoryItem.update({
+              where: { id: existingByName.id },
+              data: itemData,
+            });
+          } else {
+            cloudItem = await prisma.inventoryItem.create({ data: itemData });
+          }
+        }
+
+        if (item.id) {
+          inventoryItemIdMap.set(item.id, cloudItem.id);
+        }
+
+        result.synced.inventoryItems.push({
+          cloudId: cloudItem.id,
+          ...(item.id !== undefined ? { localId: item.id } : {}),
+        });
+      } catch (err) {
+        log.error('sync', 'Failed to sync inventory item', {
+          name: (it as any)?.name,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+
+  // === SYNC INVENTORY TRANSACTIONS ===
+  if (inventoryTransactions && inventoryTransactions.length > 0) {
+    for (const tr of inventoryTransactions) {
+      try {
+        const txn = tr as InventoryTransactionSync;
+        const resolvedItemId =
+          txn.itemCloudId || (txn.itemId ? inventoryItemIdMap.get(txn.itemId) : undefined);
+
+        if (!resolvedItemId) {
+          log.warn('sync', 'Cannot resolve inventory item ID for transaction', { itemId: txn.itemId });
+          continue;
+        }
+
+        const txnData = {
+          itemId: resolvedItemId,
+          type: txn.type,
+          quantity: txn.quantity,
+          pricePerUnit: txn.pricePerUnit,
+          totalAmount: txn.totalAmount,
+          date: txn.date,
+          notes: txn.notes ?? null,
+        };
+
+        let cloudTxn;
+        if (txn.cloudId) {
+          cloudTxn = await prisma.inventoryTransaction.upsert({
+            where: { id: txn.cloudId },
+            update: txnData,
+            create: txnData,
+          });
+        } else {
+          // Identity match to prevent duplicate transactions on retry
+          const existing = await prisma.inventoryTransaction.findFirst({
+            where: {
+              itemId: resolvedItemId,
+              type: txn.type,
+              quantity: txn.quantity,
+              pricePerUnit: txn.pricePerUnit,
+              totalAmount: txn.totalAmount,
+            },
+          });
+          if (existing) {
+            cloudTxn = await prisma.inventoryTransaction.update({
+              where: { id: existing.id },
+              data: txnData,
+            });
+          } else {
+            cloudTxn = await prisma.inventoryTransaction.create({ data: txnData });
+          }
+        }
+
+        result.synced.inventoryTransactions.push({
+          cloudId: cloudTxn.id,
+          ...(txn.id !== undefined ? { localId: txn.id } : {}),
+        });
+      } catch (err) {
+        log.error('sync', 'Failed to sync inventory transaction', {
+          itemId: (tr as any)?.itemId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+
   // === FETCH UPDATES FROM CLOUD ===
   // On first sync (no lastSyncTime), fetch ALL records
   // On subsequent syncs, only fetch records updated since last sync
@@ -314,16 +440,32 @@ export const syncData = async (req: Request, res: Response) => {
     },
   });
 
+  // Get updated inventory items
+  result.updates.inventoryItems = await prisma.inventoryItem.findMany({
+    where: whereClause,
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  // Get updated inventory transactions
+  result.updates.inventoryTransactions = await prisma.inventoryTransaction.findMany({
+    where: whereClause,
+    orderBy: { updatedAt: 'desc' },
+  });
+
   log.info('sync', 'Sync completed', {
     synced: {
       patients: result.synced.patients.length,
       invoices: result.synced.invoices.length,
       treatments: result.synced.treatments.length,
+      inventoryItems: result.synced.inventoryItems.length,
+      inventoryTransactions: result.synced.inventoryTransactions.length,
     },
     updates: {
       patients: result.updates.patients.length,
       invoices: result.updates.invoices.length,
       treatments: result.updates.treatments.length,
+      inventoryItems: result.updates.inventoryItems.length,
+      inventoryTransactions: result.updates.inventoryTransactions.length,
     },
     conflicts: result.conflicts.length,
   });
@@ -346,7 +488,7 @@ export const syncData = async (req: Request, res: Response) => {
 
 export const getSyncStatus = async (req: Request, res: Response) => {
   try {
-    const [lastPatient, lastInvoice, lastTreatment] = await Promise.all([
+    const [lastPatient, lastInvoice, lastTreatment, lastInvItem, lastInvTxn] = await Promise.all([
       prisma.patient.findFirst({
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
@@ -359,12 +501,22 @@ export const getSyncStatus = async (req: Request, res: Response) => {
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
       }),
+      prisma.inventoryItem.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+      prisma.inventoryTransaction.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
     ]);
 
     const timestamps = [
       lastPatient?.updatedAt,
       lastInvoice?.updatedAt,
-      lastTreatment?.updatedAt
+      lastTreatment?.updatedAt,
+      lastInvItem?.updatedAt,
+      lastInvTxn?.updatedAt
     ].filter((d): d is Date => !!d);
 
     const lastModified = timestamps.length > 0

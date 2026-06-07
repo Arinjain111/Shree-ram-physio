@@ -158,6 +158,41 @@ export const TreatmentSyncSchema = z.object({
 
 export type TreatmentSync = z.infer<typeof TreatmentSyncSchema>;
 
+/**
+ * Inventory Item Sync Schema — item data during sync
+ */
+export const InventoryItemSyncSchema = z.object({
+  id: z.number().int().positive().optional(),
+  cloudId: z.number().int().positive().nullish(),
+  name: z.string().min(1, 'Name is required').max(200),
+  description: z.string().max(500).nullish(),
+  stock: z.number().int().min(0).default(0),
+  costPrice: z.number().min(0),
+  sellingPrice: z.number().min(0),
+  updatedAt: z.iso.datetime().optional(),
+});
+
+export type InventoryItemSync = z.infer<typeof InventoryItemSyncSchema>;
+
+/**
+ * Inventory Transaction Sync Schema — transaction data during sync
+ */
+export const InventoryTransactionSyncSchema = z.object({
+  id: z.number().int().positive().optional(),
+  cloudId: z.number().int().positive().nullish(),
+  itemCloudId: z.number().int().positive().nullish(),
+  itemId: z.number().int().positive(),
+  type: z.enum(['PURCHASE', 'SALE', 'ADJUSTMENT']),
+  quantity: z.number().int().min(1, 'Quantity must be at least 1'),
+  pricePerUnit: z.number().min(0),
+  totalAmount: z.number().min(0),
+  date: ValidDateStringSchema,
+  notes: z.string().max(500).nullish(),
+  updatedAt: z.iso.datetime().optional(),
+});
+
+export type InventoryTransactionSync = z.infer<typeof InventoryTransactionSyncSchema>;
+
 // ============================================
 // REQUEST SCHEMAS - API request validation
 // ============================================
@@ -170,6 +205,8 @@ export const SyncRequestSchema = z.object({
   patients: z.array(PatientSyncSchema).max(500, 'Maximum 500 patients per sync batch').optional(),
   invoices: z.array(InvoiceSyncSchema).max(1000, 'Maximum 1000 invoices per sync batch').optional(),
   treatments: z.array(TreatmentSyncSchema).max(2000, 'Maximum 2000 treatments per sync batch').optional(),
+  inventoryItems: z.array(InventoryItemSyncSchema).max(500, 'Maximum 500 inventory items per sync batch').optional(),
+  inventoryTransactions: z.array(InventoryTransactionSyncSchema).max(2000, 'Maximum 2000 inventory transactions per sync batch').optional(),
 });
 
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;

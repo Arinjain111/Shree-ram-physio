@@ -90,6 +90,7 @@ model Treatment {
   
   // Relations
   invoice    Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  treatmentSessions TreatmentSession[]
   
   @@map("treatments")
   @@index([invoiceId])
@@ -149,3 +150,87 @@ model SyncLog {
   @@map("sync_logs")
   @@index([tableName, recordId])
 }
+
+model InventoryItem {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  stock        Int      @default(0)
+  costPrice    Float    @default(0) @map("cost_price")
+  sellingPrice Float    @default(0) @map("selling_price")
+  
+  // Sync tracking
+  cloudId      Int?     @map("cloud_id")
+  syncStatus   String   @default("PENDING") @map("sync_status")
+  
+  // Timestamps for sync
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  lastSyncAt   DateTime? @map("last_sync_at")
+  
+  transactions InventoryTransaction[]
+
+  @@map("inventory_items")
+}
+
+model InventoryTransaction {
+  id           Int      @id @default(autoincrement())
+  itemId       Int      @map("item_id")
+  type         String   // "PURCHASE", "SALE", "ADJUSTMENT"
+  quantity     Int      
+  pricePerUnit Float    @map("price_per_unit")
+  totalAmount  Float    @map("total_amount")
+  date         DateTime @default(now())
+  notes        String?
+  
+  // Sync tracking
+  cloudId      Int?     @map("cloud_id")
+  syncStatus   String   @default("PENDING") @map("sync_status")
+  
+  // Timestamps for sync
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  lastSyncAt   DateTime? @map("last_sync_at")
+
+  item         InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  
+  @@map("inventory_transactions")
+  @@index([itemId])
+}
+
+model SessionNoteTemplate {
+  id        Int      @id @default(autoincrement())
+  text      String   @unique
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("session_note_templates")
+}
+
+model TreatmentSession {
+  id               Int      @id @default(autoincrement())
+  treatmentId      Int      @map("treatment_id")
+  sessionNumber    Int      @map("session_number")
+  date             DateTime?
+  attended         Int      @default(0)
+  painBefore       Int?     @map("pain_before")
+  painAfter        Int?     @map("pain_after")
+  notes            String   @default("")
+  exercisesPerformed String @default("") @map("exercises_performed")
+  progress         String?
+  cancelled        Int      @default(0)
+  rescheduledDate  DateTime? @map("rescheduled_date")
+  
+  cloudId          Int?     @map("cloud_id")
+  syncStatus       String   @default("PENDING") @map("sync_status")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  lastSyncAt       DateTime? @map("last_sync_at")
+  
+  treatment        Treatment @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  
+  @@map("treatment_sessions")
+  @@index([treatmentId])
+  @@index([syncStatus])
+}
+

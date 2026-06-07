@@ -6,6 +6,7 @@ import { registerPrintHandlers } from './print';
 import { registerLayoutHandlers } from './layout';
 import { registerSyncHandlers } from './sync';
 import { registerDiagnosisHandlers } from './diagnosis';
+import { registerInventoryHandlers } from './inventory';
 import { PrismaSyncEngine } from '../sync/prismaSyncEngine';
 
 export function registerIpcHandlers(syncEngine: PrismaSyncEngine | null) {
@@ -17,4 +18,5 @@ export function registerIpcHandlers(syncEngine: PrismaSyncEngine | null) {
     registerLayoutHandlers();
     registerSyncHandlers(syncEngine);
     registerDiagnosisHandlers();
+    registerInventoryHandlers();
 }

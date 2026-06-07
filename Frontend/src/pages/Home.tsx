@@ -53,6 +53,13 @@ const Home = () => {
       description: 'Deep insights, patient stats, and exportable reports',
       path: '/reports',
       color: 'from-teal-500 to-emerald-600'
+    },
+    {
+      title: 'Inventory',
+      icon: '📦',
+      description: 'Manage clinic supplies, products, stock, and transactions',
+      path: '/inventory',
+      color: 'from-amber-500 to-amber-600'
     }
   ];
 
