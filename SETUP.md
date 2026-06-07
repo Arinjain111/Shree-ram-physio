@@ -1,6 +1,6 @@
 # Shri Ram Physio - Offline-First Sync Architecture
 
-This application uses an **offline-first architecture** where data is stored locally in SQLite and synced bidirectionally with Azure SQL in the cloud.
+This application uses an **offline-first architecture** where data is stored locally in SQLite and synced bidirectionally with PostgreSQL in the cloud.
 
 ## Architecture Overview
 
@@ -31,7 +31,7 @@ This application uses an **offline-first architecture** where data is stored loc
                          └─────────┬──────────┘
                                    │
                          ┌─────────▼──────────┐
-                         │   Azure SQL DB     │
+                         │   PostgreSQL DB     │
                          │  (Cloud Storage)   │
                          └────────────────────┘
 ```
@@ -54,7 +54,7 @@ This application uses an **offline-first architecture** where data is stored loc
 - Sync engine:
   1. Collects all pending local changes
   2. Sends to Azure backend via HTTP POST
-  3. Backend stores in Azure SQL Database
+  3. Backend stores in PostgreSQL Database
   4. Backend returns recent cloud updates
   5. Electron merges cloud updates into local SQLite
   6. Records marked as `sync_status = 'SYNCED'`
@@ -72,15 +72,15 @@ This application uses an **offline-first architecture** where data is stored loc
 
 1. **Node.js** (v18 or higher)
 2. **Azure Account** with:
-   - Azure SQL Database
+   - PostgreSQL Database
    - Azure App Service
 3. **Git** (for deployment)
 
 ---
 
-## Part 1: Azure SQL Database Setup
+## Part 1: PostgreSQL Database Setup
 
-### Step 1: Create Azure SQL Database
+### Step 1: Create PostgreSQL Database
 
 1. Go to [Azure Portal](https://portal.azure.com)
 2. Create new **SQL Database**:
@@ -148,14 +148,14 @@ You have two options for deploying the backend:
    - Create new **App Service**
    - Resource group: `shri-ram-physio-rg`
    - Name: `shri-ram-physio-api`
-   - Runtime: Node 18 LTS
+   - Runtime: Node 22 LTS
    - Region: Same as your database
    - Plan: Basic B1 (or Free F1 for testing)
 
 2. **Configure App Service**:
    - Go to App Service → **Configuration** → **Application settings**
    - Add:
-     - `DATABASE_URL` = Your Azure SQL connection string
+     - `DATABASE_URL` = Your PostgreSQL connection string
      - `NODE_ENV` = `production`
      - `ALLOWED_ORIGINS` = `*` (or specific domains)
    - Click **Save**
@@ -174,7 +174,7 @@ You have two options for deploying the backend:
      - Value: Contents of the `.PublishSettings` file (entire XML)
    - Add another secret:
      - Name: `DATABASE_URL`
-     - Value: Your Azure SQL connection string
+     - Value: Your PostgreSQL connection string
 
 5. **Deploy**:
    ```powershell
@@ -208,7 +208,7 @@ See **[.github/ACTIONS_SETUP.md](./.github/ACTIONS_SETUP.md)** for detailed GitH
    - Resource group: `shri-ram-physio-rg`
    - Name: `shri-ram-physio-api`
    - Publish: **Code**
-   - Runtime stack: **Node 18 LTS**
+   - Runtime stack: **Node 22 LTS**
    - Operating System: **Windows**
    - Region: Same as SQL database
    - Plan: Basic B1 (or Free F1 for testing)
@@ -228,7 +228,7 @@ See **[.github/ACTIONS_SETUP.md](./.github/ACTIONS_SETUP.md)** for detailed GitH
    | `AZURE_SQL_PASSWORD` | `{your_password}` |
    | `NODE_ENV` | `production` |
    | `PORT` | `8080` |
-   | `DATABASE_URL` | `sqlserver://your-server.database.windows.net:1433;database=your-db;user=your-user;password=your-password;encrypt=true;trustServerCertificate=false` |
+   | `DATABASE_URL` | `postgresql://user:password@host:5432/dbname` |
    | `ALLOWED_ORIGINS` | `*` (or specific Electron app origins) |
 
    **Note**: Prisma uses `DATABASE_URL` instead of separate `AZURE_SQL_*` variables.
@@ -330,7 +330,7 @@ npm run electron:build
 2. Create a new invoice
 3. Check sync status (should show pending changes)
 4. Click "Sync Now" or wait 5 minutes
-5. Verify data appears in Azure SQL Database
+5. Verify data appears in PostgreSQL Database
 
 ---
 
@@ -359,10 +359,10 @@ npm run electron:build
 
 ## Prisma ORM Benefits
 
-This application uses **Prisma 7.1.0** for database operations:
+This application uses **Prisma 7.8.0** for database operations:
 
 ✅ **Type Safety** - Auto-generated TypeScript types, catch errors at compile time  
-✅ **Unified Schema** - Same schema for Azure SQL and SQLite  
+✅ **Unified Schema** - Same schema for PostgreSQL and SQLite  
 ✅ **Automatic Migrations** - Version-controlled schema changes with `prisma migrate`  
 ✅ **Built-in Relations** - Easy joins with `include` instead of manual SQL  
 ✅ **Query Builder** - Intuitive API instead of raw SQL strings  
@@ -371,7 +371,7 @@ This application uses **Prisma 7.1.0** for database operations:
 ### Key Files
 
 **Backend**
-- `prisma/schema.prisma` - Database schema (Azure SQL)
+- `prisma/schema.prisma` - Database schema (PostgreSQL)
 - `src/lib/prisma.ts` - Prisma Client singleton
 - `src/routes/syncPrisma.ts` - Sync endpoint using Prisma
 
@@ -393,7 +393,7 @@ Both Backend and Frontend use the **same Prisma schema structure**:
 
 **patients**
 - `id` INTEGER PRIMARY KEY
-- `cloud_id` INTEGER (Azure SQL ID)
+- `cloud_id` INTEGER (PostgreSQL ID)
 - `name` TEXT
 - `age` INTEGER
 - `gender` TEXT
@@ -438,7 +438,7 @@ Both Backend and Frontend use the **same Prisma schema structure**:
 - `records_synced` INTEGER
 - `error_message` TEXT
 
-### Azure SQL Tables
+### PostgreSQL Tables
 
 Same schema as above, but without `cloud_id` (uses `id` as primary key).
 
@@ -643,19 +643,19 @@ window.electron.ipcRenderer.invoke('search-patients', 'John')
 2. **SQL Injection Prevention**: Parameterized queries with `mssql.Input`
 3. **Rate Limiting**: 100 requests per 15 minutes per IP
 4. **CORS**: Configure `ALLOWED_ORIGINS` to restrict access
-5. **Encryption**: Azure SQL uses TLS encryption in transit
+5. **Encryption**: PostgreSQL uses TLS encryption in transit
 
 ---
 
 ## Cost Estimates (Azure)
 
 **Development/Testing**:
-- Azure SQL: Basic tier (~$5/month)
+- PostgreSQL: Basic tier (~$5/month)
 - App Service: Free F1 or Basic B1 (~$13/month)
 - **Total**: ~$18/month
 
 **Production**:
-- Azure SQL: Standard S0 (~$15/month)
+- PostgreSQL: Standard S0 (~$15/month)
 - App Service: Standard S1 (~$70/month)
 - **Total**: ~$85/month
 
@@ -666,7 +666,7 @@ window.electron.ipcRenderer.invoke('search-patients', 'John')
 1. **User Authentication**: Add Azure AD or Auth0
 2. **Role-Based Access**: Admin vs. Staff permissions
 3. **Audit Logs**: Track who made what changes
-4. **Backup & Restore**: Automated Azure SQL backups
+4. **Backup & Restore**: Automated PostgreSQL backups
 5. **Analytics Dashboard**: Patient trends, revenue reports
 6. **Mobile App**: React Native version with same sync engine
 

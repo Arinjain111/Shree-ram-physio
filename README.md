@@ -23,8 +23,8 @@
    
    # Create .env file
    copy .env.example .env
-   # Edit .env with your Azure SQL credentials
-   # DATABASE_URL="sqlserver://server:1433;database=db;user=user;password=pass;encrypt=true"
+   # Edit .env with your PostgreSQL credentials
+   # DATABASE_URL="postgresql://user:password@host:5432/dbname"
    
    # Generate Prisma Client
    npm run prisma:generate
@@ -84,8 +84,8 @@
 **Offline-First Sync System with Prisma ORM**
 
 - **Local Storage**: SQLite with Prisma Client (embedded in Electron app)
-- **Cloud Storage**: Azure SQL Database with Prisma Client
-- **ORM**: Prisma 7.1.0 for type-safe database operations
+- **Cloud Storage**: PostgreSQL Database with Prisma Client
+- **ORM**: Prisma 7.8.0 for type-safe database operations
 - **Sync**: Bidirectional, every 5 minutes (auto) + manual trigger
 - **Migrations**: Prisma Migrate for versioned schema changes
 
@@ -96,11 +96,11 @@ React UI → IPC → Electron Main → Prisma Client (SQLite)
                                          ↓
                                    Sync Engine
                                          ↓
-                              Azure Backend API
+                              Backend API
                                          ↓
-                              Prisma Client (Azure SQL)
+                              Prisma Client (PostgreSQL)
                                          ↓
-                                  Azure SQL DB
+                                  PostgreSQL DB
 ```
 
 ---
@@ -127,7 +127,7 @@ React UI → IPC → Electron Main → Prisma Client (SQLite)
 - `src/` - React UI components
 
 ### Backend (MVC Architecture)
-- `prisma/schema.prisma` - Database schema (Azure SQL)
+- `prisma/schema.prisma` - Database schema (PostgreSQL)
 - `src/lib/prisma.ts` - Prisma Client singleton
 - `src/controllers/` - Business logic controllers
   - `syncController.ts` - Sync logic with Prisma
@@ -177,8 +177,8 @@ React UI → IPC → Electron Main → Prisma Client (SQLite)
 
 ### Backend (.env)
 ```env
-# Prisma Database URL (Azure SQL)
-DATABASE_URL="sqlserver://your-server.database.windows.net:1433;database=your-db;user=your-user;password=your-password;encrypt=true;trustServerCertificate=false"
+# Prisma Database URL (PostgreSQL)
+DATABASE_URL="postgresql://user:password@host:5432/dbname"
 
 PORT=3000
 NODE_ENV=production
@@ -203,7 +203,7 @@ This project uses **GitHub Actions** for CI/CD:
 
 1. **Setup GitHub Secrets** (one-time):
    - `AZURE_WEBAPP_PUBLISH_PROFILE` - Download from Azure Portal
-   - `DATABASE_URL` - Your Azure SQL connection string
+   - `DATABASE_URL` - Your PostgreSQL connection string
 
 2. **Deploy**:
    ```powershell
@@ -217,7 +217,7 @@ See **[.github/ACTIONS_SETUP.md](./.github/ACTIONS_SETUP.md)** for detailed setu
 ### Manual Deployment
 
 See **[SETUP.md](./SETUP.md)** for manual Azure deployment including:
-- Azure SQL Database setup
+- PostgreSQL Database setup
 - Azure App Service manual deployment
 - Multi-device sync testing
 - Troubleshooting guide
@@ -227,20 +227,20 @@ See **[SETUP.md](./SETUP.md)** for manual Azure deployment including:
 ## Tech Stack
 
 **Frontend**
-- Electron 27
-- React 18
+- Electron 39
+- React 18.2
 - TypeScript
-- Vite
-- Tailwind CSS 4
-- **Prisma 7.1.0** (ORM for SQLite)
+- Vite 7
+- Tailwind CSS 4.0
+- **Prisma 7.8.0** (ORM for SQLite)
 - axios (HTTP requests)
 
 **Backend**
-- Node.js 18+
+- Node.js 22+
 - Express
 - TypeScript
-- **Prisma 7.1.0** (ORM for Azure SQL)
-- Azure SQL Database
+- **Prisma 7.8.0** (ORM for PostgreSQL)
+- PostgreSQL Database
 
 ---
 
@@ -248,12 +248,12 @@ See **[SETUP.md](./SETUP.md)** for manual Azure deployment including:
 
 ### Prisma Unified Schema
 
-Both Backend (Azure SQL) and Frontend (SQLite) use **the same Prisma schema**:
+Both Backend (PostgreSQL) and Frontend (SQLite) use **the same Prisma schema**:
 
 **Patient** - Patient information
 - `id` (Int) - Primary key (auto-increment)
 - `name`, `age`, `gender`, `phone`, `uhid` - Patient details
-- `cloudId` (Frontend only) - Maps to Azure SQL ID
+- `cloudId` (Frontend only) - Maps to PostgreSQL ID
 - `syncStatus` (Frontend only) - 'PENDING' | 'SYNCED' | 'CONFLICT'
 - `createdAt`, `updatedAt` - Auto-managed timestamps with `@updatedAt`
 - Relations: `invoices[]`
