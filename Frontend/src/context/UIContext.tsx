@@ -13,7 +13,14 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
 
   const showToast = useCallback((type: ToastType, message: string, duration = 3000) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, type, message, duration, onClose: removeToast }]);
+    setToasts((prev) => {
+      const newToasts = [...prev, { id, type, message, duration, onClose: removeToast }];
+      // Limit to max 5 toasts on screen
+      if (newToasts.length > 5) {
+        return newToasts.slice(newToasts.length - 5);
+      }
+      return newToasts;
+    });
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -50,9 +57,11 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
       {children}
       
       {/* Toast Container */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+      <div className="fixed top-4 right-4 z-9999 flex flex-col gap-3 pointer-events-none">
         {toasts.map((toast) => (
-          <Toast key={toast.id} {...toast} />
+          <div key={toast.id} className="pointer-events-auto transition-all duration-300 ease-out">
+            <Toast {...toast} />
+          </div>
         ))}
       </div>
 

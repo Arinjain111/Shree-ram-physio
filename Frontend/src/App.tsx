@@ -9,6 +9,7 @@ import Finances from './pages/Finances';
 import Reports from './pages/Reports';
 import Inventory from './pages/Inventory';
 import UpdateBanner from './components/layout/UpdateBanner';
+import HubLayout from './components/layout/HubLayout';
 
 function App() {
   return (
@@ -17,14 +18,42 @@ function App() {
       <div className="px-4 py-4 flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/invoice-generator" element={<InvoiceGenerator />} />
-          <Route path="/invoice-customizer" element={<InvoiceCustomizer />} />
-          <Route path="/database-find" element={<DatabaseFind />} />
-          <Route path="/treatment-settings" element={<TreatmentSettings />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/finances" element={<Finances />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/inventory" element={<Inventory />} />
+
+          {/* Billing & Invoicing Hub */}
+          <Route element={<HubLayout hubName="Billing" tabs={[
+            { label: 'Generator', path: '/invoice-generator' },
+            { label: 'Customizer', path: '/invoice-customizer' }
+          ]} />}>
+            <Route path="/invoice-generator" element={<InvoiceGenerator />} />
+            <Route path="/invoice-customizer" element={<InvoiceCustomizer />} />
+          </Route>
+
+          {/* Clinic Management Hub */}
+          <Route element={<HubLayout hubName="Management" tabs={[
+            { label: 'Finances', path: '/finances' },
+            { label: 'Inventory', path: '/inventory' },
+            { label: 'Reports', path: '/reports' }
+          ]} />}>
+            <Route path="/finances" element={<Finances />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/inventory" element={<Inventory />} />
+          </Route>
+
+          {/* Configuration Hub */}
+          <Route element={<HubLayout hubName="Config" tabs={[
+            { label: 'App Settings', path: '/settings' },
+            { label: 'Presets', path: '/treatment-settings' }
+          ]} />}>
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/treatment-settings" element={<TreatmentSettings />} />
+          </Route>
+
+          {/* Patient Database Hub (Single Tab for now) */}
+          <Route element={<HubLayout hubName="Database" tabs={[
+            { label: 'Patient Search', path: '/database-find' }
+          ]} />}>
+            <Route path="/database-find" element={<DatabaseFind />} />
+          </Route>
         </Routes>
       </div>
     </div>

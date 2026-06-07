@@ -1,1 +1,44 @@
 @import "tailwindcss";
+
+@layer utilities {
+  .animate-toast-enter {
+    animation: toast-enter 0.4s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+  }
+  .animate-toast-exit {
+    animation: toast-exit 0.3s cubic-bezier(0.06, 0.71, 0.55, 1) forwards;
+  }
+  .animate-progress {
+    animation: progress-shrink linear forwards;
+  }
+}
+
+@keyframes toast-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(100%, 0, 0) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes toast-exit {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(100%, 0, 0) scale(0.95);
+  }
+}
+
+@keyframes progress-shrink {
+  0% {
+    width: 100%;
+  }
+  100% {
+    width: 0%;
+  }
+}
