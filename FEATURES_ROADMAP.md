@@ -1,6 +1,6 @@
 # Feature Checklist & Roadmap
 
-## ✅ Implemented Features (Version 2.1.2 Current)
+## ✅ Implemented Features (Version 2.5.0 Current)
 
 ### Invoice Generator
 - ✅ Patient information form (name, age, gender, phone, address)
@@ -249,6 +249,7 @@
 - **v2.1.0** - June 2026 (Current - Security & Dependency Updates)
 - **v2.1.1** - June 2026 (Unified logging system, structured logger, toast bridge, access log middleware)
 - **v2.1.2** - June 2026 (Invoice discount, diagnosis autocomplete, sync dedup fix, Finances page fix)
+- **v2.5.0** - June 2026 (Inventory management, expense tracking, reporting suite, sync overhaul, performance tuning)
 - **v2.2** - Q3 2026 (Reporting & Advanced Settings)
 - **v3.0** - 2027 (Major Cloud & Portal Update)
 
