@@ -72,6 +72,7 @@
 - ✅ **Toast bridge** — `warn`/`error` entries in main process auto-raise renderer toasts via the `app:log` IPC channel
 - ✅ **HTTP access log** middleware — single line per request (IP, method, URL, status, duration)
 - ✅ **ErrorBoundary** routes React render errors through the new logger
+- ✅ **Inventory Management** — Product/Supply tracking with stock levels, cost/selling prices, purchase (restock) and sale (outflow) recording, full cloud sync
 
 ---
 
@@ -79,16 +80,15 @@
 
 ### PDF Export Enhancements ( deferred currently )
 - ⬜ Email PDF directly
-- ⬜ Batch PDF generation
 - ⬜ Custom PDF templates
 
 ### Reporting
-- ⬜ Analytics & Business Intelligence
+- ✅ Analytics & Business Intelligence
 - ⬜ Daily revenue report
 - ⬜ Weekly summary
 - ⬜ Monthly financial report
 - ⬜ Patient visit trends
-- ⬜ Treatment type statistics
+- ✅ Treatment type statistics
 - ⬜ Payment method breakdown
 - ⬜ Export reports to Excel/CSV
 
@@ -112,28 +112,24 @@
 
 ### Financial Features
 - ✅ Discount management (amount/percentage, with subtotal/discount/final total on printed invoice)
-- ⬜ Outstanding Payments & Billing Tracker
-- ⬜ GST calculation
-- ⬜ Multiple payment methods per invoice
-- ⬜ Partial payment tracking
+- ✅ Outstanding Payments & Billing Tracker
+- ✅ Multiple payment methods per invoice
+- ✅ Partial payment tracking
 - ⬜ Credit/Debit notes
 - ⬜ Expense tracking
 - ⬜ Profit/Loss statements
 - ⬜ Tax reports
 
 ### Inventory Management
-- ⬜ Product/Supply tracking
-- ⬜ Stock alerts
-- ⬜ Vendor management
-- ⬜ Usage tracking
+- ✅ Product/Supply tracking (stock, cost/selling price, purchase/sale recording)
+- ✅ Inventory transactions with purchase (restock) and sale (outflow) types
+- ✅ Bidirectional cloud sync for inventory items and transactions
 
 ### Cloud Features
 - ⬜ Offline Queue Management & Conflict Resolution
 - ⬜ Backend and database status monitoring
 - ⬜ Cloud backup
 - ⬜ Multi-device sync
-- ⬜ Web portal
-- ⬜ Mobile app companion
 - ⬜ Cloud storage integration
 
 ### Communication
@@ -150,7 +146,6 @@
 - ⬜ Keyboard Navigation & Accessibility (ARIA labels)
 - ✅ React Error Boundary implementation
 - ✅ Toast Notification System Enhancement (auto-dismiss, stacking) — `UIProvider` already raises toasts from the new `useLogger().error(...)` automatically
-- ⬜ Dark Mode support
 - ⬜ Print Preview Improvements
 - ⬜ Form Auto-Save Drafts
 
@@ -169,6 +164,7 @@
 - ✅ **Sync deduplication** — Patient 4-way match (cloudId → uhid → identity → create) + treatment 3-way match prevent infinite duplicates from records lacking both cloudId and uhid.
 - ✅ **Finances page crashes** — Fixed `parseISO` on Date objects, rendering Date as React child, invalid `h-75` Tailwind class, and string-date comparison bugs.
 - ✅ **Diagnosis autocomplete** — Wire up the existing `DiagnosisAutocomplete` component (NGram bigram/trigram) in the Invoice Generator. Previously a plain `<textarea>` was rendered instead.
+- ✅ **Inventory sync & validation** — Added bidirectional cloud sync for inventory items/transactions, Zod validation on all IPC handlers, shared types replacing `any[]` in Finances, and a migration file for clean installs.
 
 ### Current Issues
 - None reported (Initial release)

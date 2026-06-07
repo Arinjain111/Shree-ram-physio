@@ -6,7 +6,7 @@
 
 ---
 
-## ✅ Resolved Issues (50 Total)
+## ✅ Resolved Issues (51 Total)
 
 ### 9. Data Duplication in Bidirectional Sync — ✅ Resolved
 - **Folders:** `Backend/src/controllers/syncController.ts:80-258`, `Frontend/electron/sync/prismaSyncEngine.ts:387-555`
@@ -84,6 +84,16 @@ All issues from the 2026-06-07 audit have been closed out, plus the new structur
   - Toast routing: any `logger.warn(...)` or `logger.error(...)` in the main process → toast in the renderer within one IPC round-trip.
 
 ---
+
+### 12. Inventory Management — Type Safety, Validation & Sync Gaps — ✅ Resolved
+- **Folders:** `Frontend/electron/ipc/inventory.ts`, `Frontend/src/pages/Inventory.tsx`, `Frontend/src/pages/Finances.tsx`, `Backend/src/controllers/syncController.ts`, `Frontend/electron/sync/prismaSyncEngine.ts`
+- **Symptom:** Inventory feature was functional but had critical gaps: `any[]` types in Finances causing zero type safety on inventory data; no Zod validation on IPC handlers (empty names, negative prices, zero quantities all accepted silently); no migration file (fresh installs would crash); inventory never synced to cloud.
+- **Resolution:**
+  - Created `Frontend/src/types/inventory.types.ts` with shared `InventoryItem` and `InventoryTransaction` interfaces. Replaced all `any[]` with proper types in `Finances.tsx` and `Inventory.tsx`.
+  - Added 4 Zod schemas (`AddInventoryItem`, `UpdateInventoryItem`, `RecordPurchase`, `RecordSale`) to `Frontend/src/schemas/validation.schema.ts`. Wired `validateData()` into all IPC handlers with proper error returns.
+  - Created migration `20260608120000_add_inventory_tables` for clean installs.
+  - Added full bidirectional inventory sync across all four layers: Backend Zod schemas, Backend syncController (upsert by cloudId or name-based dedup), Frontend Zod sync payload/response schemas, Frontend prismaSyncEngine (upload, download, cloud-ID writeback, cleanup, stats).
+- **Verification:** tsc 0 errors (all 3 configs), vite build clean, Docker backend rebuilt and running, Supabase tables created.
 
 ## ✅ Resolved Issues (Earlier — 39 Total)
 
