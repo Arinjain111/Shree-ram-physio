@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer
 } from 'recharts';
 import {
   subDays, subMonths, subYears, startOfDay, endOfDay, isWithinInterval,
@@ -15,11 +15,8 @@ import type { DatabaseInvoice } from '@/types/database.types';
 import type { InventoryTransaction } from '@/types/inventory.types';
 import { ipcRenderer } from '@/lib/ipc';
 
-const COLORS = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'];
-
 type DatePreset = '30days' | '3months' | '6months' | '1year' | 'custom';
 type Tab = 'overview' | 'billing';
-type FinanceFilter = 'all' | 'treatments' | 'inventory';
 
 interface Metrics {
   revenue: number;
@@ -70,7 +67,6 @@ export default function Finances() {
   const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
-  const [financeFilter, setFinanceFilter] = useState<FinanceFilter>('all');
   const log = useLogger();
 
   // Analytics State
@@ -135,7 +131,7 @@ export default function Finances() {
     setEndDate(endOfDay(end));
   };
 
-  const { currentMetrics, previousMetrics, chartData, treatmentData } = useMemo(() => {
+  const { currentMetrics, previousMetrics, chartData } = useMemo(() => {
     const currentInterval = { start: startOfDay(startDate), end: endOfDay(endDate) };
     const daysDiff = differenceInDays(currentInterval.end, currentInterval.start) + 1;
     const previousInterval = {
@@ -164,28 +160,22 @@ export default function Finances() {
     });
 
     const calculateMetrics = (invs: DatabaseInvoice[], trans: InventoryTransaction[]): Metrics => {
-      let revenue = 0;
+      let revenue = invs.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
       let expenses = 0;
-      
-      if (financeFilter === 'all' || financeFilter === 'treatments') {
-        revenue += invs.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
-      }
-      
-      if (financeFilter === 'all' || financeFilter === 'inventory') {
-        trans.forEach(t => {
-          if (t.type === 'SALE') revenue += Number(t.totalAmount) || 0;
-          if (t.type === 'PURCHASE') expenses += Number(t.totalAmount) || 0;
-        });
-      }
+
+      trans.forEach(t => {
+        if (t.type === 'SALE') revenue += Number(t.totalAmount) || 0;
+        if (t.type === 'PURCHASE') expenses += Number(t.totalAmount) || 0;
+      });
 
       const uniquePatients = new Set(invs.map(inv => inv.patient?.id || `${inv.patient?.firstName} ${inv.patient?.lastName}`));
-      return { 
-        revenue, 
+      return {
+        revenue,
         expenses,
         profit: revenue - expenses,
-        patients: uniquePatients.size, 
-        invoices: invs.length, 
-        avgRevenue: invs.length ? revenue / invs.length : 0 
+        patients: uniquePatients.size,
+        invoices: invs.length,
+        avgRevenue: invs.length ? revenue / invs.length : 0
       };
     };
 
@@ -194,57 +184,29 @@ export default function Finances() {
 
     const formatStr = preset === '30days' || preset === 'custom' && daysDiff <= 60 ? 'MMM dd' : 'MMM yyyy';
     const trendMap = new Map<string, number>();
-    
-    if (financeFilter === 'all' || financeFilter === 'treatments') {
-      [...currentInvoices].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(inv => {
-        const date = new Date(inv.date);
-        if (isValid(date)) {
-          const key = format(date, formatStr);
-          trendMap.set(key, (trendMap.get(key) || 0) + Number(inv.total));
-        }
-      });
-    }
 
-    if (financeFilter === 'all' || financeFilter === 'inventory') {
-      [...currentTrans].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(t => {
-        const date = new Date(t.date);
-        if (isValid(date) && t.type === 'SALE') {
-          const key = format(date, formatStr);
-          trendMap.set(key, (trendMap.get(key) || 0) + Number(t.totalAmount));
-        }
-      });
-    }
-    
+    [...currentInvoices].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(inv => {
+      const date = new Date(inv.date);
+      if (isValid(date)) {
+        const key = format(date, formatStr);
+        trendMap.set(key, (trendMap.get(key) || 0) + Number(inv.total));
+      }
+    });
+
+    [...currentTrans].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(t => {
+      const date = new Date(t.date);
+      if (isValid(date) && t.type === 'SALE') {
+        const key = format(date, formatStr);
+        trendMap.set(key, (trendMap.get(key) || 0) + Number(t.totalAmount));
+      }
+    });
+
     // Sort keys based on date
     const sortedKeys = Array.from(trendMap.keys()).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     const finalChartData = sortedKeys.map(date => ({ date, revenue: trendMap.get(date) || 0 }));
 
-    const tMap = new Map<string, number>();
-    if (financeFilter === 'all' || financeFilter === 'treatments') {
-      currentInvoices.forEach(inv => {
-        inv.treatments.forEach(t => {
-          tMap.set(t.name, (tMap.get(t.name) || 0) + Number(t.amount));
-        });
-      });
-    }
-
-    if (financeFilter === 'all' || financeFilter === 'inventory') {
-      currentTrans.forEach(t => {
-        if (t.type === 'SALE') {
-          const name = `Item: ${t.item?.name || 'Unknown'}`;
-          tMap.set(name, (tMap.get(name) || 0) + Number(t.totalAmount));
-        }
-      });
-    }
-
-    const tData = Array.from(tMap.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10)
-      .reverse();
-
-    return { currentMetrics: currentM, previousMetrics: previousM, chartData: finalChartData, treatmentData: tData };
-  }, [invoices, inventoryTransactions, startDate, endDate, preset, financeFilter]);
+    return { currentMetrics: currentM, previousMetrics: previousM, chartData: finalChartData };
+  }, [invoices, inventoryTransactions, startDate, endDate, preset]);
 
   const renderMetricCard = (title: string, current: number, previous: number, isCurrency: boolean = false) => {
     const diff = current - previous;
@@ -286,33 +248,19 @@ export default function Finances() {
     <div className="min-h-screen bg-slate-50/50 px-6 pb-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <PageHeader
+          breadcrumb="Management"
           title="Finance"
           icon={<div className="p-2 bg-indigo-100 text-indigo-700 rounded-lg"><ChartBarIcon /></div>}
-          actions={
-            <div className="flex bg-slate-200 p-1 rounded-xl">
-              {(['all', 'treatments', 'inventory'] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFinanceFilter(f)}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    financeFilter === f ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {f === 'all' ? 'All Finances' : f === 'treatments' ? 'Treatments Only' : 'Inventory Only'}
-                </button>
-              ))}
-            </div>
-          }
         />
 
         {/* Tabs */}
-        <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+        <div className="bg-slate-100/50 p-1 rounded-[20px] flex items-center w-fit shadow-inner ring-1 ring-slate-200/50 backdrop-blur-md">
           {([{ key: 'overview', label: 'Overview' }, { key: 'billing', label: 'Billing' }] as const).map(t => (
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
-              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === t.key ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              className={`px-6 py-2 rounded-[16px] text-sm font-medium transition-all duration-300 ${
+                activeTab === t.key ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/60' : 'text-slate-500 hover:bg-white/60 hover:text-indigo-600'
               }`}
             >
               {t.label}
@@ -325,13 +273,13 @@ export default function Finances() {
           <div className="space-y-8">
             {/* Filters */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex bg-slate-100 p-1 rounded-xl">
+              <div className="bg-slate-100/50 p-1 rounded-[20px] flex items-center shadow-inner ring-1 ring-slate-200/50 backdrop-blur-md">
                 {(['30days', '3months', '6months', '1year'] as const).map(p => (
                   <button
                     key={p}
                     onClick={() => handlePresetChange(p)}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      preset === p ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    className={`px-5 py-2 rounded-[16px] text-sm font-medium transition-all duration-300 ${
+                      preset === p ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/60' : 'text-slate-500 hover:bg-white/60 hover:text-indigo-600'
                     }`}
                   >
                     {p === '30days' ? 'Last 30 Days' : p === '3months' ? '3 Months' : p === '6months' ? '6 Months' : '1 Year'}
@@ -339,8 +287,8 @@ export default function Finances() {
                 ))}
                 <button
                   onClick={() => setPreset('custom')}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    preset === 'custom' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  className={`px-5 py-2 rounded-[16px] text-sm font-medium transition-all duration-300 ${
+                    preset === 'custom' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/60' : 'text-slate-500 hover:bg-white/60 hover:text-indigo-600'
                   }`}
                 >
                   Custom
@@ -359,12 +307,10 @@ export default function Finances() {
 
             {/* Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {renderMetricCard("Total Revenue (Inflow)", currentMetrics.revenue, previousMetrics.revenue, true)}
-              {renderMetricCard("Total Expenses (Outflow)", currentMetrics.expenses, previousMetrics.expenses, true)}
+              {renderMetricCard("Total Revenue", currentMetrics.revenue, previousMetrics.revenue, true)}
+              {renderMetricCard("Total Expenses", currentMetrics.expenses, previousMetrics.expenses, true)}
               {renderMetricCard("Net Profit", currentMetrics.profit, previousMetrics.profit, true)}
-              {financeFilter !== 'inventory' 
-                ? renderMetricCard("Patients Treated", currentMetrics.patients, previousMetrics.patients, false)
-                : renderMetricCard("Avg. Revenue", currentMetrics.avgRevenue, previousMetrics.avgRevenue, true)}
+              {renderMetricCard("Patients Treated", currentMetrics.patients, previousMetrics.patients, false)}
             </div>
 
             {/* Charts */}
@@ -392,29 +338,74 @@ export default function Finances() {
                 </div>
               </div>
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-bold text-slate-800 mb-6">Revenue by Source</h3>
-                <div className="h-80">
-                  {treatmentData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart layout="vertical" data={treatmentData} margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
-                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                        <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} width={120} />
-                        <RechartsTooltip cursor={{ fill: '#f1f5f9' }}
-                          formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, 'Revenue']}
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        />
-                        <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={30}>
-                          {treatmentData.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-slate-400">No data for selected period</div>
-                  )}
+                <h3 className="text-lg font-bold text-slate-800 mb-4">Cash Flow Summary</h3>
+                <div className="space-y-3">
+                  {(() => {
+                    const totalInvoiced = invoices.filter(inv => {
+                      const d = new Date(inv.date);
+                      return isValid(d) && d >= startOfDay(startDate) && d <= endOfDay(endDate);
+                    }).reduce((s, i) => s + Number(i.total || 0), 0);
+                    const totalCollected = invoices.filter(inv => {
+                      const d = new Date(inv.date);
+                      return isValid(d) && d >= startOfDay(startDate) && d <= endOfDay(endDate);
+                    }).reduce((s, i) => s + Number(i.amountPaid || 0), 0);
+                    const rate = totalInvoiced > 0 ? ((totalCollected / totalInvoiced) * 100).toFixed(1) : '0';
+                    const outstanding = totalInvoiced - totalCollected;
+                    return (<>
+                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                        <span className="text-sm text-slate-500">Total Invoiced</span>
+                        <span className="text-sm font-semibold text-slate-800">₹{totalInvoiced.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                        <span className="text-sm text-slate-500">Total Collected</span>
+                        <span className="text-sm font-semibold text-emerald-600">₹{totalCollected.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                        <span className="text-sm text-slate-500">Still Outstanding</span>
+                        <span className="text-sm font-semibold text-rose-600">₹{outstanding.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-slate-500">Collection Rate</span>
+                        <span className={`text-sm font-bold ${Number(rate) >= 80 ? 'text-emerald-600' : Number(rate) >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{rate}%</span>
+                      </div>
+                    </>);
+                  })()}
                 </div>
+              </div>
+            </div>
+
+            {/* Top Outstanding */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100">
+                <h3 className="font-bold text-slate-800">Top Outstanding Invoices</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead><tr className="border-b border-slate-100 bg-slate-50/50">{['Patient', 'Invoice #', 'Total', 'Paid', 'Due', 'Status'].map(h => <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{h}</th>)}</tr></thead>
+                  <tbody>
+                    {(() => {
+                      const outstandingInvs = invoices
+                        .filter(inv => Number(inv.total || 0) > Number(inv.amountPaid || 0))
+                        .sort((a, b) => (Number(b.total || 0) - Number(b.amountPaid || 0)) - (Number(a.total || 0) - Number(a.amountPaid || 0)))
+                        .slice(0, 5);
+                      return outstandingInvs.length === 0
+                        ? <tr><td colSpan={6} className="text-center py-8 text-slate-400">All invoices are fully paid</td></tr>
+                        : outstandingInvs.map(inv => {
+                          const due = Number(inv.total || 0) - Number(inv.amountPaid || 0);
+                          return (
+                            <tr key={inv.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                              <td className="px-6 py-3 text-sm font-medium text-slate-800">{inv.patient?.firstName} {inv.patient?.lastName}</td>
+                              <td className="px-6 py-3 text-sm text-slate-600">{inv.invoiceNumber}</td>
+                              <td className="px-6 py-3 text-sm text-slate-600">₹{Number(inv.total || 0).toLocaleString()}</td>
+                              <td className="px-6 py-3 text-sm text-emerald-600">₹{Number(inv.amountPaid || 0).toLocaleString()}</td>
+                              <td className="px-6 py-3 text-sm font-medium text-rose-600">₹{due.toLocaleString()}</td>
+                              <td className="px-6 py-3"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${inv.paymentStatus === 'overdue' ? 'bg-rose-100 text-rose-700' : inv.paymentStatus === 'partial' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{inv.paymentStatus || 'unpaid'}</span></td>
+                            </tr>
+                          );
+                        });
+                    })()}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

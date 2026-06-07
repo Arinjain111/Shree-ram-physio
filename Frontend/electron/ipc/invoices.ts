@@ -190,6 +190,9 @@ export function registerInvoiceHandlers() {
           cloudId: invoice.patient.cloudId
         },
         diagnosis: invoice.diagnosis,
+        notes: invoice.notes,
+        paymentMethod: invoice.paymentMethod,
+        TransactionId: invoice.TransactionId,
         treatments: invoice.treatments.map(t => ({
           name: t.name,
           duration: t.duration,

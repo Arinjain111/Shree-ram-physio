@@ -84,13 +84,13 @@
 
 ### Reporting
 - ✅ Analytics & Business Intelligence
-- ⬜ Daily revenue report
-- ⬜ Weekly summary
-- ⬜ Monthly financial report
-- ⬜ Patient visit trends
+- ✅ Daily revenue report
+- ✅ Weekly summary
+- ✅ Monthly financial report
+- ✅ Patient visit trends
 - ✅ Treatment type statistics
-- ⬜ Payment method breakdown
-- ⬜ Export reports to Excel/CSV
+- ✅ Payment method breakdown
+- ✅ Export reports to CSV
 
 ---
 
