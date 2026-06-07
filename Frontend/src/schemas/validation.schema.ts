@@ -20,7 +20,7 @@ export const PatientSchema = z.object({
   name: z.string().optional(), // Deprecated - for backward compatibility
   age: z.number().int().min(0, 'Age must be positive').max(150, 'Invalid age'),
   gender: z.enum(['Male', 'Female', 'Other']),
-  phone: z.literal('').or(z.string().min(10, 'Phone must be at least 10 digits').max(15)),
+  phone: z.union([z.string().max(15), z.literal('')]),
   uhid: z.literal('').or(z.string().max(50)),
   // Sync fields
   cloudId: z.number().int().positive().optional(),
@@ -98,6 +98,8 @@ export const InvoiceSchema = z.object({
   paymentMethod: z.enum(['Cash', 'Card', 'UPI', 'Online', 'Cheque']).default('Cash'),
   TransactionId: z.string().max(100).nullish(),
   total: z.number().min(0, 'Total must be positive'),
+  discount: z.number().min(0, 'Discount cannot be negative').default(0),
+  discountType: z.enum(['amount', 'percentage']).default('amount'),
   // Sync fields
   cloudId: z.number().int().positive().nullish(),
   syncStatus: z.enum(['PENDING', 'SYNCED', 'CONFLICT']).default('PENDING'),
@@ -175,10 +177,14 @@ export const InvoiceDataSchema = z.object({
   treatments: z.array(TreatmentFormSchema).min(1, 'At least one treatment is required'),
   diagnosis: z.string().max(500).nullish(),
   notes: z.string().max(1000).default(''),
-  paymentMethod: z.string().default('Cash'), // Keep as string to match old type
+  paymentMethod: z.string().default('Cash'),
   TransactionId: z.string().max(100).nullish(),
-  total: z.string(), // Keep as string to match old InvoiceData type
-  timestamp: z.string(), // Required timestamp field
+  total: z.string(),
+  discount: z.string().default('0'),
+  discountType: z.enum(['amount', 'percentage']).default('amount'),
+  paymentStatus: z.enum(['paid', 'partial', 'unpaid', 'overdue']).optional(),
+  amountPaid: z.number().min(0).optional(),
+  timestamp: z.string(),
 });
 
 export type InvoiceData = z.infer<typeof InvoiceDataSchema>;

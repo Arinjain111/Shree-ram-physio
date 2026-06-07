@@ -39,6 +39,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ formData }) => {
       notes: sampleNotes,
       paymentMethod: samplePaymentMode,
       total: calculateSampleTotal(),
+      discount: '0',
+      discountType: 'amount',
       timestamp: new Date().toISOString(),
       diagnosis: sampleDiagnosis,
     };

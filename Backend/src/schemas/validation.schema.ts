@@ -9,18 +9,15 @@ import { ApiError } from '../middleware/errorHandler';
 
 const OptionalUhidSchema = z.union([z.string().max(50), z.literal('')]).optional().nullable();
 
-export const ValidDateStringSchema = z.string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
-  .refine(val => {
-    const maxDate = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]!;
-    return val >= '2000-01-01' && val <= maxDate;
-  }, { message: "Date must be between year 2000 and today's date" });
+export const ValidDateStringSchema = z.union([
+  z.date(),
+  z.string().regex(/^\d{4}-\d{2}-\d{2}(T.*)?$/, 'Date must be a valid ISO string or YYYY-MM-DD')
+]).transform(val => typeof val === 'string' ? new Date(val) : val)
 
-export const ValidFutureDateStringSchema = z.string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
-  .refine(val => {
-    return val >= '2000-01-01';
-  }, { message: "Date must be year 2000 or later" });
+export const ValidFutureDateStringSchema = z.union([
+  z.date(),
+  z.string().regex(/^\d{4}-\d{2}-\d{2}(T.*)?$/, 'Date must be a valid ISO string or YYYY-MM-DD')
+]).transform(val => typeof val === 'string' ? new Date(val) : val)
 
 // ============================================
 // BASE SCHEMAS - Core data types
@@ -35,7 +32,7 @@ export const PatientSchema = z.object({
   lastName: z.string().min(1, 'Last name is required').max(50),
   age: z.number().int().min(0).max(150),
   gender: z.enum(['Male', 'Female', 'Other']),
-  phone: z.union([z.string().min(10, 'Phone must be at least 10 digits').max(15), z.literal('')]),
+  phone: z.union([z.string().max(15), z.literal('')]),
   uhid: OptionalUhidSchema,
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime().optional(),
@@ -58,6 +55,8 @@ export const InvoiceSchema = z.object({
   paymentMethod: z.enum(['Cash', 'Card', 'UPI', 'Online', 'Cheque']).default('Cash'),
   TransactionId: z.string().max(100).optional(),
   total: z.number().min(0, 'Total must be positive'),
+  discount: z.number().min(0).default(0),
+  discountType: z.enum(['amount', 'percentage']).default('amount'),
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime().optional(),
 });
@@ -96,7 +95,7 @@ export const PatientSyncSchema = z.object({
   lastName: z.string().min(1, 'Last name is required').max(50),
   age: z.number().int().min(0).max(150),
   gender: z.enum(['Male', 'Female', 'Other']),
-  phone: z.union([z.string().min(10, 'Phone must be at least 10 digits').max(15), z.literal('')]),
+  phone: z.union([z.string().max(15), z.literal('')]),
   uhid: OptionalUhidSchema,
   updatedAt: z.iso.datetime().optional(),
 });
@@ -120,6 +119,10 @@ export const InvoiceSyncSchema = z.object({
   paymentMethod: z.enum(['Cash', 'Card', 'UPI', 'Online', 'Cheque']).nullish(),
   TransactionId: z.string().max(100).nullish(),
   total: z.number().min(0, 'Total must be positive'),
+  discount: z.number().min(0).default(0),
+  discountType: z.enum(['amount', 'percentage']).default('amount'),
+  paymentStatus: z.enum(['paid', 'partial', 'unpaid', 'overdue']).optional(),
+  amountPaid: z.number().min(0).optional(),
   updatedAt: z.iso.datetime().optional(),
 }).transform(data => ({
   ...data,
@@ -127,6 +130,8 @@ export const InvoiceSyncSchema = z.object({
   notes: data.notes || '',
   paymentMethod: data.paymentMethod || 'Cash',
   TransactionId: data.TransactionId || null,
+  paymentStatus: data.paymentStatus || 'unpaid',
+  amountPaid: data.amountPaid ?? 0,
 }));
 
 export type InvoiceSync = z.infer<typeof InvoiceSyncSchema>;
@@ -192,6 +197,10 @@ export const CreateInvoiceRequestSchema = z.object({
   paymentMethod: z.enum(['Cash', 'Card', 'UPI', 'Online', 'Cheque']).optional(),
   TransactionId: z.string().max(100).optional(),
   total: z.number().min(0),
+  discount: z.number().min(0).default(0),
+  discountType: z.enum(['amount', 'percentage']).default('amount'),
+  paymentStatus: z.enum(['paid', 'partial', 'unpaid', 'overdue']).optional(),
+  amountPaid: z.number().min(0).optional(),
   treatments: z.array(TreatmentInputSchema).optional(),
 });
 

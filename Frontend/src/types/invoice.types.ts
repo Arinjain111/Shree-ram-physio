@@ -29,6 +29,8 @@ export interface InvoiceData {
   notes: string;
   paymentMethod: string;
   total: string;
+  discount?: string;
+  discountType?: 'amount' | 'percentage';
   timestamp: string;
   diagnosis?: string;
 }

@@ -44,6 +44,10 @@ export interface DatabaseInvoice {
   paymentMethod: string;
   TransactionId?: string;
   total: number;
+  discount?: number;
+  discountType?: string;
+  paymentStatus?: string;
+  amountPaid?: number;
   syncStatus?: string;
   cloudId?: number;
   lastSyncAt?: string;

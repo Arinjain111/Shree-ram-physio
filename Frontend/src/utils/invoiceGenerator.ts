@@ -1,5 +1,6 @@
 import type { InvoiceData } from '@/schemas/validation.schema.ts';
 import type { LayoutConfig } from '@/types/layout.types';
+import { calculateDiscountAmount } from './calculationUtils';
 
 // Normalize a local filesystem path or return data URL as-is
 const toFileUrl = (p: string): string => {
@@ -128,6 +129,19 @@ export const generateInvoiceHTML = (
       </tr>`;
     })
     .join('');
+
+  const subTotal = invoiceData.treatments.reduce((s, t) => {
+    const sessions = Number(t.sessions || 0);
+    const perSession = Number(t.amount || 0);
+    return s + sessions * perSession;
+  }, 0);
+  const discountValue = Number(invoiceData.discount || 0);
+  const discountType = invoiceData.discountType || 'amount';
+  const discountAmount = calculateDiscountAmount(subTotal, discountValue, discountType);
+  const hasDiscount = discountAmount > 0;
+  const discountLabel = discountType === 'percentage'
+    ? `Discount (${discountValue}%)`
+    : 'Discount';
 
   // Determine gender-based title prefix
   const rawGender = (invoiceData.patient.gender || '').toLowerCase().trim();
@@ -432,6 +446,24 @@ export const generateInvoiceHTML = (
         .treatments-table td:last-child {
           border-right: 1px solid #8764b6;
         }
+        .treatments-table .subtotal-row { 
+          font-weight: 500; 
+          background-color: #f8f3ff;
+          height: ${isCompact ? 26 : 34}px;
+        }
+        .treatments-table .discount-row { 
+          font-weight: 600; 
+          background-color: #ffffff;
+          height: ${isCompact ? 26 : 34}px;
+        }
+        .treatments-table .discount-row th {
+          color: #b91c1c;
+          border-top: 1px dashed #d1c4e9;
+        }
+        .treatments-table .discount-row th:last-child {
+          border-left: 1px dashed #d1c4e9;
+          border-right: 1px solid #8764b6;
+        }
         .treatments-table .total-row { 
           font-weight: 700; 
           background-color: #f8f3ff;
@@ -439,9 +471,21 @@ export const generateInvoiceHTML = (
           border-bottom: 1px solid #8764b6;
           height: ${isCompact ? 30 : 40}px;
         }
-        .treatments-table .total-row th {
+        .treatments-table .total-row th,
+        .treatments-table .subtotal-row th,
+        .treatments-table .discount-row th {
           padding: 10px;
           vertical-align: middle;
+        }
+        .treatments-table tfoot th:first-child {
+          border-left: 1px solid #8764b6;
+        }
+        .treatments-table tfoot th:last-child {
+          border-left: 1px solid #8764b6;
+          border-right: 1px solid #8764b6;
+        }
+        .treatments-table .subtotal-row th {
+          border-top: 1px solid #8764b6;
         }
 
         /* Footer */
@@ -633,6 +677,16 @@ export const generateInvoiceHTML = (
                       ${treatmentsHTML}
                     </tbody>
                     <tfoot>
+                      ${hasDiscount ? `
+                      <tr class="subtotal-row">
+                        <th colspan="6" class="text-right">SUBTOTAL :</th>
+                        <th class="text-right">${subTotal.toFixed(2)}</th>
+                      </tr>
+                      <tr class="discount-row">
+                        <th colspan="6" class="text-right">${discountLabel} :</th>
+                        <th class="text-right">- ${discountAmount.toFixed(2)}</th>
+                      </tr>
+                      ` : ''}
                       <tr class="total-row">
                         <th colspan="6" class="text-right">TOTAL AMOUNT :</th>
                         <th class="text-right">${invoiceData.total}</th>

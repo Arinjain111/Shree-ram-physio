@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUI } from '@/context/UIContext';
 import { useInvoicePrinter } from '@/hooks/useInvoicePrinter';
 import { useSyncManager } from '@/hooks/useSyncManager';
@@ -6,6 +6,7 @@ import { useErrorHandler } from '@/hooks/useErrorHandler';
 import PageHeader from '@/components/layout/PageHeader';
 import { SearchIcon, RefreshIcon } from '@/components/icons';
 import { PatientDetailPane } from '@/components/database/PatientDetailPane';
+import Pagination from '@/components/ui/Pagination';
 import type { DatabaseInvoice } from '@/types/database.types';
 import type { InvoiceData } from '@/schemas/validation.schema';
 import { ipcRenderer } from '@/lib/ipc';
@@ -55,8 +56,21 @@ const DatabaseFind = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<DatabaseInvoice[] | null>(null);
-  const [visibleCount, setVisibleCount] = useState(20);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [showManageOptions, setShowManageOptions] = useState(false);
+  const manageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showManageOptions) return;
+    const handler = (e: MouseEvent) => {
+      if (manageRef.current && !manageRef.current.contains(e.target as Node)) {
+        setShowManageOptions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showManageOptions]);
   
   // New States
   const [sortOption, setSortOption] = useState<SortOption>('Name A-Z');
@@ -150,7 +164,11 @@ const DatabaseFind = () => {
     return result;
   }, [allPatientGroups, debouncedSearchQuery, alphabetFilter, sortOption]);
 
-  const visiblePatientGroups = processedGroups.slice(0, visibleCount);
+  const totalPages = Math.max(1, Math.ceil(processedGroups.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedGroups = processedGroups.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [debouncedSearchQuery, alphabetFilter, sortOption]);
 
   // Update selected patient references if underlying data changes
   useEffect(() => {
@@ -190,6 +208,8 @@ const DatabaseFind = () => {
         notes: invoice.notes || '',
         paymentMethod: invoice.paymentMethod,
         total: invoice.total.toString(),
+        discount: String(invoice.discount ?? 0),
+        discountType: (invoice.discountType as 'amount' | 'percentage') || 'amount',
         timestamp: new Date().toISOString()
       };
 
@@ -210,7 +230,7 @@ const DatabaseFind = () => {
             <div className="flex flex-col items-end gap-2">
               <div className="flex items-center gap-3">
                   {/* Manage Data Dropdown */}
-                  <div className="relative">
+                  <div className="relative" ref={manageRef}>
                       <button 
                           onClick={() => setShowManageOptions(!showManageOptions)}
                           className="px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-600 font-semibold hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
@@ -340,12 +360,12 @@ const DatabaseFind = () => {
                 <div className="flex flex-1 overflow-hidden">
                     {/* Patient List */}
                     <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                        {visiblePatientGroups.length === 0 ? (
+                        {paginatedGroups.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full text-center p-6">
                                 <p className="text-slate-400 font-medium">No patients found</p>
                             </div>
                         ) : (
-                            visiblePatientGroups.map(([name, patientInvoices], index) => {
+                            paginatedGroups.map(([name, patientInvoices], index) => {
                                 const latest = patientInvoices[0];
                                 const colorTheme = COLORS[index % COLORS.length];
                                 const totalPaid = patientInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
@@ -382,13 +402,14 @@ const DatabaseFind = () => {
                                 );
                             })
                         )}
-                        {visiblePatientGroups.length < processedGroups.length && (
-                            <button 
-                                onClick={() => setVisibleCount(p => p + 20)} 
-                                className="w-full py-2.5 mt-2 bg-slate-50 text-slate-600 font-medium rounded-xl hover:bg-slate-100 transition-colors text-sm"
-                            >
-                                Load More
-                            </button>
+                        {processedGroups.length > PAGE_SIZE && (
+                            <Pagination
+                                page={safePage}
+                                totalPages={totalPages}
+                                total={processedGroups.length}
+                                pageSize={PAGE_SIZE}
+                                onPageChange={setPage}
+                            />
                         )}
                     </div>
 

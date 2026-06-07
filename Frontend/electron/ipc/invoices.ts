@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { getPrismaClient } from '../database/prisma';
 import { logError, logWarning } from '../utils/errorLogger';
+import { logger } from '../utils/logger';
 import axios from '../services/http'
 import { getBackendUrl } from '../config/backend';
 
@@ -98,6 +99,9 @@ export function registerInvoiceHandlers() {
       const totalAmount = typeof validatedData.total === 'string'
         ? parseFloat(validatedData.total)
         : validatedData.total;
+      const discountAmount = typeof validatedData.discount === 'string'
+        ? parseFloat(validatedData.discount) || 0
+        : (validatedData.discount ?? 0);
 
       // Create invoice
       const invoice = await prisma.invoice.create({
@@ -110,6 +114,14 @@ export function registerInvoiceHandlers() {
           paymentMethod: validatedData.paymentMethod || 'Cash',
           TransactionId: validatedData.TransactionId || null,
           total: totalAmount,
+          discount: discountAmount,
+          discountType: validatedData.discountType || 'amount',
+          paymentStatus: validatedData.amountPaid && validatedData.amountPaid >= totalAmount
+            ? 'paid'
+            : validatedData.amountPaid && validatedData.amountPaid > 0
+              ? 'partial'
+              : 'unpaid',
+          amountPaid: validatedData.amountPaid ?? 0,
           syncStatus: 'PENDING'
         }
       });
@@ -137,11 +149,14 @@ export function registerInvoiceHandlers() {
     }
   });
 
-  ipcMain.handle('load-invoices', async () => {
+  ipcMain.handle('load-invoices', async (_event, options?: { page?: number; pageSize?: number }) => {
     try {
       if (!prisma) {
         throw new Error('Prisma not initialized');
       }
+
+      const page = options?.page && options.page > 0 ? options.page : undefined;
+      const pageSize = options?.pageSize && options.pageSize > 0 ? options.pageSize : undefined;
 
       const invoices = await prisma.invoice.findMany({
         include: {
@@ -150,8 +165,13 @@ export function registerInvoiceHandlers() {
         },
         orderBy: {
           createdAt: 'desc'
-        }
+        },
+        ...(page !== undefined && pageSize !== undefined
+          ? { skip: (page - 1) * pageSize, take: pageSize }
+          : {}),
       });
+
+      const total = await prisma.invoice.count();
 
       const formattedInvoices = invoices.map(invoice => ({
         id: invoice.id,
@@ -179,12 +199,23 @@ export function registerInvoiceHandlers() {
           amount: t.amount
         })),
         total: invoice.total,
+        discount: invoice.discount ?? 0,
+        discountType: invoice.discountType || 'amount',
+        paymentStatus: invoice.paymentStatus,
+        amountPaid: invoice.amountPaid,
         syncStatus: invoice.syncStatus,
         cloudId: invoice.cloudId,
         lastSyncAt: invoice.lastSyncAt
       }));
 
-      return { success: true, invoices: formattedInvoices };
+      return {
+        success: true,
+        invoices: formattedInvoices,
+        total,
+        page: page ?? 1,
+        pageSize: pageSize ?? total,
+        totalPages: pageSize ? Math.ceil(total / pageSize) : 1,
+      };
     } catch (error) {
       logError('Load invoices', error);
       return { success: false, error: String(error) };
@@ -228,6 +259,10 @@ export function registerInvoiceHandlers() {
           notes: invoice.notes,
           paymentMethod: invoice.paymentMethod,
           total: invoice.total,
+          discount: invoice.discount ?? 0,
+          discountType: invoice.discountType || 'amount',
+          amountPaid: invoice.amountPaid,
+          paymentStatus: invoice.paymentStatus,
           syncStatus: invoice.syncStatus,
           cloudId: invoice.cloudId,
           lastSyncAt: invoice.lastSyncAt,
@@ -283,6 +318,9 @@ export function registerInvoiceHandlers() {
       const totalAmount = typeof validatedData.total === 'string'
         ? parseFloat(validatedData.total)
         : validatedData.total;
+      const discountAmount = typeof validatedData.discount === 'string'
+        ? parseFloat(validatedData.discount) || 0
+        : (validatedData.discount ?? 0);
 
       await prisma.$transaction(async (tx) => {
         // Update patient info (associated with this invoice)
@@ -309,9 +347,17 @@ export function registerInvoiceHandlers() {
             notes: validatedData.notes || '',
             paymentMethod: validatedData.paymentMethod || 'Cash',
             TransactionId: validatedData.TransactionId || null,
-            total: totalAmount,
-            syncStatus: 'PENDING',
-            lastSyncAt: null
+          total: totalAmount,
+          discount: discountAmount,
+          discountType: validatedData.discountType || 'amount',
+          paymentStatus: validatedData.amountPaid && validatedData.amountPaid >= totalAmount
+            ? 'paid'
+            : validatedData.amountPaid && validatedData.amountPaid > 0
+              ? 'partial'
+              : validatedData.paymentStatus || 'unpaid',
+          amountPaid: validatedData.amountPaid ?? 0,
+          syncStatus: 'PENDING',
+          lastSyncAt: null
           }
         });
 
@@ -365,7 +411,7 @@ export function registerInvoiceHandlers() {
         } catch (e: any) {
           const status = e?.response?.status;
           const msg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Cloud delete failed';
-          console.error('Cloud delete failed', e);
+          logger.error('invoices', 'Cloud delete failed', { error: msg, status, invoiceId: invoice.id });
           result.errors.push(`Cloud${status ? ` (${status})` : ''}: ${msg}`);
         }
       }
@@ -389,7 +435,7 @@ export function registerInvoiceHandlers() {
           });
           result.local = true;
         } catch (e: any) {
-          console.error('Local delete failed', e);
+          logger.error('invoices', 'Local delete failed', { error: e?.message ?? String(e), invoiceId: invoice.id });
           result.errors.push(`Local: ${e.message}`);
         }
       }
@@ -532,6 +578,96 @@ export function registerInvoiceHandlers() {
         invoiceNumber: '0401',
         source: 'fallback'
       };
+    }
+  });
+
+  ipcMain.handle('record-payment', async (_event, invoiceId: number, amount: number, method?: string) => {
+    try {
+      if (!prisma) throw new Error('Prisma not initialized');
+
+      const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId } });
+      if (!invoice) return { success: false, error: 'Invoice not found' };
+
+      const newAmountPaid = Math.min(invoice.amountPaid + amount, invoice.total);
+      const newStatus = newAmountPaid >= invoice.total ? 'paid' : newAmountPaid > 0 ? 'partial' : 'unpaid';
+
+      await prisma.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          amountPaid: newAmountPaid,
+          paymentStatus: newStatus,
+          paymentMethod: method || invoice.paymentMethod,
+          syncStatus: 'PENDING',
+        },
+      });
+
+      return { success: true, amountPaid: newAmountPaid, paymentStatus: newStatus };
+    } catch (error) {
+      logError('Record payment', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('get-billing-summary', async () => {
+    try {
+      if (!prisma) throw new Error('Prisma not initialized');
+
+      const today = new Date().toISOString().split('T')[0];
+      const allInvoices = await prisma.invoice.findMany({
+        include: { patient: true, treatments: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      for (const inv of allInvoices) {
+        const amountDue = inv.total - inv.amountPaid;
+        const isOverdue = amountDue > 0 && new Date(inv.date).toISOString().split('T')[0] < today;
+        const correctStatus = isOverdue
+          ? 'overdue'
+          : inv.amountPaid >= inv.total
+            ? 'paid'
+            : inv.amountPaid > 0
+              ? 'partial'
+              : 'unpaid';
+        if (correctStatus !== inv.paymentStatus) {
+          await prisma.invoice.update({
+            where: { id: inv.id },
+            data: { paymentStatus: correctStatus },
+          });
+          inv.paymentStatus = correctStatus;
+        }
+      }
+
+      const outdated = new Date();
+      outdated.setDate(outdated.getDate() - 30);
+      const overdueInvoices = allInvoices.filter(
+        i => (i.paymentStatus === 'unpaid' || i.paymentStatus === 'partial' || i.paymentStatus === 'overdue')
+          && new Date(i.date).toISOString().split('T')[0] < today
+          && (i.total - i.amountPaid) > 0
+      );
+
+      const formatted = allInvoices.map(inv => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        date: inv.date,
+        total: inv.total,
+        amountPaid: inv.amountPaid,
+        paymentStatus: inv.paymentStatus,
+        patientName: `${inv.patient.firstName} ${inv.patient.lastName}`,
+      }));
+
+      const totalOutstanding = overdueInvoices.reduce((s, i) => s + (i.total - i.amountPaid), 0);
+
+      return {
+        success: true,
+        totalOutstanding,
+        overdueCount: overdueInvoices.length,
+        totalCollected: allInvoices.filter(i => i.paymentStatus === 'paid').reduce((s, i) => s + i.total, 0),
+        overdueInvoices: formatted.filter(i => i.paymentStatus === 'overdue' || (i.paymentStatus !== 'paid' && new Date(i.date).toISOString().split('T')[0] < today)),
+        invoices: formatted,
+      };
+    } catch (error) {
+      logError('Get billing summary', error);
+      return { success: false, error: String(error) };
     }
   });
 }
