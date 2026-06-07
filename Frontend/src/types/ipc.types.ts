@@ -18,6 +18,10 @@ export interface SaveInvoiceResponse extends IPCResponse {
  */
 export interface LoadInvoicesResponse extends IPCResponse {
   invoices?: InvoiceData[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
+  totalPages?: number;
 }
 
 /**
@@ -61,4 +65,33 @@ export interface SyncPresetsFromCloudResponse extends IPCResponse {
     updated: number;
     failed: number;
   };
+}
+
+export interface BillingSummaryResponse extends IPCResponse {
+  totalOutstanding?: number;
+  overdueCount?: number;
+  totalCollected?: number;
+  overdueInvoices?: Array<{
+    id: number;
+    invoiceNumber: string;
+    date: string;
+    total: number;
+    amountPaid: number;
+    paymentStatus: string;
+    patientName: string;
+  }>;
+  invoices?: Array<{
+    id: number;
+    invoiceNumber: string;
+    date: string;
+    total: number;
+    amountPaid: number;
+    paymentStatus: string;
+    patientName: string;
+  }>;
+}
+
+export interface RecordPaymentResponse extends IPCResponse {
+  amountPaid?: number;
+  paymentStatus?: string;
 }

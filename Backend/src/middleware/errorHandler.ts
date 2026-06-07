@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { ZodError, type ZodIssue } from 'zod';
 import type { ApiErrorOptions } from '../types';
+import { logger } from '../utils/logger';
 
 /**
  * Central API error type used across the backend.
@@ -48,20 +49,16 @@ function mapZodIssues(issues: ZodIssue[]) {
  * Global Express error handler.
  * This should be the single place that turns errors into HTTP responses.
  */
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
-  // Log error concisely in development
-  if (process.env.NODE_ENV === 'development') {
-    if (err instanceof ApiError) {
-      console.error(`[${err.code || 'API_ERROR'}] ${err.statusCode}: ${err.message}`);
-    } else if (err instanceof ZodError) {
-      console.error(`[VALIDATION_ERROR] 400: ${err.issues.length} validation issues`);
-    } else {
-      console.error(`[SERVER_ERROR] 500: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  }
+export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
+  const ctx = 'http';
 
   // Zod validation errors
   if (err instanceof ZodError) {
+    logger.warn(ctx, 'Validation failed', {
+      path: req.path,
+      issueCount: err.issues.length,
+      issues: mapZodIssues(err.issues),
+    });
     return res.status(400).json({
       success: false,
       message: 'Validation failed',
@@ -71,6 +68,12 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
 
   // Intentionally thrown API errors
   if (err instanceof ApiError) {
+    const level = err.statusCode >= 500 ? 'error' : 'warn';
+    logger[level](ctx, err.message, {
+      path: req.path,
+      statusCode: err.statusCode,
+      code: err.code,
+    });
     const payload: Record<string, unknown> = {
       success: false,
       message: err.message,
@@ -83,7 +86,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
       payload.details = err.details;
     }
 
-    if (process.env.NODE_ENV === 'development' && (err as Error).stack) {
+    if (process.env['NODE_ENV'] === 'development' && (err as Error).stack) {
       payload.stack = (err as Error).stack;
     }
 
@@ -92,6 +95,11 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
 
   // Any other/unexpected error
   const message = err instanceof Error ? err.message : 'Internal server error';
+  const stack = err instanceof Error ? err.stack : undefined;
+  logger.error(ctx, message, {
+    path: req.path,
+    stack,
+  });
 
   return res.status(500).json({
     success: false,

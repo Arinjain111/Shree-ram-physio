@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { LayoutConfig } from '@/types/layout.types';
 import { ipcRenderer } from '@/lib/ipc';
+import { useLogger } from '@/utils/logger';
 
 const defaultLayout: LayoutConfig = {
   clinicName: 'Shree Ram Physiotherapy & Rehabilitation Center',
@@ -61,6 +62,7 @@ const LayoutContext = createContext<LayoutContextValue | undefined>(undefined);
 export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const [layout, setLayout] = useState<LayoutConfig>(defaultLayout);
   const [loading, setLoading] = useState(true);
+  const log = useLogger();
 
   const loadLayout = useCallback(async () => {
     try {
@@ -69,7 +71,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
         setLayout({ ...defaultLayout, ...result.layout });
       }
     } catch (error) {
-      console.error('Error loading layout:', error);
+      log.error('layout', 'Error loading layout', { error: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -88,7 +90,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       }
       return false;
     } catch (error) {
-      console.error('Error saving layout:', error);
+      log.error('layout', 'Error saving layout', { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   }, []);

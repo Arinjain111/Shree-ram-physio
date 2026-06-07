@@ -43,9 +43,16 @@ const Home = () => {
     {
       title: 'Finances & Analytics',
       icon: '📈',
-      description: 'Track revenue, view trends, and analyze clinic performance',
+      description: 'Track revenue, billing, payments, and outstanding balances',
       path: '/finances',
       color: 'from-indigo-500 to-indigo-600'
+    },
+    {
+      title: 'Reports & Analytics',
+      icon: '📊',
+      description: 'Deep insights, patient stats, and exportable reports',
+      path: '/reports',
+      color: 'from-teal-500 to-emerald-600'
     }
   ];
 

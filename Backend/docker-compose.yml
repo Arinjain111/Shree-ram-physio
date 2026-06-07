@@ -28,7 +28,7 @@ services:
       dockerfile: Dockerfile
     container_name: srp_backend
     ports:
-      - "3000:3000"
+      - "3100:3000"
     # Load env vars from .env.docker (local Postgres, no Accelerate)
     env_file:
       - .env.docker

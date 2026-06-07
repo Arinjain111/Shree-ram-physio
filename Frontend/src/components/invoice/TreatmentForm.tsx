@@ -3,6 +3,7 @@ import type { TreatmentPreset } from '@/types/treatmentPreset.types';
 import type { TreatmentFormProps } from '@/types/component.types';
 import { ValidDateStringSchema } from '@/schemas/validation.schema.ts';
 import { ipcRenderer } from '@/lib/ipc';
+import { useLogger } from '@/utils/logger';
 
 const TreatmentForm = ({ 
   treatments, 
@@ -15,6 +16,7 @@ const TreatmentForm = ({
   const [filteredPresets, setFilteredPresets] = useState<TreatmentPreset[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const log = useLogger();
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ const TreatmentForm = ({
         setPresets(result.presets || []);
       }
     } catch (error) {
-      console.error('Error loading treatment presets:', error);
+      log.error('invoice', 'Error loading treatment presets', { error: error instanceof Error ? error.message : String(error) });
     }
   };
 

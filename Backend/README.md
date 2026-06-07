@@ -143,6 +143,44 @@ Backend/
 └── API_DOCUMENTATION.md        # Complete API docs
 ```
 
+## Logging
+
+The backend uses a single structured logger (`src/utils/logger.ts`) with these guarantees:
+
+- **Format:** JSON in `NODE_ENV=production`, human-readable in development.
+- **Level filter:** `LOG_LEVEL` env var (`debug` | `info` | `warn` | `error` | `silent`). Defaults to `info` in production, `debug` in development.
+- **Redaction:** Any field whose key matches `password`, `token`, `apikey`, `api_key`, or `x-api-key` is replaced with `[redacted]` before the log is written.
+- **Helpers:**
+  - `logger.with(fields)` — return a child logger with default fields attached to every entry (e.g. request id).
+  - `logger.child({ level, fields })` — return a child with an overridden level and/or fields.
+  - `logger.time(ctx, label, fn)` — time a block; logs `label completed` or `label failed` with `durationMs`.
+
+### HTTP access log
+
+`src/middleware/requestLogger.ts` is registered before all routes in `src/server.ts`. It emits a single line per request:
+
+```
+2026-06-07T12:00:00.000Z ℹ [http] GET /api/patients 200 14ms
+```
+
+- Captured: timestamp, method, URL, status, duration, IP, user-agent, and (for non-GET bodies) a redacted body snapshot.
+- Sensitive headers (`authorization`, `x-api-key`, cookies) are stripped.
+
+### Error handler
+
+`src/middleware/errorHandler.ts` is the final middleware. It:
+
+- Returns `ApiError` instances with their declared status code.
+- Maps Zod validation errors to a `400` response with `details.issues`.
+- Logs unexpected errors with stack and re-emits as `500`.
+
+Example:
+
+```ts
+import { logger } from '@/utils/logger';
+logger.info('invoices', 'Invoice created', { id: invoice.id, total: invoice.total });
+```
+
 ## Development
 
 ### Available Scripts

@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { getPrismaClient } from '../database/prisma';
 import { logError } from '../utils/errorLogger';
+import { logger } from '../utils/logger';
 import axios from '../services/http';
 import { getBackendUrl } from '../config/backend';
 
@@ -120,7 +121,7 @@ export function registerPatientHandlers() {
                 } catch (e: any) {
                     const status = e?.response?.status;
                     const msg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Cloud delete failed';
-                    console.error('Cloud delete failed', e);
+                    logger.error('patients', 'Cloud delete failed', { error: msg, status, patientId });
                     result.errors.push(`Cloud${status ? ` (${status})` : ''}: ${msg}`);
                 }
             }
@@ -135,7 +136,7 @@ export function registerPatientHandlers() {
                     await prisma.patient.delete({ where: { id: patientId } });
                     result.local = true;
                 } catch (e: any) {
-                    console.error('Local delete failed', e);
+                    logger.error('patients', 'Local delete failed', { error: e?.message ?? String(e), patientId });
                     result.errors.push(`Local: ${e.message}`);
                 }
             }

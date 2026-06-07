@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
+import { logger } from '../utils/logger';
 
 /**
  * Reset all database tables (DANGEROUS - use with caution)
@@ -7,28 +8,28 @@ import prisma from '../lib/prisma';
  */
 export const resetDatabase = async (req: Request, res: Response) => {
   try {
-    console.log('⚠️  Database reset requested');
-    
+    logger.warn('reset', 'Database reset requested');
+
     // Delete in order to respect foreign key constraints
     await prisma.$transaction(async (tx) => {
       // Delete treatments first (depends on invoices and treatment presets)
       const deletedTreatments = await tx.treatment.deleteMany();
-      console.log(`   Deleted ${deletedTreatments.count} treatments`);
-      
+      logger.debug('reset', 'Deleted treatments', { count: deletedTreatments.count });
+
       // Delete invoices (depends on patients)
       const deletedInvoices = await tx.invoice.deleteMany();
-      console.log(`   Deleted ${deletedInvoices.count} invoices`);
-      
+      logger.debug('reset', 'Deleted invoices', { count: deletedInvoices.count });
+
       // Delete patients
       const deletedPatients = await tx.patient.deleteMany();
-      console.log(`   Deleted ${deletedPatients.count} patients`);
-      
+      logger.debug('reset', 'Deleted patients', { count: deletedPatients.count });
+
       // Delete treatment presets (can be done last)
       const deletedPresets = await tx.treatmentPreset.deleteMany();
-      console.log(`   Deleted ${deletedPresets.count} treatment presets`);
+      logger.debug('reset', 'Deleted treatment presets', { count: deletedPresets.count });
     });
 
-    console.log('✅ Database reset completed successfully');
+    logger.info('reset', 'Database reset completed successfully');
 
     res.json({
       success: true,
@@ -41,7 +42,7 @@ export const resetDatabase = async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('❌ Database reset failed:', error);
+    logger.error('reset', 'Database reset failed', { error: error?.message ?? String(error) });
     res.status(500).json({
       success: false,
       error: error.message || 'Database reset failed'
@@ -71,7 +72,7 @@ export const getDatabaseStats = async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('❌ Failed to get database stats:', error);
+    logger.error('reset', 'Failed to get database stats', { error: error?.message ?? String(error) });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to get database statistics'

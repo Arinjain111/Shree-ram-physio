@@ -1,7 +1,14 @@
 /**
  * Concise Error Logger Utility
  * Formats errors in a readable, minimal format
+ *
+ * This is a thin compatibility shim around the structured `logger` (../utils/logger).
+ * New code should call `logger.error(...)` / `logger.warn(...)` / `logger.info(...)` directly.
+ * These helpers are kept for the dozens of existing call sites that already pass
+ * `(context, error)` or `(context, message)` shaped arguments.
  */
+
+import { logger } from './logger';
 
 interface ErrorDetails {
   code?: string;
@@ -14,17 +21,17 @@ interface ErrorDetails {
  */
 export function logError(context: string, error: any): void {
   const details = parseError(error);
-  const errorCode = details.code ? `[${details.code}]` : '[ERROR]';
-  const location = details.location ? ` - ${details.location}` : '';
-  
-  console.error(`${errorCode} ${context}: ${details.message}${location}`);
+  logger.error(context, details.message, {
+    code: details.code,
+    location: details.location,
+  });
 }
 
 /**
  * Logs warnings in a concise format
  */
 export function logWarning(context: string, message: string): void {
-  console.warn(`[WARN] ${context}: ${message}`);
+  logger.warn(context, message);
 }
 
 /**
@@ -32,7 +39,7 @@ export function logWarning(context: string, message: string): void {
  */
 export function logInfo(context: string, message: string): void {
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[INFO] ${context}: ${message}`);
+    logger.debug(context, message);
   }
 }
 
@@ -51,7 +58,7 @@ function parseError(error: any): ErrorDetails {
         location: error.config?.url
       };
     }
-    
+
     // Network errors
     if (error.code === 'ECONNREFUSED') {
       return {
@@ -60,7 +67,7 @@ function parseError(error: any): ErrorDetails {
         location: error.config?.url
       };
     }
-    
+
     // Other axios errors
     return {
       code: error.code || 'NETWORK_ERROR',
@@ -90,5 +97,5 @@ function parseError(error: any): ErrorDetails {
  * Format success message
  */
 export function logSuccess(context: string, message: string): void {
-  console.log(`✅ ${context}: ${message}`);
+  logger.info(context, message);
 }

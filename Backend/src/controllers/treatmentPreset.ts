@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { ApiError, asyncHandler } from '../middleware/errorHandler';
 import { PresetSyncRequestSchema, validateOrThrow, type PresetSyncRequest } from '../schemas/validation.schema';
+import { logger } from '../utils/logger';
 
 // Get all treatment presets
 export const getAllPresets = async (req: Request, res: Response) => {
@@ -210,7 +211,7 @@ export const syncPresets = async (req: Request, res: Response) => {
         results.created++;
       }
     } catch (error) {
-      console.error('Error syncing preset:', preset, error);
+      logger.error('presets', 'Error syncing preset', { preset: preset?.name, error: error instanceof Error ? error.message : String(error) });
       results.failed++;
     }
   }

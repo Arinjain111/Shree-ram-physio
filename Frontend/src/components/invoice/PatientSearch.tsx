@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { searchPatients as searchAlgo } from '@/utils/searchUtils';
 import type { Patient } from '@/types/database.types';
 import type { PatientSearchProps } from '@/types/component.types';
+import { useLogger } from '@/utils/logger';
 
 const PatientSearch = ({ invoices, onPatientSelect }: PatientSearchProps) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -11,6 +12,7 @@ const PatientSearch = ({ invoices, onPatientSelect }: PatientSearchProps) => {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const log = useLogger();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -43,7 +45,7 @@ const PatientSearch = ({ invoices, onPatientSelect }: PatientSearchProps) => {
         setShowDropdown(results.length > 0);
         setSelectedIndex(-1);
       } catch (error) {
-        console.error('Error searching patients:', error);
+        log.error('search', 'Error searching patients', { error: error instanceof Error ? error.message : String(error) });
         setSearchResults([]);
       } finally {
         setIsSearching(false);

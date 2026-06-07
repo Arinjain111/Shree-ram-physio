@@ -3,6 +3,7 @@ import { getPrismaClient } from '../database/prisma';
 import { PrismaSyncEngine } from '../sync/prismaSyncEngine';
 import { getBackendUrl } from '../config/backend';
 import { logError } from '../utils/errorLogger';
+import { logger } from '../utils/logger';
 import axios from '../services/http';
 
 export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
@@ -32,7 +33,7 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
         try {
             if (!prisma) throw new Error('Prisma not initialized');
 
-            console.log('⚠️ Forcing all local records to PENDING...');
+            logger.warn('sync', 'Forcing all local records to PENDING');
 
             const p = await prisma.patient.updateMany({
                 where: { cloudId: null },
@@ -47,7 +48,7 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
                 data: { syncStatus: 'PENDING' }
             });
 
-            console.log(`Updated status to PENDING: ${p.count} patients, ${i.count} invoices, ${t.count} treatments`);
+            logger.info('sync', 'Updated status to PENDING', { patients: p.count, invoices: i.count, treatments: t.count });
 
             // Trigger sync immediately
             if (syncEngine) {
@@ -79,24 +80,24 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
                 throw new Error('Prisma not initialized');
             }
 
-            console.log('⚠️  Resetting local database...');
+            logger.warn('sync', 'Resetting local database');
 
             // Delete all records in transaction
             await prisma.$transaction(async (tx) => {
                 const deletedTreatments = await tx.treatment.deleteMany();
-                console.log(`   Deleted ${deletedTreatments.count} treatments`);
+                logger.debug('sync', 'Deleted treatments', { count: deletedTreatments.count });
 
                 const deletedInvoices = await tx.invoice.deleteMany();
-                console.log(`   Deleted ${deletedInvoices.count} invoices`);
+                logger.debug('sync', 'Deleted invoices', { count: deletedInvoices.count });
 
                 const deletedPatients = await tx.patient.deleteMany();
-                console.log(`   Deleted ${deletedPatients.count} patients`);
+                logger.debug('sync', 'Deleted patients', { count: deletedPatients.count });
 
                 const deletedPresets = await tx.treatmentPreset.deleteMany();
-                console.log(`   Deleted ${deletedPresets.count} treatment presets`);
+                logger.debug('sync', 'Deleted treatment presets', { count: deletedPresets.count });
             });
 
-            console.log('✅ Local database reset successfully');
+            logger.info('sync', 'Local database reset successfully');
             return { success: true, message: 'Local database reset successfully' };
         } catch (error) {
             logError('Reset local database', error);
@@ -110,12 +111,12 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
                 throw new Error('Sync engine not initialized');
             }
 
-            console.log('🔄 Resetting sync timestamp to force full sync...');
-            
+            logger.info('sync', 'Resetting sync timestamp to force full sync');
+
             // Reset the lastSyncTime to null to trigger a full sync
             await syncEngine.resetSyncTimestamp();
 
-            console.log('✅ Sync timestamp reset - next sync will fetch ALL cloud data');
+            logger.info('sync', 'Sync timestamp reset - next sync will fetch ALL cloud data');
             return { success: true, message: 'Sync timestamp reset successfully' };
         } catch (error) {
             logError('Reset sync timestamp', error);
@@ -127,7 +128,7 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
         try {
             const backendUrl = getBackendUrl();
 
-            console.log(`⚠️  Resetting cloud database via backend: ${backendUrl}`);
+            logger.warn('sync', 'Resetting cloud database via backend', { backendUrl });
 
             const response = await axios.post(`${backendUrl}/api/database/reset`, {}, {
                 timeout: 30000,
@@ -137,13 +138,13 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
             });
 
             if (response.data.success) {
-                console.log('✅ Cloud database reset successfully');
+                logger.info('sync', 'Cloud database reset successfully');
                 return { success: true, message: 'Cloud database reset successfully' };
             } else {
                 throw new Error(response.data.error || 'Failed to reset cloud database');
             }
         } catch (error: any) {
-            console.error('Cloud database reset error:', error.response?.data || error.message);
+            logger.error('sync', 'Cloud database reset error', { error: (error.response?.data?.error || error?.message) ?? String(error) });
             logError('Reset cloud database', error);
             return {
                 success: false,
@@ -154,18 +155,18 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
 
     ipcMain.handle('reset-all-databases', async () => {
         try {
-            console.log('⚠️  Resetting both local and cloud databases...');
+            logger.warn('sync', 'Resetting both local and cloud databases');
 
             // IMPORTANT: Stop auto-sync during reset to prevent data from syncing back
             if (syncEngine) {
-                console.log('   ⏸️  Pausing auto-sync during reset...');
+                logger.info('sync', 'Pausing auto-sync during reset');
                 syncEngine.stopAutoSync();
             }
 
             // Step 1: Reset CLOUD database FIRST (so it doesn't sync back)
             const backendUrl = getBackendUrl();
 
-            console.log(`   1️⃣ Resetting cloud database via: ${backendUrl}`);
+            logger.info('sync', 'Step 1: resetting cloud database', { backendUrl });
             try {
                 const cloudResponse = await axios.post(`${backendUrl}/api/database/reset`, {}, {
                     timeout: 30000,
@@ -177,9 +178,9 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
                 if (!cloudResponse.data.success) {
                     throw new Error(cloudResponse.data.error || 'Failed to reset cloud database');
                 }
-                console.log('   ✅ Cloud database reset successfully');
+                logger.info('sync', 'Cloud database reset successfully');
             } catch (cloudError: any) {
-                console.error('   ❌ Cloud database reset failed:', cloudError.response?.data || cloudError.message);
+                logger.error('sync', 'Cloud database reset failed', { error: (cloudError.response?.data?.error || cloudError?.message) ?? String(cloudError) });
                 throw new Error(`Cloud reset failed: ${cloudError.response?.data?.error || cloudError.message}`);
             }
 
@@ -188,32 +189,32 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
                 throw new Error('Prisma not initialized');
             }
 
-            console.log('   2️⃣ Resetting local database...');
+            logger.info('sync', 'Step 2: resetting local database');
             await prisma.$transaction(async (tx) => {
                 const deletedTreatments = await tx.treatment.deleteMany();
-                console.log(`      ✓ Deleted ${deletedTreatments.count} local treatments`);
+                logger.debug('sync', 'Deleted local treatments', { count: deletedTreatments.count });
 
                 const deletedInvoices = await tx.invoice.deleteMany();
-                console.log(`      ✓ Deleted ${deletedInvoices.count} local invoices`);
+                logger.debug('sync', 'Deleted local invoices', { count: deletedInvoices.count });
 
                 const deletedPatients = await tx.patient.deleteMany();
-                console.log(`      ✓ Deleted ${deletedPatients.count} local patients`);
+                logger.debug('sync', 'Deleted local patients', { count: deletedPatients.count });
 
                 const deletedPresets = await tx.treatmentPreset.deleteMany();
-                console.log(`      ✓ Deleted ${deletedPresets.count} local treatment presets`);
+                logger.debug('sync', 'Deleted local treatment presets', { count: deletedPresets.count });
             });
-            console.log('   ✅ Local database reset successfully');
+            logger.info('sync', 'Local database reset successfully');
 
             // Step 3: Wait a moment to ensure everything is committed
             await new Promise(resolve => setTimeout(resolve, 1000));
 
             // Step 4: Resume auto-sync
             if (syncEngine) {
-                console.log('   ▶️  Resuming auto-sync...');
+                logger.info('sync', 'Resuming auto-sync');
                 syncEngine.startAutoSync(30 * 60 * 1000); // 30 minutes
             }
 
-            console.log('✅ All databases reset successfully');
+            logger.info('sync', 'All databases reset successfully');
             return {
                 success: true,
                 message: 'All databases (local and cloud) reset successfully'
@@ -224,7 +225,7 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
                 syncEngine.startAutoSync(30 * 60 * 1000);
             }
 
-            console.error('❌ Reset all databases failed:', error);
+            logger.error('sync', 'Reset all databases failed', { error: error?.message ?? String(error) });
             logError('Reset all databases', error);
             return {
                 success: false,
@@ -246,7 +247,7 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
                 prisma.treatmentPreset.count()
             ]);
 
-            console.log(`📊 Database stats: ${patients} patients, ${invoices} invoices, ${treatments} treatments, ${treatmentPresets} presets`);
+            logger.debug('sync', 'Database stats', { patients, invoices, treatments, treatmentPresets });
 
             return {
                 success: true,

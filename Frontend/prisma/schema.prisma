@@ -40,12 +40,16 @@ model Invoice {
   id             Int       @id @default(autoincrement())
   invoiceNumber  String    @unique @map("invoice_number")
   patientId      Int       @map("patient_id")
-  date           String
+  date           DateTime
   diagnosis      String    @default("")
   notes          String    @default("")
   paymentMethod  String    @default("Cash") @map("payment_method")
   TransactionId  String?   @map("transaction_id")
   total          Float
+  discount       Float     @default(0) @map("discount")
+  discountType   String    @default("amount") @map("discount_type")
+  paymentStatus  String    @default("unpaid") @map("payment_status")
+  amountPaid     Float     @default(0) @map("amount_paid")
   
   // Sync tracking
   cloudId        Int?      @map("cloud_id")
@@ -71,8 +75,8 @@ model Treatment {
   name       String
   duration   String    @default("")
   sessions   Int
-  startDate  String    @map("start_date")
-  endDate    String    @map("end_date")
+  startDate  DateTime  @map("start_date")
+  endDate    DateTime  @map("end_date")
   amount     Float
   
   // Sync tracking
@@ -102,6 +106,32 @@ model TreatmentPreset {
   updatedAt        DateTime @updatedAt @map("updated_at")
   
   @@map("treatment_presets")
+}
+
+// Diagnosis presets for autocomplete suggestions
+model DiagnosisPreset {
+  id         Int       @id @default(autoincrement())
+  name       String    @unique
+  frequency  Int       @default(0)
+
+  // Sync tracking
+  cloudId    Int?      @map("cloud_id")
+  syncStatus String    @default("PENDING") @map("sync_status")
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  lastSyncAt DateTime? @map("last_sync_at")
+
+  @@map("diagnosis_presets")
+}
+
+// Diagnosis shortcuts — expand short texts to full diagnosis names
+model DiagnosisShortcut {
+  id       Int    @id @default(autoincrement())
+  shortcut String @unique
+  expands  String
+
+  @@map("diagnosis_shortcuts")
 }
 
 // Sync logs for tracking sync operations

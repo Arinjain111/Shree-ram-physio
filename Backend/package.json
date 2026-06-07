@@ -27,16 +27,15 @@
     "express-rate-limit": "^7.4.1",
     "helmet": "^8.0.0",
     "pg": "^8.13.3",
+    "prisma": "^7.8.0",
     "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
-    "@types/mssql": "^9.1.8",
-    "@types/node": "^22.10.2",
+    "@types/node": "^22.12.0",
     "@types/pg": "^8.11.6",
     "nodemon": "^3.1.11",
-    "prisma": "^7.8.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
@@ -46,5 +45,8 @@
   },
   "author": "Shri Ram Physio",
   "license": "MIT",
-  "description": "Backend for Electron app sync — local Docker PG + Supabase production"
+  "description": "Backend for Electron app sync — local Docker PG + Supabase production",
+  "overrides": {
+    "@hono/node-server": "^2.0.4"
+  }
 }

@@ -6,7 +6,7 @@ import { getPrismaClient, disconnectPrisma } from './database/prisma';
 import { initializeDatabase } from './database/initDatabase';
 import { PrismaSyncEngine } from './sync/prismaSyncEngine';
 import { registerIpcHandlers } from './ipc/index';
-import { logError, logSuccess } from './utils/errorLogger';
+import { logger } from './utils/logger';
 import { getBackendUrl } from './config/backend';
 
 // Vite plugin provides these globals - declare them for TS
@@ -14,7 +14,7 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 // Early diagnostics
-console.log('[Main] starting process', { pid: process.pid, argv: process.argv, cwd: process.cwd() });
+logger.info('main', 'starting process', { pid: process.pid, argv: process.argv, cwd: process.cwd() });
 
 // Suppress Node.js warnings
 process.removeAllListeners('warning');
@@ -26,11 +26,11 @@ app.commandLine.appendSwitch('disable-gpu-compositing');
 
 // Global error handlers to avoid silent exits in dev
 process.on('uncaughtException', (err) => {
-  console.error('[Main] uncaughtException', err);
+  logger.error('main', 'uncaughtException', { error: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined });
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[Main] unhandledRejection', reason);
+  logger.error('main', 'unhandledRejection', { reason: reason instanceof Error ? reason.message : String(reason) });
 });
 
 dotenv.config();
@@ -57,7 +57,7 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const shouldOpenDevTools = isDev && process.env.ELECTRON_OPEN_DEVTOOLS !== '0';
 
 function createWindow() {
-  console.log('[Main] Creating main window. isDev=', isDev);
+  logger.info('main', 'Creating main window', { isDev });
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -91,13 +91,13 @@ function createWindow() {
 
   // Fix for undefined viteName in packaged app
   if (!viteName || viteName === 'undefined') {
-    console.log('[Main] viteName was undefined, enforcing "main_window"');
+    logger.warn('main', 'viteName was undefined, enforcing "main_window"');
     viteName = 'main_window';
   }
 
   if (devServerUrl) {
     // Development mode - load from Vite dev server
-    console.log('[Main] Loading dev URL:', devServerUrl);
+    logger.info('main', 'Loading dev URL', { url: devServerUrl });
     mainWindow.loadURL(devServerUrl);
     if (shouldOpenDevTools) {
       mainWindow.webContents.openDevTools({ mode: 'detach' });
@@ -119,8 +119,8 @@ function createWindow() {
       }
     });
 
-    console.log('[Main] Production index candidates:', candidates);
-    console.log('[Main] Loading production index.html from:', indexPath);
+    logger.debug('main', 'Production index candidates', { candidates });
+    logger.info('main', 'Loading production index.html', { path: indexPath });
 
     if (!indexPath) {
       throw new Error(`Cannot find renderer index.html. Tried:\n${candidates.join('\n')}`);
@@ -134,16 +134,16 @@ function createWindow() {
   }
 
   mainWindow.on('ready-to-show', () => {
-    console.log('[Main] ready-to-show, showing window');
+    logger.debug('main', 'ready-to-show, showing window');
     mainWindow?.show();
   });
 
   mainWindow.webContents.on('did-finish-load', () => {
-    console.log('[Main] did-finish-load');
+    logger.debug('main', 'did-finish-load');
   });
 
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
-    console.error('[Main] did-fail-load', { errorCode, errorDescription, validatedURL });
+    logger.error('main', 'did-fail-load', { errorCode, errorDescription, validatedURL });
   });
 
   mainWindow.on('closed', () => {
@@ -158,7 +158,7 @@ app.whenReady().then(async () => {
   try {
     await initializeDatabase();
   } catch (error: any) {
-    logError('Database initialization', error);
+    logger.error('main', 'Database initialization failed', { error: error?.message, stack: error?.stack });
     dialog.showErrorBox('Database Error', `Failed to initialize database: ${error.message}\n${error.stack || ''}`);
   }
 
@@ -168,10 +168,10 @@ app.whenReady().then(async () => {
     prisma = getPrismaClient();
     // Verify foreign keys are enabled
     await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON');
-    logSuccess('Prisma', 'Client initialized');
+    logger.info('main', 'Prisma client initialized');
   } catch (error: any) {
     prisma = null;
-    logError('Prisma initialization', error);
+    logger.error('main', 'Prisma initialization failed', { error: error?.message, stack: error?.stack });
     dialog.showErrorBox('Database Error', `Failed to initialize Prisma: ${error.message}\n${error.stack || ''}`);
   }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { LayoutConfig } from '@/types/layout.types';
 import { ipcRenderer } from '@/lib/ipc';
+import { useLogger } from '@/utils/logger';
 
 export type { LayoutConfig };
 
@@ -56,6 +57,7 @@ const defaultLayout: LayoutConfig = {
 export const useInvoiceLayout = () => {
   const [layout, setLayout] = useState<LayoutConfig>(defaultLayout);
   const [loading, setLoading] = useState(true);
+  const log = useLogger();
 
   useEffect(() => {
     loadLayout();
@@ -68,7 +70,7 @@ export const useInvoiceLayout = () => {
         setLayout({ ...defaultLayout, ...result.layout });
       }
     } catch (error) {
-      console.error('Error loading layout:', error);
+      log.error('layout', 'Error loading layout', { error: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -83,7 +85,7 @@ export const useInvoiceLayout = () => {
       }
       return false;
     } catch (error) {
-      console.error('Error saving layout:', error);
+      log.error('layout', 'Error saving layout', { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   };

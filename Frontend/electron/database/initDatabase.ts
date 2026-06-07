@@ -2,6 +2,8 @@ import { app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { loadBetterSqlite3 } from '../lib/nativeLoader';
+import { seedDiagnosisData } from './seedDiagnosisPresets';
+import { logger } from '../utils/logger';
 
 /**
  * Initialize SQLite database with all tables
@@ -12,7 +14,7 @@ export async function initializeDatabase(): Promise<void> {
     const Database = loadBetterSqlite3();
 
     const dbPath = path.join(app.getPath('userData'), 'shri-ram-physio.db');
-    console.log(`📁 Database path: ${dbPath}`);
+    logger.info('db', 'Database path', { path: dbPath });
 
     // Check if database already exists and has tables
     if (fs.existsSync(dbPath)) {
@@ -30,7 +32,7 @@ export async function initializeDatabase(): Promise<void> {
                 const needsUhidNullableMigration = !!uhidCol && uhidCol.notnull === 1;
 
                 if (needsUhidNullableMigration) {
-                    console.log('🔧 Migrating local DB: making patients.uhid nullable...');
+                    logger.info('db', 'Migrating local DB: making patients.uhid nullable');
                     db.exec('PRAGMA foreign_keys = OFF;');
                     db.exec('BEGIN;');
                     try {
@@ -64,10 +66,10 @@ export async function initializeDatabase(): Promise<void> {
                         db.exec('ALTER TABLE patients_new RENAME TO patients;');
 
                         db.exec('COMMIT;');
-                        console.log('✅ Local DB migration complete');
+                        logger.info('db', 'Local DB migration complete');
                     } catch (e) {
                         db.exec('ROLLBACK;');
-                        console.error('❌ Local DB migration failed:', e);
+                        logger.error('db', 'Local DB migration failed', { error: e instanceof Error ? e.message : String(e) });
                         throw e;
                     } finally {
                         db.exec('PRAGMA foreign_keys = ON;');
@@ -79,27 +81,85 @@ export async function initializeDatabase(): Promise<void> {
                 const hasTransactionId = invoiceCols.some(c => c.name === 'transaction_id');
 
                 if (!hasTransactionId) {
-                    console.log('🔧 Migrating local DB: adding transaction_id to invoices...');
+                    logger.info('db', 'Migrating local DB: adding transaction_id to invoices');
                     try {
                         db.exec('ALTER TABLE invoices ADD COLUMN transaction_id TEXT;');
-                        console.log('✅ transaction_id column added');
+                        logger.info('db', 'transaction_id column added');
                     } catch (e) {
-                        console.error('❌ Failed to add transaction_id column:', e);
+                        logger.error('db', 'Failed to add transaction_id column', { error: e instanceof Error ? e.message : String(e) });
                     }
                 }
 
-                console.log('✅ Database already initialized');
+                // Lightweight migration: add payment_status and amount_paid to invoices if missing.
+                const hasPaymentStatus = invoiceCols.some(c => c.name === 'payment_status');
+                if (!hasPaymentStatus) {
+                    logger.info('db', 'Migrating local DB: adding payment_status to invoices');
+                    try {
+                        db.exec("ALTER TABLE invoices ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'unpaid';");
+                        logger.info('db', 'payment_status column added');
+                    } catch (e) {
+                        logger.error('db', 'Failed to add payment_status column', { error: e instanceof Error ? e.message : String(e) });
+                    }
+                }
+                const hasAmountPaid = invoiceCols.some(c => c.name === 'amount_paid');
+                if (!hasAmountPaid) {
+                    logger.info('db', 'Migrating local DB: adding amount_paid to invoices');
+                    try {
+                        db.exec('ALTER TABLE invoices ADD COLUMN amount_paid REAL NOT NULL DEFAULT 0;');
+                        logger.info('db', 'amount_paid column added');
+                    } catch (e) {
+                        logger.error('db', 'Failed to add amount_paid column', { error: e instanceof Error ? e.message : String(e) });
+                    }
+                }
+
+                // Lightweight migration: add diagnosis_presets table if missing.
+                const existingTables: Array<{ name: string }> = db.prepare(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).all() as any;
+                const hasDiagnosisPresets = existingTables.some(t => t.name === 'diagnosis_presets');
+                if (!hasDiagnosisPresets) {
+                    logger.info('db', 'Migrating local DB: adding diagnosis_presets table');
+                    db.exec(`
+                CREATE TABLE IF NOT EXISTS diagnosis_presets (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT NOT NULL UNIQUE,
+                  frequency INTEGER NOT NULL DEFAULT 0,
+                  cloud_id INTEGER,
+                  sync_status TEXT NOT NULL DEFAULT 'PENDING',
+                  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  last_sync_at TEXT
+                );
+              `);
+                    logger.info('db', 'diagnosis_presets table added');
+                }
+                const hasDiagnosisShortcuts = existingTables.some(t => t.name === 'diagnosis_shortcuts');
+                if (!hasDiagnosisShortcuts) {
+                    logger.info('db', 'Migrating local DB: adding diagnosis_shortcuts table');
+                    db.exec(`
+                CREATE TABLE IF NOT EXISTS diagnosis_shortcuts (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  shortcut TEXT NOT NULL UNIQUE,
+                  expands TEXT NOT NULL
+                );
+              `);
+                    logger.info('db', 'diagnosis_shortcuts table added');
+                }
+
+                logger.info('db', 'Database already initialized');
                 db.close();
+
+                seedDiagnosisData();
                 return;
             }
         } catch (error) {
-            console.log('⚠️ Database exists but may be corrupted, recreating...');
+            logger.warn('db', 'Database exists but may be corrupted, recreating', { error: error instanceof Error ? error.message : String(error) });
         }
         db.close();
     }
 
     // Create new database with all tables
-    console.log('🔨 Creating database tables...');
+    logger.info('db', 'Creating database tables');
     const db = new Database(dbPath);
 
     try {
@@ -136,6 +196,8 @@ export async function initializeDatabase(): Promise<void> {
         payment_method TEXT NOT NULL DEFAULT 'Cash',
         transaction_id TEXT,
         total REAL NOT NULL,
+        payment_status TEXT NOT NULL DEFAULT 'unpaid',
+        amount_paid REAL NOT NULL DEFAULT 0,
         cloud_id INTEGER,
         sync_status TEXT NOT NULL DEFAULT 'PENDING',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -169,6 +231,29 @@ export async function initializeDatabase(): Promise<void> {
 
         db.exec('CREATE INDEX IF NOT EXISTS treatments_invoice_id_idx ON treatments(invoice_id);');
 
+        // Create diagnosis_presets table
+        db.exec(`
+      CREATE TABLE IF NOT EXISTS diagnosis_presets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        frequency INTEGER NOT NULL DEFAULT 0,
+        cloud_id INTEGER,
+        sync_status TEXT NOT NULL DEFAULT 'PENDING',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_sync_at TEXT
+      );
+    `);
+
+        // Create diagnosis_shortcuts table
+        db.exec(`
+      CREATE TABLE IF NOT EXISTS diagnosis_shortcuts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shortcut TEXT NOT NULL UNIQUE,
+        expands TEXT NOT NULL
+      );
+    `);
+
         // Create treatment_presets table
         db.exec(`
       CREATE TABLE IF NOT EXISTS treatment_presets (
@@ -197,10 +282,14 @@ export async function initializeDatabase(): Promise<void> {
 
         db.exec('CREATE INDEX IF NOT EXISTS sync_logs_table_name_record_id_idx ON sync_logs(table_name, record_id);');
 
-        console.log('✅ Database tables created successfully');
+        db.exec('CREATE INDEX IF NOT EXISTS diagnosis_presets_name_idx ON diagnosis_presets(name);');
+
+        logger.info('db', 'Database tables created successfully');
+
+        seedDiagnosisData();
 
     } catch (error) {
-        console.error('❌ Failed to create database tables:', error);
+        logger.error('db', 'Failed to create database tables', { error: error instanceof Error ? error.message : String(error) });
         throw error;
     } finally {
         db.close();

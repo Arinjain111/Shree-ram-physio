@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import type { SyncPayload, SyncResponse, SyncStatus } from '../types';
+import { logger } from '../utils/logger';
 
 export class SyncEngine {
   private apiClient: AxiosInstance;
@@ -18,11 +19,11 @@ export class SyncEngine {
 
   // Start automatic sync every 5 minutes
   startAutoSync(intervalMs: number = 5 * 60 * 1000) {
-    console.log('Starting auto-sync...');
-    
+    logger.info('sync', 'Starting auto-sync', { intervalMs });
+
     // Initial sync
     this.performSync();
-    
+
     // Periodic sync
     this.syncInterval = setInterval(() => {
       this.performSync();
@@ -33,7 +34,7 @@ export class SyncEngine {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
-      console.log('Auto-sync stopped');
+      logger.debug('sync', 'Auto-sync stopped');
     }
   }
 
@@ -44,30 +45,30 @@ export class SyncEngine {
     }
 
     this.isSyncing = true;
-    console.log('Starting sync process...');
+    logger.debug('sync', 'Starting sync process');
 
     try {
       // Check internet connectivity
       const isOnline = await this.checkConnectivity();
       if (!isOnline) {
-        console.log('No internet connection. Sync skipped.');
+        logger.warn('sync', 'No internet connection. Sync skipped.');
         return { success: false, message: 'No internet connection' };
       }
 
       // 1. Collect pending changes from local DB
       const pendingData = this.collectPendingChanges();
-      
+
       // 2. Send to cloud and get updates
       const response = await this.sendToCloud(pendingData);
-      
+
       // 3. Update local database with cloud data
       this.applyCloudUpdates(response);
-      
-      console.log('Sync completed successfully');
+
+      logger.info('sync', 'Sync completed successfully');
       return { success: true, message: 'Sync completed' };
 
     } catch (error: any) {
-      console.error('Sync failed:', error.message);
+      logger.error('sync', 'Sync failed', { error: error?.message ?? String(error) });
       return { success: false, message: error.message };
     } finally {
       this.isSyncing = false;
@@ -88,7 +89,7 @@ export class SyncEngine {
     const invoices = this.db.getPendingRecords('invoices');
     const treatments = this.db.getPendingRecords('treatments');
 
-    console.log(`Pending changes: ${patients.length} patients, ${invoices.length} invoices, ${treatments.length} treatments`);
+    logger.debug('sync', 'Pending changes', { patients: patients.length, invoices: invoices.length, treatments: treatments.length });
 
     return { patients, invoices, treatments };
   }
@@ -159,7 +160,7 @@ export class SyncEngine {
       }
     });
 
-    console.log('Cloud updates applied to local database');
+    logger.debug('sync', 'Cloud updates applied to local database');
   }
 
   // Get sync status

@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useErrorHandler } from './useErrorHandler';
+import { useLogger } from '@/utils/logger';
 import { ipcRenderer } from '@/lib/ipc';
 
 export const useSyncManager = () => {
     const { handleError } = useErrorHandler();
+    const log = useLogger();
 
     const [isSyncing, setIsSyncing] = useState(false);
     const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -17,7 +19,7 @@ export const useSyncManager = () => {
                 setDbStats(result.stats);
             }
         } catch (error) {
-            console.error('Error loading database stats:', error);
+            log.error('sync', 'Error loading database stats', { error: error instanceof Error ? error.message : String(error) });
         }
     }, []);
 
@@ -41,14 +43,14 @@ export const useSyncManager = () => {
                 // "Sync already in progress" is not a real error — just skip silently
                 const errorMsg = result.error || result.result?.message || '';
                 if (errorMsg.includes('already in progress')) {
-                    console.log('⏳ Sync already in progress, skipping.');
+                    log.debug('sync', 'Sync already in progress, skipping');
                     setSyncMessage('');
                     return true;
                 }
                 throw new Error(errorMsg || 'Sync failed unknown error');
             }
         } catch (error) {
-            console.error('Error syncing:', error);
+            log.error('sync', 'Sync failed', { error: error instanceof Error ? error.message : String(error) });
             setSyncMessage('Sync failed');
             handleError(error, 'Sync with backend failed');
             setTimeout(() => setSyncMessage(''), 5000);

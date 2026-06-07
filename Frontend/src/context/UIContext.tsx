@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import Toast from '@/components/ui/Toast';
 import Modal from '@/components/ui/Modal';
+import { UILogBridge } from '@/components/ui/UILogBridge';
 import type { ToastType, ToastProps, ModalProps, UIContextType } from '@/types/ui.types';
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
@@ -45,6 +46,7 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <UIContext.Provider value={{ showToast, showModal, closeModal }}>
+      <UILogBridge />
       {children}
       
       {/* Toast Container */}

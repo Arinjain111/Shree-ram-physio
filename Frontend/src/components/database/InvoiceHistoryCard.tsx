@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { DatabaseInvoice } from '@/types/database.types';
 import TreatmentCalendar, { COLORS } from './TreatmentCalendar';
 import { useNavigate } from 'react-router-dom';
 import { useUI } from '@/context/UIContext';
+import { useLogger } from '@/utils/logger';
 import { ipcRenderer } from '@/lib/ipc';
 
 // Utils
@@ -38,6 +39,19 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
   const canEdit = invoice.syncStatus !== 'SYNCED';
   const hasCloudData = !!invoice.cloudId;
   const [showDeleteOptions, setShowDeleteOptions] = useState(false);
+  const deleteRef = useRef<HTMLDivElement>(null);
+  const log = useLogger();
+
+  useEffect(() => {
+    if (!showDeleteOptions) return;
+    const handler = (e: MouseEvent) => {
+      if (deleteRef.current && !deleteRef.current.contains(e.target as Node)) {
+        setShowDeleteOptions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDeleteOptions]);
 
   const handleDelete = async (target: 'local' | 'cloud' | 'both') => {
     showModal({
@@ -60,12 +74,12 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
               confirmText: 'Close'
             });
             if (result.errors?.length) {
-              console.error('Invoice Delete errors:', result.errors);
+              log.error('db', 'Invoice delete partial errors', { errors: result.errors });
             }
           }
         } catch (error) {
           showToast('error', 'Failed to invoke delete operation');
-          console.error(error);
+          log.error('db', 'Failed to invoke invoice delete', { error: error instanceof Error ? error.message : String(error) });
         } finally {
           setShowDeleteOptions(false);
         }
@@ -133,7 +147,7 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
             Print Invoice
           </button>
           
-          <div className="relative">
+          <div className="relative" ref={deleteRef}>
             <button
               onClick={() => setShowDeleteOptions(!showDeleteOptions)}
               className="flex items-center gap-2 px-3 py-2 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"

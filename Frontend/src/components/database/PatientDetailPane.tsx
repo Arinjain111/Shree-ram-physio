@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useUI } from '@/context/UIContext';
+import { useLogger } from '@/utils/logger';
 import type { DatabaseInvoice } from '@/types/database.types';
 import { InvoiceHistoryCard } from './InvoiceHistoryCard';
 import { ipcRenderer } from '@/lib/ipc';
@@ -14,6 +15,19 @@ export const PatientDetailPane = ({ invoices, onPrintInvoice }: PatientDetailPan
   const [modalVisibleCount, setModalVisibleCount] = useState(5);
   const [showDeleteOptions, setShowDeleteOptions] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const deleteRef = useRef<HTMLDivElement>(null);
+  const log = useLogger();
+
+  useEffect(() => {
+    if (!showDeleteOptions) return;
+    const handler = (e: MouseEvent) => {
+      if (deleteRef.current && !deleteRef.current.contains(e.target as Node)) {
+        setShowDeleteOptions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDeleteOptions]);
   
   if (!invoices || invoices.length === 0) {
       return (
@@ -57,12 +71,12 @@ export const PatientDetailPane = ({ invoices, onPrintInvoice }: PatientDetailPan
                       });
                       // Show partial errors if any
                       if (result.errors && result.errors.length > 0) {
-                          console.error('Delete errors:', result.errors);
+                          log.error('db', 'Patient delete partial errors', { errors: result.errors });
                       }
                   }
               } catch (error) {
                   showToast('error', 'Failed to invoke delete operation');
-                  console.error(error);
+                  log.error('db', 'Failed to invoke patient delete', { error: error instanceof Error ? error.message : String(error) });
               } finally {
                   setIsDeleting(false);
                   setShowDeleteOptions(false);
@@ -124,7 +138,7 @@ export const PatientDetailPane = ({ invoices, onPrintInvoice }: PatientDetailPan
           </div>
           <div className="flex items-center gap-3">
             {/* Delete Dropdown */}
-            <div className="relative">
+            <div className="relative" ref={deleteRef}>
                 <button
                     onClick={() => setShowDeleteOptions(!showDeleteOptions)}
                     className="p-2 hover:bg-rose-50 text-rose-400 hover:text-rose-600 rounded-lg transition-colors flex items-center gap-2"
@@ -166,7 +180,7 @@ export const PatientDetailPane = ({ invoices, onPrintInvoice }: PatientDetailPan
           </div>
         </div>
 
-        {/* Modal Content */}
+        {/* Content */}
         <div className="overflow-y-auto p-8 bg-slate-50/50">
           <div className="space-y-6">
             {invoices.slice(0, modalVisibleCount).map((invoice, idx) => (

@@ -125,7 +125,7 @@ export const getInvoicesByPatient = async (req: Request, res: Response) => {
 // Create invoice with treatments
 export const createInvoice = async (req: Request, res: Response) => {
   // Validate request body using shared Zod schema
-  const { invoiceNumber, patientId, date, diagnosis, notes, paymentMethod, TransactionId, total, treatments } = validateOrThrow<CreateInvoiceRequest>(
+  const { invoiceNumber, patientId, date, diagnosis, notes, paymentMethod, TransactionId, total, paymentStatus, amountPaid, treatments } = validateOrThrow<CreateInvoiceRequest>(
     CreateInvoiceRequestSchema,
     req.body
   );
@@ -160,6 +160,8 @@ export const createInvoice = async (req: Request, res: Response) => {
         paymentMethod: paymentMethod || 'Cash',
         TransactionId: TransactionId || null,
         total,
+        paymentStatus: paymentStatus || 'unpaid',
+        amountPaid: amountPaid ?? 0,
         ...(treatments && treatments.length > 0
           ? {
               treatments: {
@@ -190,7 +192,7 @@ export const createInvoice = async (req: Request, res: Response) => {
 // Update invoice
 export const updateInvoice = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { invoiceNumber, patientId, date, diagnosis, total, treatments } = req.body;
+  const { invoiceNumber, patientId, date, diagnosis, total, paymentStatus, amountPaid, treatments } = req.body;
 
   const invoiceId = parseInt(id as string, 10);
   if (Number.isNaN(invoiceId)) {

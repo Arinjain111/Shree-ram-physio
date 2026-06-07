@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { getPrismaClient } from '../database/prisma';
 import { logError, logInfo, logSuccess } from '../utils/errorLogger';
+import { logger } from '../utils/logger';
 import axios from '../services/http';
 import { getBackendUrl } from '../config/backend';
 
@@ -34,7 +35,7 @@ export function registerPresetHandlers() {
             }
 
             const backendUrl = getBackendUrl();
-            console.log(`📋 Syncing presets from: ${backendUrl}/api/presets`);
+            logger.info('presets', 'Syncing presets from cloud', { url: `${backendUrl}/api/presets` });
 
             // Fetch presets from cloud
             const response = await axios.get(`${backendUrl}/api/presets`, {
@@ -46,7 +47,7 @@ export function registerPresetHandlers() {
             }
 
             const cloudPresets = response.data.presets;
-            console.log(`📋 Received ${cloudPresets.length} presets from cloud`);
+            logger.debug('presets', 'Received presets from cloud', { count: cloudPresets.length });
             
             const stats = {
                 fetched: cloudPresets.length,
@@ -137,7 +138,7 @@ export function registerPresetHandlers() {
                 });
                 logInfo('Cloud sync', `Preset uploaded: ${preset.name}`);
             } catch (syncError) {
-                console.warn('⚠️ Failed to sync preset to cloud (will retry later):', syncError);
+                logger.warn('presets', 'Failed to sync preset to cloud (will retry later)', { error: syncError instanceof Error ? syncError.message : String(syncError) });
             }
 
             return { success: true, preset };
@@ -176,7 +177,7 @@ export function registerPresetHandlers() {
                 });
                 logInfo('Cloud sync', `Preset updated: ${preset.name}`);
             } catch (syncError) {
-                console.warn('⚠️ Failed to update preset in cloud (will retry later):', syncError);
+                logger.warn('presets', 'Failed to update preset in cloud (will retry later)', { error: syncError instanceof Error ? syncError.message : String(syncError) });
             }
 
             return { success: true, preset };
@@ -198,10 +199,10 @@ export function registerPresetHandlers() {
                 where: { id }
             });
 
-            console.log(`✅ Deleted preset ${id} from local database (cloud unchanged)`);
+            logger.info('presets', 'Deleted preset from local database (cloud unchanged)', { id });
             return { success: true };
         } catch (error) {
-            console.error('Failed to delete preset', error);
+            logger.error('presets', 'Failed to delete preset', { error: error instanceof Error ? error.message : String(error) });
             return { success: false, error: String(error) };
         }
     });

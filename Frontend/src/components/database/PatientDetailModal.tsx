@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useUI } from '@/context/UIContext';
+import { useLogger } from '@/utils/logger';
 import type { DatabaseInvoice } from '@/types/database.types';
 import { InvoiceHistoryCard } from './InvoiceHistoryCard';
 import { ipcRenderer } from '@/lib/ipc';
@@ -15,7 +16,8 @@ export const PatientDetailModal = ({ invoices, onClose, onPrintInvoice }: Patien
   const [modalVisibleCount, setModalVisibleCount] = useState(5);
   const [showDeleteOptions, setShowDeleteOptions] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+  const log = useLogger();
+
   if (!invoices || invoices.length === 0) return null;
 
   const latest = invoices[0];
@@ -52,12 +54,12 @@ export const PatientDetailModal = ({ invoices, onClose, onPrintInvoice }: Patien
                       });
                       // Show partial errors if any
                       if (result.errors && result.errors.length > 0) {
-                          console.error('Delete errors:', result.errors);
+                          log.error('db', 'Patient delete partial errors', { errors: result.errors });
                       }
                   }
               } catch (error) {
                   showToast('error', 'Failed to invoke delete operation');
-                  console.error(error);
+                  log.error('db', 'Failed to invoke patient delete', { error: error instanceof Error ? error.message : String(error) });
               } finally {
                   setIsDeleting(false);
                   setShowDeleteOptions(false);

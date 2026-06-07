@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import { logger } from '../utils/logger';
 
 export function setupAutoUpdates() {
     const getWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
@@ -47,7 +48,7 @@ export function setupAutoUpdates() {
 
     // Skip auto-updates in development (but keep IPC handlers registered).
     if (!app.isPackaged) {
-        console.log('[AutoUpdate] Disabled (app not packaged)');
+        logger.debug('autoupdate', 'Disabled (app not packaged)');
         return;
     }
 
@@ -59,22 +60,22 @@ export function setupAutoUpdates() {
         autoUpdater.autoInstallOnAppQuit = true;
 
         autoUpdater.on('error', (err) => {
-            console.error('[AutoUpdate] error:', err);
+            logger.error('autoupdate', 'error', { message: err?.message ?? String(err) });
             sendUpdateStatus({ status: 'error', error: err?.message || 'Unknown error' });
         });
 
         autoUpdater.on('checking-for-update', () => {
-            console.log('[AutoUpdate] checking-for-update');
+            logger.debug('autoupdate', 'checking-for-update');
             sendUpdateStatus({ status: 'checking' });
         });
 
         autoUpdater.on('update-not-available', (info) => {
-            console.log('[AutoUpdate] update-not-available', { version: info?.version });
+            logger.debug('autoupdate', 'update-not-available', { version: info?.version });
             sendUpdateStatus({ status: 'not-available', version: info?.version });
         });
 
         autoUpdater.on('update-available', async (info) => {
-            console.log('[AutoUpdate] update-available', { version: info?.version });
+            logger.info('autoupdate', 'update-available', { version: info?.version });
             sendUpdateStatus({ status: 'available', version: info?.version });
             // Download starts automatically, no blocking dialog needed.
         });
@@ -94,7 +95,7 @@ export function setupAutoUpdates() {
                 win.setProgressBar(-1);
             }
 
-            console.log('[AutoUpdate] update-downloaded', { version: info?.version });
+            logger.info('autoupdate', 'update-downloaded', { version: info?.version });
             // Notify the frontend via IPC. The renderer will show a non-intrusive banner.
             sendUpdateStatus({ status: 'downloaded', version: info?.version });
             
@@ -110,7 +111,7 @@ export function setupAutoUpdates() {
                 await autoUpdater.checkForUpdates();
             } catch (err) {
                 // Most common while you're setting up releases: latest.yml isn't there yet.
-                console.warn(`[AutoUpdate] ${label} check failed:`, err);
+                logger.warn('autoupdate', `${label} check failed`, { error: err instanceof Error ? err.message : String(err) });
             }
         };
 
@@ -122,9 +123,9 @@ export function setupAutoUpdates() {
             void check('periodic');
         }, 60 * 60 * 1000);
 
-        console.log('[AutoUpdate] Configured successfully with electron-updater');
+        logger.info('autoupdate', 'Configured successfully with electron-updater');
     } catch (error) {
-        console.error('[AutoUpdate] Failed to setup:', error);
+        logger.error('autoupdate', 'Failed to setup', { error: error instanceof Error ? error.message : String(error) });
         // App will continue without auto-update functionality
     }
 }

@@ -1,6 +1,7 @@
 import { ipcMain, app, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import { logger } from '../utils/logger';
 
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 
@@ -16,7 +17,7 @@ function getSettings(): AppSettings {
             return JSON.parse(data);
         }
     } catch (error) {
-        console.error('Error reading settings:', error);
+        logger.error('settings', 'Error reading settings', { error: error instanceof Error ? error.message : String(error) });
     }
 
     // Default settings
@@ -30,7 +31,7 @@ function saveSettings(settings: AppSettings): void {
     try {
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
     } catch (error) {
-        console.error('Error saving settings:', error);
+        logger.error('settings', 'Error saving settings', { error: error instanceof Error ? error.message : String(error) });
     }
 }
 

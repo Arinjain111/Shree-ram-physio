@@ -370,6 +370,37 @@ Opens at http://localhost:5556 - view/edit local SQLite data with GUI
 - **Prisma Client** - Auto-generated after schema changes
 - **SQLite** - Embedded database (no server required)
 - **Electron** - Cross-platform desktop app
+- **Unified logging** - see [Logging](#logging) below
+
+## Logging
+
+Both the Electron main process and the React renderer share a single, structured logger surface:
+
+- **Main process:** `electron/utils/logger.ts` — `logger.debug|info|warn|error(context, message, fields?)`.
+  - Format: human-readable in development, JSON in production (`LOG_LEVEL=info` is the default in `production`).
+  - `forwardToRenderer: true` is on by default, so any `warn`/`error` is shipped to the renderer as a toast via the `app:log` IPC channel.
+  - `silentLogger` is a variant for hot paths that should never raise a toast.
+- **Renderer:** `src/utils/logger.ts` — exports both a static `logger` (usable from non-React modules) and a `useLogger()` hook (which always raises a toast for `warn`/`error` even before the bridge is wired).
+- **Bridge:** `src/components/ui/UILogBridge.tsx` is mounted inside `<UIProvider>`. It subscribes to `app:log` and exposes a `window.__uiBridge.showToast(level, context, message, fields)` shim so non-React code can raise toasts the same way.
+
+Sensitive keys (`password`, `token`, `apikey`, `api_key`, `x-api-key`) are redacted before logs are written.
+
+Example:
+
+```ts
+import { useLogger } from '@/utils/logger';
+
+function PaymentModal() {
+  const log = useLogger();
+  // ...
+  try {
+    await ipcRenderer.invoke('record-payment', ...);
+  } catch (e) {
+    log.error('payment', 'Payment failed', { error: e.message });
+    // ↑ this raises a toast in the UI
+  }
+}
+```
 
 ## Troubleshooting
 

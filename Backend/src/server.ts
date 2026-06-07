@@ -9,10 +9,13 @@ import syncRoutes from './routes/syncPrisma';
 import patientRoutes from './routes/patient';
 import invoiceRoutes from './routes/invoice';
 import treatmentPresetRoutes from './routes/treatmentPreset';
+import diagnosisRoutes from './routes/diagnosis';
 import resetRoutes from './routes/reset';
 import prisma from './lib/prisma';
 import { errorHandler } from './middleware/errorHandler';
+import { requestLogger } from './middleware/requestLogger';
 import { requireApiKey } from './middleware/auth';
+import { logger } from './utils/logger';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
@@ -29,6 +32,9 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Request access log (after body parsing so we can log safe body summaries)
+app.use(requestLogger);
 
 // Rate limiting with custom key generator for Azure App Service
 const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
@@ -77,6 +83,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/patients', requireApiKey, patientRoutes);
 app.use('/api/invoices', requireApiKey, invoiceRoutes);
 app.use('/api/presets', requireApiKey, treatmentPresetRoutes);
+app.use('/api/diagnosis', requireApiKey, diagnosisRoutes);
 app.use('/api/database', requireApiKey, resetRoutes);
 
 // Centralized error handler (must be after routes)
@@ -86,20 +93,19 @@ app.use(errorHandler);
 async function startServer() {
   // Start server immediately regardless of DB status
   app.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
-    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info('server', `Listening on port ${PORT}`, { env: process.env['NODE_ENV'] || 'development' });
   });
 
   try {
     // Test Prisma connection in background
-    const dbUrl = process.env.DATABASE_URL || 'NOT_SET';
-    console.log('🔄 Attempting to connect to Supabase through Prisma accelerate...');
-    console.log('📊 DATABASE_URL configured:', dbUrl.substring(0, 50) + '...');
+    const dbUrl = process.env['DATABASE_URL'] || 'NOT_SET';
+    logger.info('db', 'Connecting to database', { urlPrefix: dbUrl.substring(0, 50) + '...' });
     await prisma.$connect();
-    console.log('✅ Prisma connected to Supabase');
+    logger.info('db', 'Database connection established');
   } catch (error) {
-    console.error('⚠️  Database connection failed at startup (Server is still running):');
-    console.error(error instanceof Error ? error.message : error);
+    logger.error('db', 'Database connection failed at startup (server still listening)', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     // We do NOT exit the process, allowing the server to handle requests
     // Requests requiring DB will fail with 500s, which is expected behavior
   }
@@ -107,13 +113,13 @@ async function startServer() {
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('\nShutting down gracefully...');
+  logger.info('server', 'Received SIGINT, shutting down');
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('\nShutting down gracefully...');
+  logger.info('server', 'Received SIGTERM, shutting down');
   await prisma.$disconnect();
   process.exit(0);
 });

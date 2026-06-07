@@ -4,6 +4,7 @@ import { HashRouter } from 'react-router-dom';
 import { UIProvider } from '@/context/UIContext';
 import { LayoutProvider } from '@/context/LayoutContext';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
+import { logger } from '@/utils/logger';
 import App from './App';
 import './index.css'
 
@@ -24,13 +25,13 @@ window.onerror = function(message, source, lineno, colno, error) {
 
 // Check for electron integration (via preload script with contextIsolation)
 try {
-  console.log('Checking Electron Integration...');
+  logger.debug('boot', 'Checking Electron integration');
   if (!window.electronAPI) {
     throw new Error('window.electronAPI is not defined. Preload script not loaded?');
   }
-  console.log('Electron API available:', typeof window.electronAPI.invoke, typeof window.electronAPI.on);
+  logger.debug('boot', 'Electron API available', { invoke: typeof window.electronAPI.invoke, on: typeof window.electronAPI.on });
 } catch (e: any) {
-  console.error('Electron integration check failed:', e);
+  logger.error('boot', 'Electron integration check failed', { error: e?.message ?? String(e) });
   window.onerror(e.message, 'main.tsx', 0, 0, e);
 }
 
