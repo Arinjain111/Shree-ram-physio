@@ -124,6 +124,7 @@ export default function Finances() {
   const handlePayment = async () => {
     await refreshBilling();
     showToast('success', 'Payment recorded successfully');
+    ipcRenderer.invoke('sync-now').catch(() => {});
   };
 
   // Analytics

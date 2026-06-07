@@ -634,7 +634,7 @@ export function registerInvoiceHandlers() {
         if (correctStatus !== inv.paymentStatus) {
           await prisma.invoice.update({
             where: { id: inv.id },
-            data: { paymentStatus: correctStatus },
+            data: { paymentStatus: correctStatus, syncStatus: 'PENDING' },
           });
           inv.paymentStatus = correctStatus;
         }
