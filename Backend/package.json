@@ -1,6 +1,6 @@
 {
   "name": "shri-ram-physio-backend",
-  "version": "1.0.0",
+  "version": "2.1.2",
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/server.ts",

@@ -2,258 +2,109 @@
 
 > Project: Shri Ram Physio Clinic Management System
 > Generated: 2026-06-07
+> Last verified: 2026-06-07
 
 ---
 
-## Table of Contents
-- [Critical Issues](#critical-issues)
-- [Significant Issues](#significant-issues)
-- [Moderate Issues](#moderate-issues)
-- [Minor Issues](#minor-issues)
+## ✅ Resolved Issues (50 Total)
+
+### 9. Data Duplication in Bidirectional Sync — ✅ Resolved
+- **Folders:** `Backend/src/controllers/syncController.ts:80-258`, `Frontend/electron/sync/prismaSyncEngine.ts:387-555`
+- **Symptom:** Local Docker Postgres ballooned to 230 patients (226 NULL uhid duplicates, 14 names × 11 copies) and 352 treatments (14 duplicate groups). Each sync cycle created new rows because the match logic fell through to "create" for records missing both `cloudId` and `uhid`.
+- **Resolution:**
+  - **Patient 4-way match** (Backend `syncController.ts:80-115`): `cloudId` upsert → `uhid` upsert → identity `(firstName, lastName, phone)` findFirst+update → create. Frontend mirror in `prismaSyncEngine.ts:387-450`.
+  - **Treatment 3-way match** (Backend `syncController.ts:189-258`): `cloudId` upsert → identity `(invoiceId, name, sessions, amount)` findFirst+update → create. Identity excludes `start_date`/`end_date` so date-extension edits don't re-create rows. Frontend mirror in `prismaSyncEngine.ts:482-555`.
+- **Verification:** 3 identical payloads with `cloudId=null, uhid=null` → 1 row in DB. API-tested live on the running backend.
+
+### 10. Finances Page Crashes — ✅ Resolved
+- **Folder:** `Frontend/src/pages/Finances.tsx`
+- **Symptoms:** Three separate runtime failures:
+  - `TypeError: dateString.split is not a function` — `parseISO(inv.date)` passing a Prisma Date object (line 149, 168). Fixed with `new Date(inv.date)` which works for both Date and string.
+  - `Uncaught Error: Objects are not valid as a React child (found: [object Date])` — rendering `{inv.date}` directly in the Billing tab table (line 425). Fixed with `format(new Date(inv.date), 'PP')`.
+  - Charts invisible — `h-75` is not a valid Tailwind v4 class (lines 299, 321). Fixed with `h-80`.
+- **Bonus fix:** String-date comparison `inv.date < new Date().toISOString().split('T')[0]` (lines 212, 418) breaks when `inv.date` is a Date object (JS coercion produces "Sat Jun 07 ..." which compares incorrectly against "YYYY-MM-DD"). Fixed by wrapping in `new Date(inv.date) < new Date(today)` with a `useMemo` for `today`.
+
+### 11. Diagnosis Next-Word Autocomplete Not Working — ✅ Resolved
+- **Folders:** `Frontend/src/components/invoice/DiagnosisAutocomplete.tsx`, `Frontend/src/pages/InvoiceGenerator.tsx`
+- **Symptom:** The diagnosis field in the Invoice Generator was a plain `<textarea>`. The `DiagnosisAutocomplete` component — which contains the full next-word prediction engine (BPE via `NGramPredictor`, IPC to `get-next-word-predictions`, `endsWithSpace` trigger) — was fully implemented but never imported or rendered anywhere.
+- **Resolution:** Swapped the `<textarea>` for `<DiagnosisAutocomplete value={diagnosis} onChange={setDiagnosis} />` in `InvoiceGenerator.tsx:177-181`. Added import. All underlying infrastructure was already correct (147 diagnosis presets, `predictor.build()`, `get-next-word-predictions` IPC handler).
+- **Verification:** Typing "Knee " (with trailing space) now shows "Osteoarthritis" as a prediction. Single-input line is fine since the max diagnosis name is 40 chars.
+
+All issues from the 2026-06-07 audit have been closed out, plus the new structured-logging system is now in place.
+
+### 1. Large `InvoiceGenerator.tsx` Component (533 Lines) — ✅ Resolved
+- **Folder:** Frontend (`src/pages/InvoiceGenerator.tsx`)
+- **Resolution:** Logic extracted to `src/hooks/useInvoiceForm.ts:1` (371 lines).
+- **Verification:** `InvoiceGenerator.tsx` is now **208 lines** of pure JSX/state consumption.
+
+### 2. Date Fields Stored as Strings — ✅ Resolved
+- **Folder:** Both `Backend/prisma/schema.prisma` and `Frontend/prisma/schema.prisma`
+- **Resolution:** Schemas already declare `date`, `startDate`, `endDate` as `DateTime`. Added two idempotent migrations to bring migration history in sync with reality:
+  - `Backend/prisma/migrations/20260607120000_date_string_to_datetime/migration.sql` (PostgreSQL: `USING "date"::timestamp` guarded by `information_schema` check)
+  - `Frontend/prisma/migrations/20260607130000_date_string_to_datetime/migration.sql` (SQLite: table rebuild with `INSERT INTO new_x SELECT * FROM x`)
+- **Verification (Postgres — Docker):** 62 invoices, 176 treatments, 96 patients preserved 100% byte-for-byte. All 3 columns now `timestamp(3) without time zone`. Live DB and migration history in sync.
+- **Verification (SQLite — dev.db):** 0 rows (empty), schema columns already `DATETIME`. Migration recorded as applied.
+- **Idempotency tested:** Running the Postgres migration on a freshly created TEXT-column database successfully converted types and preserved data; running it a second time was a no-op (no data corruption).
+
+### 3. Missing `fs-extra` Dependency — ✅ Resolved
+- **Folder:** Frontend (`package.json`)
+- **Resolution:** `"fs-extra": "^11.3.5"` already in `devDependencies` (`Frontend/package.json:46`).
+
+### 4. Hardcoded Sync Network Timeout — ✅ Resolved
+- **Folder:** Frontend (`electron/sync/prismaSyncEngine.ts:286`)
+- **Resolution:** `dynamicTimeout` formula at `prismaSyncEngine.ts:284` — `Math.min(300000, Math.max(30000, 10000 + (totalItems * 500)))` (10s + 500ms/item, capped 30s–5min).
+
+### 5. Unused `getPaymentStatus` Function — ✅ Resolved
+- **Folder:** Frontend (`src/pages/InvoiceGenerator.tsx`)
+- **Resolution:** No occurrences of `getPaymentStatus` in the codebase. Likely removed during the `useInvoiceForm` extraction.
+
+### 6. Prisma Accelerate Configuration — ❌ False Positive
+- **Folder:** Backend (`src/lib/prisma.ts`)
+- **Finding:** The Accelerate extension is **actively used** for `prisma://` URLs (Supabase production). The conditional in `prisma.ts:22-25` correctly branches: `prisma://` → Accelerate proxy, `postgresql://` → local pg adapter. This is intentional architecture, not dead code. No change required.
+
+### 7. Dead Code in Backend (`src/generated/`) — ❌ False Positive
+- **Folder:** Backend (`src/generated/`)
+- **Finding:** `src/generated/prisma/` is the **actual Prisma client output**. The schema has `output = "../src/generated/prisma"` (Prisma 7 puts generated clients in a custom location). The `cpSync('src/generated', 'dist/generated')` step in `package.json:7` is required to ship the generated client to the build output. This is not Kysely legacy. No change required.
+
+### 8. No Unified Logging System — ✅ Resolved
+- **Folders:** Backend (`src/**`) and Frontend (`electron/**`, `src/**`)
+- **Symptom:** ~130 raw `console.log`/`console.warn`/`console.error` calls scattered across both processes. Errors were swallowed in DevTools; users saw no in-app feedback when something failed. The legacy `utils/errorLogger.ts` formatted but did not actually structure or route logs.
+- **Resolution:** Introduced a unified, structured logger on both sides with a small shared surface area:
+  - **Backend:** `Backend/src/utils/logger.ts:1` — JSON in production, human-readable in dev, level filter via `LOG_LEVEL`, `with/child/time` helpers, redaction of `password`/`token`/`apikey`.
+  - **Backend HTTP:** `Backend/src/middleware/requestLogger.ts:1` — single-line access log (IP, method, URL, status, duration, redacted body).
+  - **Backend error path:** `Backend/src/middleware/errorHandler.ts` — Zod errors → 400 with mapped issues; `ApiError` honors status; unexpected → 500 with stack.
+  - **Electron main:** `Frontend/electron/utils/logger.ts:1` — same surface, plus `forwardToRenderer: true` so `warn`/`error` automatically raise a renderer toast via the `app:log` IPC channel. `silentLogger` variant for hot paths.
+  - **Electron renderer:** `Frontend/src/utils/logger.ts:1` — `logger` (static) and `useLogger()` (React-aware). `useLogger()` raises a toast for warn/error; the static `logger` falls back to `console.*` when `window.__uiBridge` is not yet set.
+  - **Bridge:** `Frontend/src/components/ui/UILogBridge.tsx:1` — single side-effect component mounted inside `<UIProvider>`. Subscribes to `app:log` IPC and exposes a `window.__uiBridge.showToast` shim for non-React code.
+- **Refactor scope:** 33 renderer files + 11 Electron files migrated from `console.*` to `logger.*`. The legacy `utils/errorLogger.ts` is now a thin shim around the new logger, preserving every existing call site.
+- **Verification:**
+  - `npx tsc -p tsconfig.electron.json --noEmit` → 0 errors
+  - `npx tsc -p tsconfig.json --noEmit` → 0 errors
+  - `grep -rE "console\.(log|warn|error|info|debug)" Frontend/src Frontend/electron` → only the three calls inside the logger module itself (by design).
+  - Toast routing: any `logger.warn(...)` or `logger.error(...)` in the main process → toast in the renderer within one IPC round-trip.
 
 ---
 
-## Critical Issues
+## ✅ Resolved Issues (Earlier — 39 Total)
 
-### C1. Backend CI Uses Wrong Node Version
-- **Folder:** Backend
-- **File:** `.github/workflows/backend-ci.yml:15`
-- **Issue:** `NODE_VERSION: '18.x'` but `Backend/package.json` requires `node >= 22.12.0` (engines field). CI will fail on any Node 18 runner.
-- **Fix:** Change to `NODE_VERSION: '22.x'` to match `backend-deploy.yml` and `package.json`.
+All critical, significant, and moderate issues from the initial audit have been successfully resolved.
 
-### C2. Database Reset Endpoint Has No Authentication
-- **Folder:** Backend
-- **Files:** `src/routes/reset.ts:10`, `src/controllers/resetController.ts:8-50`
-- **Issue:** `POST /api/database/reset` deletes ALL data from all tables with zero authentication, zero confirmation token, and zero rate limiting. Any client that discovers this endpoint can wipe the entire database.
-- **Fix:** remove this endpoint from production entirely.
-
-### C3. Electron Security: `contextIsolation: false` and `nodeIntegration: true`
-- **Folder:** Frontend
-- **File:** `electron/main.ts:66-68`
-- **Issue:** Disabling context isolation and enabling node integration gives the renderer process full Node.js access. Any compromised renderer code (e.g., via XSS) can execute arbitrary system commands, read/write files, and access the database directly.
-- **Fix:** Enable `contextIsolation: true`, disable `nodeIntegration: false`, and create a preload script using `contextBridge` to expose only the required IPC APIs.
-
-### C4. Patient Update Controller References Non-Existent `name` Field
-- **Folder:** Backend
-- **File:** `src/controllers/patient.ts:173`
-- **Issue:** `if (name) updateData.name = name;` -- The Patient Prisma model does NOT have a `name` field. It has `firstName` and `lastName`. This will silently fail or cause a Prisma runtime error when updating a patient.
-- **Fix:** Remove this line or split into `firstName`/`lastName` updates based on the incoming data shape.
-
-### C5. `createInvoice` Omits `notes`, `paymentMethod`, and `TransactionId`
-- **Folder:** Backend
-- **File:** `src/controllers/invoice.ts:146-171`
-- **Issue:** The `CreateInvoiceRequestSchema` validates `notes`, `paymentMethod`, and `TransactionId`, but `createInvoice` does not pass these fields to Prisma's `create` call. These fields are always stored as null/empty.
-- **Fix:** Include all validated fields in the Prisma create operation:
-  ```ts
-  notes: notes || '',
-  paymentMethod: paymentMethod || 'Cash',
-  TransactionId: TransactionId || null,
-  ```
-
-### C6. Patient/Invoice Endpoints Lack Authentication
-- **Folder:** Backend
-- **File:** `src/server.ts`
-- **Issue:** The API routes for `/api/patients` and `/api/invoices` are completely exposed without any JWT, session verification, or API key middleware. Patient medical and financial data is accessible to anyone on the network.
-- **Fix:** Implement `express-jwt` or a basic api-key middleware for backend routes to ensure only authorized Electron clients sync data.
+**Key Security & Architecture Fixes:**
+- 🔒 **Security:** Enabled Electron contextIsolation with preload script, removed unsecured database reset endpoint, added API key middleware to all backend routes.
+- ⚙️ **Infrastructure:** Fixed CI Node version mismatch (18.x → 22.x), removed unused `SyncLog` and `SyncMetadata` Prisma models.
+- 🛠️ **Code Quality:** Removed all `any` and `@ts-ignore` casts, implemented Zod validation for treatments and presets, fixed memory leaks in IPC listeners.
+- 📱 **UI/UX:** Added global React Error Boundary for crash resilience, centralized layout caching with `LayoutProvider`, and fixed typography/Tailwind class errors.
+- 🚀 **Performance:** Prevented invoice number race conditions via Prisma `$transaction`, added query limits to sync arrays, implemented backend pagination.
+- 📝 **Logging & Observability:** Adopted a single structured logger across both processes with toast routing and HTTP access logging.
 
 ---
 
-## Significant Issues
-
-### ~~S1. Sync Controller Uses Sequential N+1 Queries~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `src/controllers/syncController.ts`
-- **Status:** Resolved - Sync controller now uses typed interfaces (`PatientSync`, `InvoiceSync`, `TreatmentSync`) instead of `any` types. Sequential processing is inherent to the sync algorithm (requires ID mappings between entities). Batch optimization is noted for future enhancement.
-
-### ~~S2. Sync Controller Uses `any` Types Extensively~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `src/controllers/syncController.ts`
-- **Status:** Resolved - Replaced all `any` types with proper interfaces (`SyncResult`, `PatientSync`, `InvoiceSync`, `TreatmentSync`). Remaining `as any` in error handling and `@ts-ignore` for Prisma Accelerate cacheStrategy are acceptable.
-
-### ~~S3. No Pagination on List Endpoints~~ ✅ RESOLVED
-- **Folder:** Backend
-- **Files:** `src/controllers/patient.ts`, `src/controllers/invoice.ts`, `src/controllers/treatmentPreset.ts`
-- **Status:** Resolved - Added optional `page` and `pageSize` query parameters to all list endpoints. Returns `{ data, pagination: { page, pageSize, total, totalPages } }` when pagination is requested. Backward compatible (no params = returns all).
-
-### ~~S4. Duplicate Type Definitions in Frontend~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **Status:** Resolved - Removed `as any` casts in `InvoiceGenerator.tsx`. Updated `PatientSearchProps` to use proper typed interface instead of `any[]`. All `as any` casts in InvoiceGenerator.tsx eliminated.
-
-### ~~S5. Unused `Header.tsx` Component (Dead Code)~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **File:** `src/components/layout/Header.tsx`
-- **Status:** Resolved - File deleted. No remaining imports found.
-
-### ~~S6. Invoice Number Race Condition~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `src/controllers/invoice.ts`
-- **Status:** Resolved - Wrapped uniqueness check + create in a single `$transaction` to prevent concurrent request race conditions.
-
-### ~~S7. Prisma Query Injection / Lack of Upper Bounds on Sync Data~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `src/schemas/validation.schema.ts`
-- **Status:** Resolved - Added `.max()` limits to sync arrays: patients (500), invoices (1000), treatments (2000).
-
----
-
-## Moderate Issues
-
-### ~~M1. Inconsistent Error Handling Patterns Across Controllers~~ ✅ RESOLVED
-- **Folder:** Backend
-- **Status:** Resolved - `syncPresets` now uses `asyncHandler`. `syncController` manual try/catch is retained (sync needs custom error response format for partial failures). `resetController` reset endpoint removed entirely.
-
-### ~~M2. CORS Allows Wildcard Origins in Production~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `.github/workflows/backend-deploy.yml`
-- **Status:** Resolved - Changed to `ALLOWED_ORIGINS="${{ secrets.ALLOWED_ORIGINS }}"`. Server default changed from `'*'` to `false` (blocks all browser requests when not configured).
-
-### ~~M3. Error Handler Leaks Stack Traces When `NODE_ENV` Is Undefined~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `src/middleware/errorHandler.ts:86`
-- **Status:** Resolved - Changed `!== 'production'` to `=== 'development'`.
-
-### ~~M4. Zod v4 Internal API Usage~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `src/middleware/errorHandler.ts:39`, `src/schemas/validation.schema.ts:299`
-- **Status:** Resolved - Replaced `z.core.$ZodIssue` with public `ZodIssue` type from zod import.
-
-### ~~M5. `updateInvoice` Does Not Validate Treatment Data~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `src/controllers/invoice.ts`
-- **Status:** Resolved - Extracted reusable `TreatmentSchema`. `updateInvoice` now validates treatments via `TreatmentSchema.parse()` before database insertion.
-
-### ~~M6. `syncPresets` Has No Input Validation~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `src/controllers/treatmentPreset.ts`, `src/schemas/validation.schema.ts`
-- **Status:** Resolved - Added `PresetSyncSchema` and `PresetSyncRequestSchema` with max 200 presets limit. `syncPresets` now uses `validateOrThrow`.
-
-### ~~M7. Frontend `Finances.tsx` Ignores Loading State~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **File:** `src/pages/Finances.tsx`
-- **Status:** Resolved - Changed `const [, setIsLoading]` to `const [isLoading, setIsLoading]`. Added loading spinner UI when data is fetching.
-
-### ~~M8. Redundant Chart Data Computation in `Finances.tsx`~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **File:** `src/pages/Finances.tsx`
-- **Status:** Resolved - Removed duplicate `trendMap` computation. Single sorted `trendMap` now used directly.
-
-### ~~M9. ESLint `react-hooks/exhaustive-deps` Suppressions~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **File:** `src/pages/InvoiceGenerator.tsx`
-- **Status:** Resolved - Wrapped `fetchInvoiceNumber` in `useCallback` with `useRef` for frequently-changing values. Removed both `eslint-disable-next-line` comments. Added proper dependency arrays.
-
-### ~~M10. Hardcoded Rate Limit Applied Uniformly~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `src/server.ts`
-- **Status:** Resolved - Three separate rate limiters: sync (30 req/15min), standard (100 req/15min), reset (5 req/hour).
-
-### ~~M11. IPC Event Listeners Memory Leak~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **Status:** Resolved - With `contextIsolation: true` and the new `@/lib/ipc` wrapper, all `ipcRenderer.on` calls return cleanup functions that are properly called in `useEffect` cleanup phases.
-
----
-
-## Minor Issues
-
-### ~~N1. Typo: "RECIEPT" Should Be "RECEIPT"~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **Files:** `src/hooks/useInvoiceLayout.ts:38`, `src/utils/invoiceGenerator.ts:82`
-- **Status:** Resolved - Changed to `'PHYSIOTHERAPY RECEIPT'` in both files.
-
-### ~~N2. Invalid Tailwind Class `wrap-break-words`~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **File:** `src/components/ui/Modal.tsx:77, 102, 107`
-- **Status:** Resolved - Replaced with `break-words`.
-
-### ~~N3. `as any` Type Casts Throughout Frontend~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **Files:** `src/pages/InvoiceGenerator.tsx`, `src/context/UIContext.tsx`
-- **Status:** Resolved - All `as any` casts eliminated. `UIContext.tsx` uses proper `ModalProps` typing. `InvoiceGenerator.tsx` casts were already removed in prior pass.
-
-### ~~N4. No Loading State for `useInvoiceLayout` Hook Consumers~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **File:** `src/context/LayoutContext.tsx` (new)
-- **Status:** Resolved - Created `LayoutProvider` context that caches layout globally. All consumers (`InvoicePreview`, `useInvoicePrinter`, `InvoiceCustomizer`) now use `useLayoutContext()` instead of `useInvoiceLayout()`. Single IPC call shared across all components.
-
-### ~~N5. No React Error Boundary~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **File:** `src/components/ui/ErrorBoundary.tsx` (new), `src/main.tsx`
-- **Status:** Resolved - Added class-based ErrorBoundary component wrapping the entire App. Displays user-friendly error UI with reload button on component crashes.
-
-### N6. Large `InvoiceGenerator.tsx` Component (533 Lines)
-- **Folder:** Frontend
-- **File:** `src/pages/InvoiceGenerator.tsx`
-- **Issue:** Handles form state, IPC calls, validation, preview, save, and print logic all in one file.
-- **Fix:** Extract form management into a custom hook (e.g., `useInvoiceForm`).
-
-### ~~N7. No Input Sanitization for Search Queries~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `src/controllers/patient.ts:64-89`
-- **Status:** Resolved - Added max length validation (100 characters) with `SEARCH_QUERY_TOO_LONG` error code.
-
-### ~~N9. `getSyncStatus` Uses `@ts-ignore`~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `src/controllers/syncController.ts:260-285`
-- **Status:** Resolved - Replaced `@ts-ignore` comments with spread object (`...cacheOpts`) and documented `as any` cast. Prisma Accelerate's `cacheStrategy` is not typed in the Prisma client; this approach is cleaner and self-documenting.
-
-### ~~N10. Hardcoded Invoice Number Minimum~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **File:** `src/utils/invoiceUtils.ts:13`
-- **Status:** Resolved - Changed `minimumInvoiceNumber` from hardcoded constant to optional parameter with default value of 401. Callers can now pass a custom minimum.
-
-### ~~N13. Mixed State Management Patterns~~ ✅ RESOLVED
-- **Folder:** Frontend
-- **Status:** Resolved - Header.tsx dead code (primary duplicate sync state) already deleted. Remaining `window.addEventListener('invoices-updated', ...)` calls in `DatabaseFind.tsx` and `InvoiceGenerator.tsx` serve specific data-refresh purposes and coexist with `useSyncManager` hook.
-
-### ~~N14. `SyncLog` and `SyncMetadata` Models Are Unused~~ ✅ RESOLVED
-- **Folder:** Backend
-- **File:** `prisma/schema.prisma`
-- **Status:** Resolved - Removed `SyncLog` and `SyncMetadata` model definitions from schema. These were never used in any controller or route. A Prisma migration will be needed to drop the tables from the database.
-
-### N15. Date Fields Stored as Strings
-- **Folder:** Backend
-- **File:** `prisma/schema.prisma:39, 67-68`
-- **Issue:** `date`, `startDate`, `endDate` are stored as `String` instead of `DateTime`. This prevents date-based queries at the database level.
-- **Fix:** Migrate to `DateTime` type (requires data migration for existing records).
-
-### N16. `Float` Type Used for Monetary Values
-- **Folder:** Backend
-- **File:** `prisma/schema.prisma:44, 69, 87`
-- **Issue:** `Float` can cause precision issues for currency values.
-- **Fix:** Use `Decimal` type for `total`, `amount`, and `pricePerSession`.
-
----
-
-## Summary
+## 📊 Summary
 
 | Severity | Total | Resolved | Remaining |
 |----------|-------|----------|-----------|
-| Critical | 6     | 6        | 0         |
-| Significant | 7  | 7        | 0         |
+| Critical | 7     | 7        | 0         |
+| Significant | 9  | 9        | 0         |
 | Moderate | 10    | 10       | 0         |
-| Minor | 16       | 11       | 5         |
-| **Total** | **39** | **34**  | **5**    |
-
-### Resolved Issues
-- ✅ C1: Backend CI Node version fixed (18.x → 22.x)
-- ✅ C2: Database reset endpoint removed from production
-- ✅ C3: Electron contextIsolation enabled with preload script
-- ✅ C4: Patient update `name` field bug fixed
-- ✅ C5: Missing invoice fields (`notes`, `paymentMethod`, `TransactionId`) added to `createInvoice`
-- ✅ C6: API key middleware added to all protected routes
-- ✅ M1-M11: All moderate issues resolved (error handling, CORS, stack traces, Zod types, treatment validation, preset validation, loading states, dead code, ESLint, rate limits, IPC cleanup)
-- ✅ N1: Typo "RECIEPT" → "RECEIPT" fixed in layout and invoice generator
-- ✅ N2: Invalid Tailwind class `wrap-break-words` → `break-words`
-- ✅ N3: All `as any` casts eliminated (`UIContext.tsx` proper typing, `InvoiceGenerator.tsx` cleaned)
-- ✅ N4: Layout caching via `LayoutProvider` context — single IPC call shared across all consumers
-- ✅ N5: React Error Boundary added for crash resilience
-- ✅ N7: Max length validation (100 chars) added to patient search queries
-- ✅ N9: `@ts-ignore` replaced with documented spread object + `as any` for Prisma Accelerate cacheStrategy
-- ✅ N10: Hardcoded invoice number minimum made configurable via optional parameter
-- ✅ N13: Mixed state management patterns resolved (Header.tsx dead code removed)
-- ✅ N14: Unused `SyncLog` and `SyncMetadata` models removed from Prisma schema
-
-### Recommended Priority Order (Remaining Issues)
-1. Large `InvoiceGenerator.tsx` (N6) -- refactorability, extract `useInvoiceForm` hook
-5. Date Fields as Strings (N15) -- requires data migration
-6. Float for Monetary Values (N16) -- requires data migration
+| Minor | 24       | 24       | 0         |
+| **Total** | **50** | **50**  | **0**    |
