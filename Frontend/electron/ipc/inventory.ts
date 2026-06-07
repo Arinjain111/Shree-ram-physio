@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { getPrismaClient } from '../database/prisma';
 import { logger as log } from '../utils/logger';
+import { getCached, setCache, clearCache } from '../utils/readCache';
 
 let AddInventoryItemSchema: any;
 let UpdateInventoryItemSchema: any;
@@ -25,10 +26,14 @@ export function registerInventoryHandlers() {
 
   ipcMain.handle('get-inventory-items', async () => {
     try {
+      const cached = getCached('inventory-items');
+      if (cached) return cached;
       const items = await prisma.inventoryItem.findMany({
         orderBy: { name: 'asc' }
       });
-      return { success: true, items };
+      const result = { success: true as const, items };
+      setCache('inventory-items', result);
+      return result;
     } catch (error) {
       log.error('inventory', 'Failed to fetch inventory items', { error: error instanceof Error ? error.message : String(error) });
       return { success: false, error: 'Failed to fetch inventory items' };
@@ -52,6 +57,7 @@ export function registerInventoryHandlers() {
           stock: 0,
         }
       });
+      clearCache('inventory');
       return { success: true, item };
     } catch (error) {
       log.error('inventory', 'Failed to add inventory item', { error: error instanceof Error ? error.message : String(error) });
@@ -79,6 +85,7 @@ export function registerInventoryHandlers() {
           sellingPrice,
         }
       });
+      clearCache('inventory');
       return { success: true, item };
     } catch (error) {
       log.error('inventory', 'Failed to update inventory item', { error: error instanceof Error ? error.message : String(error) });
@@ -114,6 +121,7 @@ export function registerInventoryHandlers() {
         return { item, transaction };
       });
 
+      clearCache('inventory');
       return { success: true, ...result };
     } catch (error) {
       log.error('inventory', 'Failed to record purchase', { error: error instanceof Error ? error.message : String(error) });
@@ -154,6 +162,7 @@ export function registerInventoryHandlers() {
         return { item: updatedItem, transaction };
       });
 
+      clearCache('inventory');
       return { success: true, ...result };
     } catch (error) {
       log.error('inventory', 'Failed to record sale', { error: error instanceof Error ? error.message : String(error) });
@@ -164,14 +173,17 @@ export function registerInventoryHandlers() {
   ipcMain.handle('get-inventory-transactions', async (_, limit: unknown = 100) => {
     try {
       const take = typeof limit === 'number' && limit > 0 ? Math.min(Number(limit), 5000) : 100;
+      const cacheKey = `inv-txns:${take}`;
+      const cached = getCached(cacheKey);
+      if (cached) return cached;
       const transactions = await prisma.inventoryTransaction.findMany({
         orderBy: { date: 'desc' },
         take,
-        include: {
-          item: true
-        }
+        include: { item: true }
       });
-      return { success: true, transactions };
+      const result = { success: true as const, transactions };
+      setCache(cacheKey, result);
+      return result;
     } catch (error) {
       log.error('inventory', 'Failed to fetch inventory transactions', { error: error instanceof Error ? error.message : String(error) });
       return { success: false, error: 'Failed to fetch inventory transactions' };

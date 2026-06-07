@@ -3,12 +3,14 @@ import { PrismaClient } from '@prisma/client';
 import { getPrismaClient } from '../database/prisma';
 import { BrowserWindow } from 'electron';
 import { logger } from '../utils/logger';
+import { clearAllCache } from '../utils/readCache';
 
 export class PrismaSyncEngine {
   private prisma: PrismaClient;
   private backendUrl: string;
   private syncInterval: NodeJS.Timeout | null = null;
   private isSyncing: boolean = false;
+  private pendingSync: boolean = false;
 
   // Azure App Service can cold-start; keep these >5s.
   private static readonly HEALTH_TIMEOUT_MS = 15_000;
@@ -38,12 +40,8 @@ export class PrismaSyncEngine {
       return;
     }
 
-    logger.info('sync', 'Auto-sync started', { intervalMinutes: intervalMs / 60000 });
+    logger.debug('sync', 'Auto-sync started', { intervalMinutes: intervalMs / 60000 });
 
-    // Sync immediately on start
-    this.performSync().catch((err) => logger.error('sync', 'Initial sync failed', { error: String(err) }));
-
-    // Then sync at intervals
     this.syncInterval = setInterval(() => {
       this.performSync().catch((err) => logger.error('sync', 'Interval sync failed', { error: String(err) }));
     }, intervalMs);
@@ -133,7 +131,9 @@ export class PrismaSyncEngine {
    */
   async performSync(force: boolean = false): Promise<{ success: boolean; message: string; lastSyncTime?: string; errors?: string[]; stats?: any }> {
     if (this.isSyncing) {
-      return { success: false, message: 'Sync already in progress' };
+      if (!force) { this.pendingSync = true; }
+      logger.debug('sync', 'Skipped — sync already in progress', { queued: !force });
+      return { success: true, message: !force ? 'Sync queued' : 'Sync already in progress' };
     }
 
     this.isSyncing = true;
@@ -153,7 +153,7 @@ export class PrismaSyncEngine {
       }
 
       if (!check.shouldSync) {
-        logger.info('sync', `Skipping: ${check.message}`);
+        logger.debug('sync', `Skipping: ${check.message}`);
         return {
           success: true,
           message: check.message || 'Skipped',
@@ -190,7 +190,7 @@ export class PrismaSyncEngine {
         include: { item: true }
       });
 
-      logger.info('sync', 'Pending items to upload', {
+      logger.debug('sync', 'Pending items to upload', {
         patients: pendingPatients.length,
         invoices: pendingInvoices.length,
         treatments: pendingTreatments.length,
@@ -410,14 +410,14 @@ export class PrismaSyncEngine {
       }
 
       // === APPLY CLOUD UPDATES ===
-      logger.info('sync', 'Applying cloud updates', {
+      logger.debug('sync', 'Applying cloud updates', {
         patients: updates.patients?.length || 0,
         invoices: updates.invoices?.length || 0,
         treatments: updates.treatments?.length || 0,
       });
 
       if ((updates.patients?.length || 0) === 0 && (updates.invoices?.length || 0) === 0 && (updates.treatments?.length || 0) === 0) {
-        logger.warn('sync', 'Backend returned zero updates - cloud may be empty or sync endpoint issue');
+        logger.debug('sync', 'Backend returned zero updates — cloud may be empty or sync endpoint issue');
       }
 
       // Apply patient updates from cloud
@@ -894,6 +894,7 @@ export class PrismaSyncEngine {
       const totalUploaded = synced.patients.length + synced.invoices.length + synced.treatments.length
         + (synced.inventoryItems?.length || 0) + (synced.inventoryTransactions?.length || 0);
 
+      clearAllCache();
       logger.info('sync', 'Sync completed', {
         uploaded: { total: totalUploaded, patients: synced.patients.length, invoices: synced.invoices.length, treatments: synced.treatments.length, inventoryItems: synced.inventoryItems?.length || 0, inventoryTransactions: synced.inventoryTransactions?.length || 0 },
         downloaded: { total: totalDownloaded, patients: updates.patients?.length || 0, invoices: updates.invoices?.length || 0, treatments: updates.treatments?.length || 0, inventoryItems: updates.inventoryItems?.length || 0, inventoryTransactions: updates.inventoryTransactions?.length || 0 },
@@ -949,6 +950,11 @@ export class PrismaSyncEngine {
       };
     } finally {
       this.isSyncing = false;
+      if (this.pendingSync) {
+        this.pendingSync = false;
+        logger.debug('sync', 'Running queued sync');
+        this.performSync().catch(() => {});
+      }
     }
   }
 
@@ -985,6 +991,11 @@ export class PrismaSyncEngine {
 
     return {
       pendingChanges: pendingCount.reduce((a, b) => a + b, 0),
+      patients: pendingCount[0],
+      invoices: pendingCount[1],
+      treatments: pendingCount[2],
+      inventoryItems: pendingCount[3],
+      inventoryTransactions: pendingCount[4],
       lastSync: lastSync?.createdAt || null,
       lastSyncStatus: lastSync?.status || 'never',
       isSyncing: this.isSyncing

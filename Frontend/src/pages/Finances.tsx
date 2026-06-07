@@ -257,6 +257,14 @@ export default function Finances() {
     return { currentMetrics: currentM, previousMetrics: previousM, chartData: finalChartData };
   }, [invoices, inventoryTransactions, startDate, endDate, preset]);
 
+  const cashFlow = useMemo(() => {
+    const invs = invoices.filter(inv => { const d = new Date(inv.date); return isValid(d) && d >= startOfDay(startDate) && d <= endOfDay(endDate); });
+    const totalInvoiced = invs.reduce((s, i) => s + Number(i.total || 0), 0);
+    const totalCollected = invs.reduce((s, i) => s + Number(i.amountPaid || 0), 0);
+    const rate = totalInvoiced > 0 ? Number(((totalCollected / totalInvoiced) * 100).toFixed(1)) : 0;
+    return { totalInvoiced, totalCollected, outstanding: totalInvoiced - totalCollected, rate };
+  }, [invoices, startDate, endDate]);
+
   const renderMetricCard = (title: string, current: number, previous: number, isCurrency: boolean = false) => {
     const diff = current - previous;
     const percentChange = previous === 0 ? (current > 0 ? 100 : 0) : (diff / previous) * 100;
@@ -424,36 +432,22 @@ export default function Finances() {
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h3 className="text-lg font-semibold text-slate-800 mb-4">Cash Flow Summary</h3>
                 <div className="space-y-3">
-                  {(() => {
-                    const totalInvoiced = invoices.filter(inv => {
-                      const d = new Date(inv.date);
-                      return isValid(d) && d >= startOfDay(startDate) && d <= endOfDay(endDate);
-                    }).reduce((s, i) => s + Number(i.total || 0), 0);
-                    const totalCollected = invoices.filter(inv => {
-                      const d = new Date(inv.date);
-                      return isValid(d) && d >= startOfDay(startDate) && d <= endOfDay(endDate);
-                    }).reduce((s, i) => s + Number(i.amountPaid || 0), 0);
-                    const rate = totalInvoiced > 0 ? ((totalCollected / totalInvoiced) * 100).toFixed(1) : '0';
-                    const outstanding = totalInvoiced - totalCollected;
-                    return (<>
-                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                        <span className="text-sm text-slate-500">Total Invoiced</span>
-                        <span className="text-sm font-semibold text-slate-800">₹{totalInvoiced.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                        <span className="text-sm text-slate-500">Total Collected</span>
-                        <span className="text-sm font-semibold text-emerald-600">₹{totalCollected.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                        <span className="text-sm text-slate-500">Still Outstanding</span>
-                        <span className="text-sm font-semibold text-rose-600">₹{outstanding.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-sm text-slate-500">Collection Rate</span>
-                        <span className={`text-sm font-semibold ${Number(rate) >= 80 ? 'text-emerald-600' : Number(rate) >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{rate}%</span>
-                      </div>
-                    </>);
-                  })()}
+                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                    <span className="text-sm text-slate-500">Total Invoiced</span>
+                    <span className="text-sm font-semibold text-slate-800">₹{cashFlow.totalInvoiced.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                    <span className="text-sm text-slate-500">Total Collected</span>
+                    <span className="text-sm font-semibold text-emerald-600">₹{cashFlow.totalCollected.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                    <span className="text-sm text-slate-500">Still Outstanding</span>
+                    <span className="text-sm font-semibold text-rose-600">₹{cashFlow.outstanding.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm text-slate-500">Collection Rate</span>
+                    <span className={`text-sm font-semibold ${cashFlow.rate >= 80 ? 'text-emerald-600' : cashFlow.rate >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{cashFlow.rate}%</span>
+                  </div>
                 </div>
               </div>
             </div>

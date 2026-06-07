@@ -148,22 +148,41 @@ export default function Reports() {
     return weeks.map(w => ({ date: format(w, 'MMM dd'), visits: map.get(format(w, 'yyyy-ww')) || 0 }));
   }, [filteredInvoices, startDate, endDate]);
 
-  // Weekly summary table
+  // Weekly summary table — single-pass bucketing instead of O(n*m) nested filter
   const weeklySummary = useMemo(() => {
     const weeks = eachWeekOfInterval({ start: startDate, end: endDate });
-    return weeks.map(w => {
+    const weekKeys = weeks.map(w => format(startOfWeek(w, { weekStartsOn: 1 }), 'yyyy-ww'));
+    const buckets: { revenue: number; expenses: number; patients: Set<string>; count: number }[] = weeks.map(() => ({ revenue: 0, expenses: 0, patients: new Set(), count: 0 }));
+
+    const getWeekIdx = (d: Date) => {
+      const key = format(startOfWeek(d, { weekStartsOn: 1 }), 'yyyy-ww');
+      return weekKeys.indexOf(key);
+    };
+
+    for (const inv of filteredInvoices) {
+      const d = new Date(inv.date);
+      if (!isValid(d)) continue;
+      const idx = getWeekIdx(d);
+      if (idx < 0) continue;
+      buckets[idx].revenue += Number(inv.total) || 0;
+      buckets[idx].count += 1;
+      buckets[idx].patients.add(`${inv.patient?.id || ''}|${inv.patient?.firstName}|${inv.patient?.lastName}`);
+    }
+
+    for (const t of filteredTxns) {
+      const d = new Date(t.date);
+      if (!isValid(d)) continue;
+      const idx = getWeekIdx(d);
+      if (idx < 0) continue;
+      if (t.type === 'SALE') buckets[idx].revenue += Number(t.totalAmount) || 0;
+      if (t.type === 'PURCHASE') buckets[idx].expenses += Number(t.totalAmount) || 0;
+    }
+
+    return weeks.map((w, i) => {
+      const b = buckets[i];
       const ws = startOfWeek(w, { weekStartsOn: 1 });
       const we = endOfWeek(w, { weekStartsOn: 1 });
-      const invs = filteredInvoices.filter(i => {
-        const d = new Date(i.date); return isValid(d) && d >= ws && d <= we;
-      });
-      const txns = filteredTxns.filter(t => {
-        const d = new Date(t.date); return isValid(d) && d >= ws && d <= we;
-      });
-      const rev = invs.reduce((s, i) => s + (Number(i.total) || 0), 0) + txns.filter(t => t.type === 'SALE').reduce((s, t) => s + (Number(t.totalAmount) || 0), 0);
-      const exp = txns.filter(t => t.type === 'PURCHASE').reduce((s, t) => s + (Number(t.totalAmount) || 0), 0);
-      const patients = new Set(invs.map(i => i.patient?.id || `${i.patient?.firstName} ${i.patient?.lastName}`)).size;
-      return { week: `${format(ws, 'MMM dd')} - ${format(we, 'MMM dd')}`, revenue: rev, expenses: exp, profit: rev - exp, patients, invoices: invs.length };
+      return { week: `${format(ws, 'MMM dd')} - ${format(we, 'MMM dd')}`, revenue: b.revenue, expenses: b.expenses, profit: b.revenue - b.expenses, patients: b.patients.size, invoices: b.count };
     });
   }, [filteredInvoices, filteredTxns, startDate, endDate]);
 

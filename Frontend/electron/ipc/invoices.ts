@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import { getPrismaClient } from '../database/prisma';
 import { logError, logWarning } from '../utils/errorLogger';
 import { logger } from '../utils/logger';
+import { getCached, setCache, clearCache } from '../utils/readCache';
 import axios from '../services/http'
 import { getBackendUrl } from '../config/backend';
 
@@ -142,6 +143,7 @@ export function registerInvoiceHandlers() {
         });
       }
 
+      clearCache('invoices');
       return { success: true, invoiceId: invoice.id };
     } catch (error) {
       logError('Save invoice', error);
@@ -151,6 +153,9 @@ export function registerInvoiceHandlers() {
 
   ipcMain.handle('load-invoices', async (_event, options?: { page?: number; pageSize?: number }) => {
     try {
+      const cacheKey = `invoices:${options?.page || 0}:${options?.pageSize || 0}`;
+      const cached = getCached(cacheKey);
+      if (cached) return cached;
       if (!prisma) {
         throw new Error('Prisma not initialized');
       }
@@ -211,14 +216,16 @@ export function registerInvoiceHandlers() {
         lastSyncAt: invoice.lastSyncAt
       }));
 
-      return {
-        success: true,
+      const result = {
+        success: true as const,
         invoices: formattedInvoices,
         total,
         page: page ?? 1,
         pageSize: pageSize ?? total,
         totalPages: pageSize ? Math.ceil(total / pageSize) : 1,
       };
+      setCache(cacheKey, result);
+      return result;
     } catch (error) {
       logError('Load invoices', error);
       return { success: false, error: String(error) };
@@ -382,6 +389,7 @@ export function registerInvoiceHandlers() {
         }
       });
 
+      clearCache('invoices');
       return { success: true, invoiceId };
     } catch (error) {
       logError('Update invoice', error);
@@ -604,6 +612,7 @@ export function registerInvoiceHandlers() {
         },
       });
 
+      clearCache('invoices');
       return { success: true, amountPaid: newAmountPaid, paymentStatus: newStatus };
     } catch (error) {
       logError('Record payment', error);
@@ -621,7 +630,8 @@ export function registerInvoiceHandlers() {
         orderBy: { createdAt: 'desc' },
       });
 
-      for (const inv of allInvoices) {
+      // Compute corrected payment status in-memory only (no DB writes during reads)
+      const withCorrectedStatus = allInvoices.map(inv => {
         const amountDue = inv.total - inv.amountPaid;
         const isOverdue = amountDue > 0 && new Date(inv.date).toISOString().split('T')[0] < today;
         const correctStatus = isOverdue
@@ -631,24 +641,16 @@ export function registerInvoiceHandlers() {
             : inv.amountPaid > 0
               ? 'partial'
               : 'unpaid';
-        if (correctStatus !== inv.paymentStatus) {
-          await prisma.invoice.update({
-            where: { id: inv.id },
-            data: { paymentStatus: correctStatus, syncStatus: 'PENDING' },
-          });
-          inv.paymentStatus = correctStatus;
-        }
-      }
+        return { ...inv, paymentStatus: correctStatus };
+      });
 
-      const outdated = new Date();
-      outdated.setDate(outdated.getDate() - 30);
-      const overdueInvoices = allInvoices.filter(
+      const overdueInvoices = withCorrectedStatus.filter(
         i => (i.paymentStatus === 'unpaid' || i.paymentStatus === 'partial' || i.paymentStatus === 'overdue')
           && new Date(i.date).toISOString().split('T')[0] < today
           && (i.total - i.amountPaid) > 0
       );
 
-      const formatted = allInvoices.map(inv => ({
+      const formatted = withCorrectedStatus.map(inv => ({
         id: inv.id,
         invoiceNumber: inv.invoiceNumber,
         date: inv.date,

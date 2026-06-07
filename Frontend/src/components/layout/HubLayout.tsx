@@ -18,7 +18,7 @@ export default function HubLayout({ tabs }: HubLayoutProps) {
     <div className="min-h-full flex flex-col relative animate-in fade-in duration-500">
       
       {/* Unified Full-Width Top Navigation Bar */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-white/70 backdrop-blur-2xl border-b border-white/60 shadow-xs px-4 sm:px-6 py-3 flex items-center justify-between">
+      <div className="fixed top-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-md border-b border-white/60 shadow-xs px-4 sm:px-6 py-3 flex items-center justify-between">
         
         {/* LEFT: PageHeader Title Portal Target */}
         <div id="page-header-left" className="flex items-center gap-4 flex-1 min-w-[200px]">

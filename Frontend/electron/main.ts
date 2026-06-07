@@ -181,6 +181,8 @@ app.whenReady().then(async () => {
 
   // Start auto-sync (every 5 minutes)
   syncEngine.startAutoSync();
+  // Run an initial sync on startup
+  syncEngine.performSync().catch(() => {});
 
   // Register IPC handlers
   registerIpcHandlers(syncEngine);
@@ -189,21 +191,25 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', async (event) => {
-  // Prevent default quit to do cleanup first
-  // We check for syncEngine existence, but also just cleanup regardless to be safe
   if (syncEngine || getPrismaClient()) {
     event.preventDefault();
 
-    // Stop sync engine
+    // Run a last-chance sync to push any pending changes before closing
     if (syncEngine) {
+      try {
+        logger.info('app', 'Running shutdown sync...');
+        const result = await syncEngine.performSync(true);
+        logger.info('app', 'Shutdown sync finished', { result: result.message });
+      } catch (e) {
+        logger.warn('app', 'Shutdown sync failed, closing anyway', {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
       syncEngine.stopAutoSync();
       syncEngine = null;
     }
 
-    // Disconnect Prisma
     await disconnectPrisma();
-
-    // Force quit after cleanup
     setImmediate(() => app.exit(0));
   }
 });

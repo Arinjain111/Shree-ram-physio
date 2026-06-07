@@ -21,9 +21,24 @@ const Settings = () => {
   const [autoSaveInvoicePdf, setAutoSaveInvoicePdf] = useState(true);
   const [loading, setLoading] = useState(true);
   const [isFullSyncing, setIsFullSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ pendingChanges: number; lastSync: string | null; isSyncing: boolean } | null>(null);
   const { status, checkForUpdates } = useAutoUpdater();
 
   useEffect(() => { loadSettings(); }, []);
+
+  const loadSyncStatus = async () => {
+    try {
+      const r = await ipcRenderer.invoke('get-sync-status');
+      if (r?.success && r.status) setSyncStatus(r.status);
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadSyncStatus();
+    if (activeCategory !== 'sync') return;
+    const interval = setInterval(loadSyncStatus, 10000);
+    return () => clearInterval(interval);
+  }, [activeCategory]);
 
   useEffect(() => {
     if (status === 'checking') showToast('info', 'Checking for updates, please wait...');
@@ -246,6 +261,49 @@ const Settings = () => {
               {/* Category: SYNC */}
               {activeCategory === 'sync' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  {/* Sync Workflow Indicator */}
+                  <div className="p-6 rounded-2xl border border-slate-100 bg-white shadow-xs">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-sm font-medium text-slate-800">Sync Status</h4>
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${syncStatus?.isSyncing ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                        <span className={`w-2 h-2 rounded-full ${syncStatus?.isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                        {syncStatus?.isSyncing ? 'Syncing...' : 'Idle'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div className="bg-slate-50 rounded-xl p-3">
+                        <p className="text-xs text-slate-500">Pending Changes</p>
+                        <p className="text-xl font-bold text-amber-600">{syncStatus?.pendingChanges ?? '---'}</p>
+                      </div>
+                      <div className="bg-slate-50 rounded-xl p-3">
+                        <p className="text-xs text-slate-500">Last Sync</p>
+                        <p className="text-sm font-semibold text-slate-700">{syncStatus?.lastSync ? new Date(syncStatus.lastSync).toLocaleString() : 'Never'}</p>
+                      </div>
+                    </div>
+                    <div className="border-t border-slate-100 pt-3">
+                      <p className="text-xs text-slate-500 mb-2">Sync Progress</p>
+                      <div className="space-y-1.5">
+                        {[
+                          { label: 'Patients', key: 'patients' as const },
+                          { label: 'Invoices', key: 'invoices' as const },
+                          { label: 'Treatments', key: 'treatments' as const },
+                          { label: 'Inventory Items', key: 'inventoryItems' as const },
+                          { label: 'Inv. Transactions', key: 'inventoryTransactions' as const },
+                        ].map(row => {
+                          const count = (syncStatus as any)?.[row.key] ?? undefined;
+                          return (
+                            <div key={row.label} className="flex items-center justify-between text-xs">
+                              <span className="text-slate-600">{row.label}</span>
+                              <span className={`font-medium ${count > 0 ? 'text-amber-600' : count === 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                {count !== undefined ? (count > 0 ? `${count} pending` : 'Synced') : '---'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="p-6 rounded-2xl border border-slate-100 bg-white shadow-xs">
                     <h4 className="text-sm font-medium text-slate-800 mb-2">Force Full Sync</h4>
                     <p className="text-xs text-slate-500 mb-6 max-w-md leading-relaxed">

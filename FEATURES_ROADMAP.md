@@ -118,6 +118,7 @@
 - ⬜ Credit/Debit notes
 - ✅ Expense tracking (clinic expenses by category with amounts and notes)
 - ✅ Profit/Loss statements
+- ✅ Sync status dashboard (per-table pending counts, last sync time, idle/syncing indicators in Settings)
 - ⬜ Tax reports
 
 ### Inventory Management

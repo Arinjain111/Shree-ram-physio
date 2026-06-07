@@ -22,11 +22,11 @@ const LEVEL_RANK: Record<LogLevel, number> = {
   silent: 100,
 };
 
-const LEVEL_EMOJI: Record<LogLevel, string> = {
-  debug: '·',
-  info: 'ℹ',
-  warn: '⚠',
-  error: '✖',
+const LEVEL_TAG: Record<LogLevel, string> = {
+  debug:  'DBG',
+  info:   'INF',
+  warn:   'WRN',
+  error:  'ERR',
   silent: '',
 };
 
@@ -79,11 +79,11 @@ function makeLogger(opts: LoggerOptions): Logger {
     if (LEVEL_RANK[recordLevel] < threshold) return;
 
     const merged: LogFields = { ...baseFields, ...(fields || {}) };
-    const emoji = LEVEL_EMOJI[recordLevel];
+    const tag = LEVEL_TAG[recordLevel];
     const ctxStr = context ? `[${context}]` : '';
     const fieldsStr = merged && Object.keys(merged).length ? ' ' + safeStringify(merged) : '';
 
-    const line = `${timestamp()} ${emoji} ${ctxStr} ${message}${fieldsStr}`;
+    const line = `${timestamp()} [${tag}] ${ctxStr} ${message}${fieldsStr}`;
 
     if (recordLevel === 'error') {
       console.error(line);
