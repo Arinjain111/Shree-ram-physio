@@ -410,6 +410,13 @@ export const RecordSaleSchema = z.object({
 
 export type RecordSaleInput = z.infer<typeof RecordSaleSchema>;
 
+export const AddExpenseSchema = z.object({
+  category: z.string().min(1, 'Category is required').max(100),
+  amount: z.number().min(0.01, 'Amount must be at least 0.01'),
+  date: z.string().optional(),
+  notes: z.string().max(500).nullish(),
+});
+
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================

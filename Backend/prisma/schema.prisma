@@ -186,3 +186,16 @@ model TreatmentSession {
   @@map("treatment_sessions")
   @@index([treatmentId])
 }
+
+model Expense {
+  id         Int       @id @default(autoincrement())
+  category   String
+  amount     Float
+  date       DateTime  @default(now())
+  notes      String?
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@map("expenses")
+}

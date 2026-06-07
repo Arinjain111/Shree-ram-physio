@@ -61,10 +61,13 @@ const statusLabels: Record<string, string> = {
 
 type StatusTab = 'all' | 'unpaid' | 'partial' | 'paid' | 'overdue';
 
+interface ExpenseItem { id: number; category: string; amount: number; date: string; notes?: string; }
+
 export default function Finances() {
   const { showToast } = useUI();
   const [invoices, setInvoices] = useState<DatabaseInvoice[]>([]);
   const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const log = useLogger();
@@ -83,18 +86,26 @@ export default function Finances() {
     invoiceId: number; patientName: string; invoiceNumber: string; total: number; amountPaid: number
   } | null>(null);
 
+  // Expense form
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [expCat, setExpCat] = useState('Rent');
+  const [expAmt, setExpAmt] = useState(0);
+  const [expNotes, setExpNotes] = useState('');
+
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [invResult, billResult, transResult] = await Promise.all([
+        const [invResult, billResult, transResult, expenseResult] = await Promise.all([
           ipcRenderer.invoke('load-invoices'),
           ipcRenderer.invoke('get-billing-summary'),
-          ipcRenderer.invoke('get-inventory-transactions', 5000) // load many
+          ipcRenderer.invoke('get-inventory-transactions', 5000),
+          ipcRenderer.invoke('get-expenses'),
         ]);
         if (invResult.success) setInvoices(invResult.invoices);
         if (billResult.success) setBillingData(billResult);
         if (transResult?.success) setInventoryTransactions(transResult.transactions);
+        if (expenseResult?.success) setExpenses(expenseResult.expenses);
       } catch (error) {
         log.error('finances', 'Failed to load finance data', { error: error instanceof Error ? error.message : String(error) });
         showToast('error', 'Failed to load data');
@@ -217,7 +228,7 @@ export default function Finances() {
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
         <h3 className="text-sm font-semibold text-slate-500 mb-2">{title}</h3>
-        <div className="text-3xl font-bold text-slate-800 mb-2">{displayCurrent}</div>
+        <div className="text-3xl font-semibold text-slate-800 mb-2">{displayCurrent}</div>
         <div className={`text-sm font-medium flex items-center gap-1 ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
           <span>{isPositive ? '↑' : '↓'}</span>
           <span>{Math.abs(percentChange).toFixed(1)}%</span>
@@ -294,14 +305,20 @@ export default function Finances() {
                   Custom
                 </button>
               </div>
-              <div className="flex items-center gap-2">
-                <input type="date" value={format(startDate, 'yyyy-MM-dd')}
-                  onChange={e => { setPreset('custom'); setStartDate(new Date(e.target.value)); }}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500" />
-                <span className="text-slate-400">to</span>
-                <input type="date" value={format(endDate, 'yyyy-MM-dd')}
-                  onChange={e => { setPreset('custom'); setEndDate(new Date(e.target.value)); }}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500" />
+              <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-xl border border-slate-200/60 shadow-inner">
+                <div className="relative flex items-center">
+                  <input type="date" value={format(startDate, 'yyyy-MM-dd')}
+                    onChange={e => { setPreset('custom'); setStartDate(new Date(e.target.value)); }}
+                    className="pl-4 pr-10 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-shadow appearance-none cursor-pointer outline-none hover:border-slate-300 shadow-sm [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer" />
+                  <svg className="w-5 h-5 text-slate-400 absolute right-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </div>
+                <span className="text-slate-400 font-medium text-sm">to</span>
+                <div className="relative flex items-center">
+                  <input type="date" value={format(endDate, 'yyyy-MM-dd')}
+                    onChange={e => { setPreset('custom'); setEndDate(new Date(e.target.value)); }}
+                    className="pl-4 pr-10 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-shadow appearance-none cursor-pointer outline-none hover:border-slate-300 shadow-sm [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer" />
+                  <svg className="w-5 h-5 text-slate-400 absolute right-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </div>
               </div>
             </div>
 
@@ -316,20 +333,26 @@ export default function Finances() {
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-bold text-slate-800 mb-6">Revenue Trend</h3>
+                <h3 className="text-lg font-semibold text-slate-800 mb-6">Revenue Trend</h3>
                 <div className="h-80">
                   {chartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} tickFormatter={(val) => `₹${val}`} />
+                      <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorFinRev" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.9}/>
+                            <stop offset="95%" stopColor="#818cf8" stopOpacity={0.4}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} axisLine={false} tickLine={false} dy={10} />
+                        <YAxis tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} tickFormatter={(val) => `₹${val}`} axisLine={false} tickLine={false} dx={-10} />
                         <RechartsTooltip
-                          cursor={{ fill: '#f1f5f9' }}
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                          cursor={{ fill: '#f8fafc' }}
+                          contentStyle={{ borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.05)', fontWeight: 500, color: '#334155' }}
                           formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, 'Revenue']}
                         />
-                        <Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                        <Bar dataKey="revenue" fill="url(#colorFinRev)" radius={[6, 6, 0, 0]} maxBarSize={32} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
@@ -338,7 +361,7 @@ export default function Finances() {
                 </div>
               </div>
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Cash Flow Summary</h3>
+                <h3 className="text-lg font-semibold text-slate-800 mb-4">Cash Flow Summary</h3>
                 <div className="space-y-3">
                   {(() => {
                     const totalInvoiced = invoices.filter(inv => {
@@ -366,7 +389,7 @@ export default function Finances() {
                       </div>
                       <div className="flex justify-between items-center py-2">
                         <span className="text-sm text-slate-500">Collection Rate</span>
-                        <span className={`text-sm font-bold ${Number(rate) >= 80 ? 'text-emerald-600' : Number(rate) >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{rate}%</span>
+                        <span className={`text-sm font-semibold ${Number(rate) >= 80 ? 'text-emerald-600' : Number(rate) >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{rate}%</span>
                       </div>
                     </>);
                   })()}
@@ -377,7 +400,7 @@ export default function Finances() {
             {/* Top Outstanding */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100">
-                <h3 className="font-bold text-slate-800">Top Outstanding Invoices</h3>
+                <h3 className="font-semibold text-slate-800">Top Outstanding Invoices</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -411,6 +434,31 @@ export default function Finances() {
           </div>
         )}
 
+        {/* Expenses */}
+        {!showExpenseForm ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex items-center justify-between">
+            <div><span className="text-sm font-medium text-slate-700">Expenses</span><span className="text-xs text-slate-400 ml-2">{expenses.length} recorded</span></div>
+            <button onClick={() => setShowExpenseForm(true)} className="px-4 py-2 text-sm font-medium text-white bg-rose-500 rounded-lg hover:bg-rose-600">+ Record Expense</button>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
+            <div className="flex items-center justify-between"><h3 className="font-semibold text-slate-800">Record Expense</h3><button onClick={() => setShowExpenseForm(false)} className="text-slate-400 hover:text-slate-600 text-sm">Cancel</button></div>
+            <div className="flex gap-3 flex-wrap items-end">
+              <select value={expCat} onChange={e => setExpCat(e.target.value)} className="px-3 py-2 border rounded-lg text-sm">
+                {['Rent','Salary','Utilities','Supplies','Equipment','Marketing','Other'].map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <div className="relative"><span className="absolute left-3 top-2 text-slate-400 text-sm">₹</span><input type="number" min="1" value={expAmt || ''} onChange={e => setExpAmt(Number(e.target.value))} className="pl-8 w-32 px-3 py-2 border rounded-lg text-sm" /></div>
+              <input type="text" placeholder="Notes (optional)" value={expNotes} onChange={e => setExpNotes(e.target.value)} className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[150px]" />
+              <button onClick={async () => { if (!expAmt) return; const r = await ipcRenderer.invoke('add-expense', { category: expCat, amount: expAmt, notes: expNotes }); if (r.success) { showToast('success','Expense recorded'); setShowExpenseForm(false); setExpAmt(0); setExpNotes(''); const er = await ipcRenderer.invoke('get-expenses'); if (er.success) setExpenses(er.expenses); } else showToast('error', r.error); }} className="px-4 py-2 text-sm font-medium text-white bg-rose-500 rounded-lg hover:bg-rose-600">Save</button>
+            </div>
+          </div>
+        )}
+        {expenses.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto"><table className="w-full text-sm"><tbody>{expenses.slice(0, 5).map(e => <tr key={e.id} className="border-b border-slate-50"><td className="px-6 py-2 text-slate-600">{format(new Date(e.date), 'MMM dd')}</td><td className="px-2 py-2"><span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">{e.category}</span></td><td className="px-6 py-2 text-slate-500 text-xs">{e.notes}</td><td className="px-6 py-2 text-right font-medium text-rose-600">₹{e.amount.toLocaleString()}</td></tr>)}</tbody></table></div>
+          </div>
+        )}
+
         {/* Billing Tab */}
         {activeTab === 'billing' && (
           <div className="space-y-6">
@@ -418,15 +466,15 @@ export default function Finances() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <p className="text-sm font-semibold text-slate-500 mb-1">Total Outstanding</p>
-                <p className="text-3xl font-bold text-rose-600">₹{billingData?.totalOutstanding?.toLocaleString() ?? 0}</p>
+                <p className="text-3xl font-semibold text-rose-600">₹{billingData?.totalOutstanding?.toLocaleString() ?? 0}</p>
               </div>
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <p className="text-sm font-semibold text-slate-500 mb-1">Overdue Invoices</p>
-                <p className="text-3xl font-bold text-amber-600">{billingData?.overdueCount ?? 0}</p>
+                <p className="text-3xl font-semibold text-amber-600">{billingData?.overdueCount ?? 0}</p>
               </div>
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <p className="text-sm font-semibold text-slate-500 mb-1">Total Collected</p>
-                <p className="text-3xl font-bold text-emerald-600">₹{billingData?.totalCollected?.toLocaleString() ?? 0}</p>
+                <p className="text-3xl font-semibold text-emerald-600">₹{billingData?.totalCollected?.toLocaleString() ?? 0}</p>
               </div>
             </div>
 

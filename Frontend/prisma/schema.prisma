@@ -234,3 +234,19 @@ model TreatmentSession {
   @@index([syncStatus])
 }
 
+model Expense {
+  id         Int       @id @default(autoincrement())
+  category   String
+  amount     Float
+  date       DateTime  @default(now())
+  notes      String?
+
+  cloudId    Int?      @map("cloud_id")
+  syncStatus String    @default("PENDING") @map("sync_status")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  lastSyncAt DateTime? @map("last_sync_at")
+
+  @@map("expenses")
+}
+

@@ -116,8 +116,8 @@
 - ✅ Multiple payment methods per invoice
 - ✅ Partial payment tracking
 - ⬜ Credit/Debit notes
-- ⬜ Expense tracking
-- ⬜ Profit/Loss statements
+- ✅ Expense tracking (clinic expenses by category with amounts and notes)
+- ✅ Profit/Loss statements
 - ⬜ Tax reports
 
 ### Inventory Management
