@@ -33,7 +33,7 @@ export const SyncStatusDot = ({ status }: { status?: string }) => {
     );
 };
 
-type SortOption = 'Name A-Z' | 'Name Z-A' | 'Recent' | 'Highest Paid';
+type SortOption = 'Name A-Z' | 'Name Z-A' | 'Most Recent' | 'Highest Paid';
 type SyncFilterOption = 'All' | 'Synced' | 'Pending';
 
 const DatabaseFind = () => {
@@ -140,6 +140,10 @@ const DatabaseFind = () => {
       });
     }
 
+    if (sortOption !== 'Most Recent' as any) {
+      // Just to satisfy the original code structure if needed
+    }
+
     result.sort((a, b) => {
         const [nameA, invsA] = a;
         const [nameB, invsB] = b;
@@ -151,10 +155,9 @@ const DatabaseFind = () => {
                 const totalB = invsB.reduce((sum, inv) => sum + (inv.total || 0), 0);
                 return totalB - totalA;
             }
-            case 'Recent': {
-                const dateA = Math.max(...invsA.map(inv => new Date(inv.date).getTime()));
-                const dateB = Math.max(...invsB.map(inv => new Date(inv.date).getTime()));
-                return dateB - dateA;
+            case 'Most Recent': {
+                const parseInvNum = (invs: DatabaseInvoice[]) => Math.max(...invs.map(inv => parseInt(inv.invoiceNumber.replace(/\D/g, '')) || 0));
+                return parseInvNum(invsB) - parseInvNum(invsA);
             }
             default: return 0;
         }
@@ -351,7 +354,7 @@ const DatabaseFind = () => {
                                 <div>
                                     <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Sort By</h4>
                                     <div className="grid grid-cols-2 gap-2">
-                                        {(['Name A-Z', 'Name Z-A', 'Recent', 'Highest Paid'] as SortOption[]).map(opt => (
+                                        {(['Name A-Z', 'Name Z-A', 'Most Recent', 'Highest Paid'] as SortOption[]).map(opt => (
                                             <button 
                                                 key={opt}
                                                 onClick={() => setSortOption(opt)}

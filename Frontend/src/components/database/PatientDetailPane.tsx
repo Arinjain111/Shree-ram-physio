@@ -40,10 +40,16 @@ export const PatientDetailPane = ({ invoices, onPrintInvoice }: PatientDetailPan
       );
   }
 
-  const latest = invoices[0];
+  const sortedInvoices = [...invoices].sort((a, b) => {
+    const numA = parseInt(a.invoiceNumber.replace(/\D/g, '')) || 0;
+    const numB = parseInt(b.invoiceNumber.replace(/\D/g, '')) || 0;
+    return numB - numA;
+  });
+
+  const latest = sortedInvoices[0];
   const patient = latest.patient;
   
-  const totalPaid = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+  const totalPaid = sortedInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
   const hasCloudData = !!patient.cloudId;
 
   const handleDelete = (target: 'local' | 'cloud' | 'both') => {
@@ -162,17 +168,17 @@ export const PatientDetailPane = ({ invoices, onPrintInvoice }: PatientDetailPan
                 Invoice History
             </h3>
             
-            {invoices.slice(0, modalVisibleCount).map((invoice, idx) => (
+            {sortedInvoices.slice(0, modalVisibleCount).map((invoice, idx) => (
               <InvoiceHistoryCard
                 key={invoice.invoiceNumber}
                 invoice={invoice}
                 index={idx}
-                totalCount={invoices.length}
+                totalCount={sortedInvoices.length}
                 onPrint={onPrintInvoice}
               />
             ))}
 
-            {modalVisibleCount < invoices.length && (
+            {modalVisibleCount < sortedInvoices.length && (
               <div className="flex justify-center pt-4 pb-2">
                 <button
                   onClick={() => setModalVisibleCount(prev => prev + 5)}
