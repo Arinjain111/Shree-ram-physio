@@ -657,6 +657,7 @@ export function registerInvoiceHandlers() {
         total: inv.total,
         amountPaid: inv.amountPaid,
         paymentStatus: inv.paymentStatus,
+        paymentMethod: inv.paymentMethod,
         patientName: `${inv.patient.firstName} ${inv.patient.lastName}`,
       }));
 

@@ -264,8 +264,8 @@ export default function Inventory() {
       {/* Item Modal */}
       {isItemModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity">
-          <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white/50">
+          <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 w-full max-w-md overflow-visible animate-in zoom-in-95 duration-200">
+            <div className="rounded-t-3xl px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white/50">
               <h3 className="font-semibold text-slate-800 text-lg">{editingItem ? 'Edit Product' : 'Add New Product'}</h3>
               <button onClick={() => setItemModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -302,8 +302,8 @@ export default function Inventory() {
       {/* Transaction Modal */}
       {isTransactionModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity">
-          <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white/50">
+          <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 w-full max-w-md overflow-visible animate-in zoom-in-95 duration-200">
+            <div className="rounded-t-3xl px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white/50">
               <h3 className="font-semibold text-slate-800 text-lg">Record {transactionType === 'PURCHASE' ? 'Purchase (Restock)' : 'Sale (Outflow)'}</h3>
               <button onClick={() => setTransactionModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

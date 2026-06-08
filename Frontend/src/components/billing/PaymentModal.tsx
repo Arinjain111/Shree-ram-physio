@@ -11,15 +11,16 @@ interface PaymentModalProps {
   invoiceNumber: string;
   total: number;
   amountPaid: number;
+  paymentMethod: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 export default function PaymentModal({
-  isOpen, invoiceId, patientName, invoiceNumber, total, amountPaid, onClose, onSuccess
+  isOpen, invoiceId, patientName, invoiceNumber, total, amountPaid, paymentMethod, onClose, onSuccess
 }: PaymentModalProps) {
   const [amount, setAmount] = useState(total - amountPaid);
-  const [method, setMethod] = useState('Cash');
+  const [method, setMethod] = useState(paymentMethod || 'Cash');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const log = useLogger();
 
@@ -48,8 +49,8 @@ export default function PaymentModal({
       <div className="fixed inset-0 bg-slate-900/50 transition-opacity" onClick={onClose} />
       <div className="fixed inset-0 z-10 overflow-y-auto">
         <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-          <div className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md border border-slate-100">
-            <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+          <div className="relative transform overflow-visible rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md border border-slate-100">
+            <div className="rounded-t-2xl px-6 py-5 border-b border-slate-100 bg-slate-50/50">
               <h3 className="text-lg font-semibold text-slate-900">Record Payment</h3>
             </div>
             <div className="px-6 py-5 space-y-5">
@@ -105,7 +106,7 @@ export default function PaymentModal({
                 />
               </div>
             </div>
-            <div className="bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-100">
+            <div className="rounded-b-2xl bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-100">
               <button
                 onClick={onClose}
                 className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"

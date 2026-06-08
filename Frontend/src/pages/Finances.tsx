@@ -35,6 +35,7 @@ interface InvoiceSummary {
   total: number;
   amountPaid: number;
   paymentStatus: string;
+  paymentMethod: string;
   patientName: string;
 }
 
@@ -84,7 +85,7 @@ export default function Finances() {
   const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [billingTab, setBillingTab] = useState<StatusTab>('overdue');
   const [paymentModal, setPaymentModal] = useState<{
-    invoiceId: number; patientName: string; invoiceNumber: string; total: number; amountPaid: number
+    invoiceId: number; patientName: string; invoiceNumber: string; total: number; amountPaid: number; paymentMethod: string;
   } | null>(null);
 
   // Expense form
@@ -719,6 +720,7 @@ export default function Finances() {
                                     invoiceNumber: inv.invoiceNumber,
                                     total: inv.total,
                                     amountPaid: inv.amountPaid,
+                                    paymentMethod: inv.paymentMethod,
                                   })}
                                   className="px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-500 transition-colors"
                                 >
@@ -746,6 +748,7 @@ export default function Finances() {
           invoiceNumber={paymentModal.invoiceNumber}
           total={paymentModal.total}
           amountPaid={paymentModal.amountPaid}
+          paymentMethod={paymentModal.paymentMethod}
           onClose={() => setPaymentModal(null)}
           onSuccess={handlePayment}
         />

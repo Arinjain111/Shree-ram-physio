@@ -1,5 +1,6 @@
 import { useUI } from '@/context/UIContext';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+import { useState } from 'react';
 
 /* Components */
 import PageHeader from '@/components/layout/PageHeader';
@@ -26,6 +27,7 @@ const InvoiceGenerator = () => {
     discountType, setDiscountType,
     invoiceDate, setInvoiceDate,
     paymentMethod, setPaymentMethod,
+    amountPaid, setAmountPaid,
     TransactionId, setTransactionId,
     notes, setNotes,
     invoiceNumber, setInvoiceNumber,
@@ -41,6 +43,31 @@ const InvoiceGenerator = () => {
     handleSaveAndPDF,
     getCurrentInvoiceData
   } = useInvoiceForm();
+
+  const [isPartialMode, setIsPartialMode] = useState(false);
+
+  const subTotal = Number(
+    treatments.reduce((sum: any, t: any) => sum + (Number(t.sessions || 0) * Number(t.amount || 0)), 0).toFixed(2)
+  );
+  const totalAmount = discountType === 'percentage' 
+    ? subTotal - (subTotal * (discount || 0)) / 100 
+    : subTotal - (discount || 0);
+
+  let currentPaymentStatus = 'unpaid';
+  if (isPartialMode) {
+    currentPaymentStatus = 'partial';
+  } else if (amountPaid > 0) {
+    if (amountPaid >= totalAmount && totalAmount > 0) {
+      currentPaymentStatus = 'paid';
+    } else {
+      currentPaymentStatus = 'partial';
+    }
+  }
+
+  // Clear partial mode if fully paid
+  if (isPartialMode && amountPaid >= totalAmount && totalAmount > 0) {
+    setIsPartialMode(false);
+  }
 
   return (
     <div className="w-full max-w-400 min-h-fit bg-slate-50/50 px-6  mx-auto">
@@ -164,6 +191,54 @@ const InvoiceGenerator = () => {
                     />
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-[#5F3794]">Payment Status</h3>
+                    <p className="mb-2 text-xs text-gray-500">
+                      Mark as Paid, Unpaid, or Partial
+                    </p>
+                    <CustomSelect
+                      value={currentPaymentStatus}
+                      onChange={(val) => {
+                        if (val === 'paid') {
+                          setIsPartialMode(false);
+                          setAmountPaid(totalAmount);
+                        } else if (val === 'unpaid') {
+                          setIsPartialMode(false);
+                          setAmountPaid(0);
+                        } else if (val === 'partial') {
+                          setIsPartialMode(true);
+                          if (amountPaid >= totalAmount) {
+                            setAmountPaid(0);
+                          }
+                        }
+                      }}
+                      options={[
+                        { value: 'unpaid', label: 'Unpaid' },
+                        { value: 'paid', label: 'Paid' },
+                        { value: 'partial', label: 'Partial Paid' },
+                      ]}
+                    />
+                  </div>
+                  {currentPaymentStatus === 'partial' && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-[#5F3794]">Amount Paid (₹)</h3>
+                      <p className="mb-2 text-xs text-gray-500">
+                        Enter the exact amount received
+                      </p>
+                      <input
+                        type="number"
+                        min="0"
+                        max={totalAmount}
+                        step="0.01"
+                        value={amountPaid || ''}
+                        onChange={e => setAmountPaid(Number(e.target.value))}
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
               </section>
 
               <PatientForm 
@@ -210,9 +285,7 @@ const InvoiceGenerator = () => {
                       setDiscount(value);
                       setDiscountType(type);
                     }}
-                    subTotal={Number(
-                      treatments.reduce((sum, t) => sum + (Number(t.sessions || 0) * Number(t.amount || 0)), 0).toFixed(2)
-                    )}
+                    subTotal={subTotal}
                   />
                 </div>
               </section>
