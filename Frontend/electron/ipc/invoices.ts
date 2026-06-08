@@ -109,7 +109,7 @@ export function registerInvoiceHandlers() {
         data: {
           invoiceNumber: validatedData.invoiceNumber,
           patientId: patient.id,
-          date: validatedData.date,
+          date: new Date(validatedData.date),
           diagnosis: validatedData.diagnosis || '',
           notes: validatedData.notes || '',
           paymentMethod: validatedData.paymentMethod || 'Cash',
@@ -135,8 +135,8 @@ export function registerInvoiceHandlers() {
             name: treatment.name,
             duration: treatment.duration || '',
             sessions: treatment.sessions,
-            startDate: treatment.startDate,
-            endDate: treatment.endDate,
+            startDate: new Date(treatment.startDate),
+            endDate: new Date(treatment.endDate),
             amount: treatment.amount,
             syncStatus: 'PENDING'
           }
@@ -182,7 +182,7 @@ export function registerInvoiceHandlers() {
         id: invoice.id,
         patientId: invoice.patientId,
         invoiceNumber: invoice.invoiceNumber,
-        date: invoice.date,
+        date: invoice.date.toISOString().split('T')[0],
         patient: {
           id: invoice.patient.id,
           firstName: invoice.patient.firstName,
@@ -202,8 +202,8 @@ export function registerInvoiceHandlers() {
           name: t.name,
           duration: t.duration,
           sessions: t.sessions,
-          startDate: t.startDate,
-          endDate: t.endDate,
+          startDate: t.startDate.toISOString().split('T')[0],
+          endDate: t.endDate.toISOString().split('T')[0],
           amount: t.amount
         })),
         total: invoice.total,
@@ -253,7 +253,7 @@ export function registerInvoiceHandlers() {
           id: invoice.id,
           patientId: invoice.patientId,
           invoiceNumber: invoice.invoiceNumber,
-          date: invoice.date,
+          date: invoice.date.toISOString().split('T')[0],
           patient: {
             id: invoice.patient.id,
             firstName: invoice.patient.firstName,
@@ -280,8 +280,8 @@ export function registerInvoiceHandlers() {
             name: t.name,
             duration: t.duration,
             sessions: t.sessions,
-            startDate: t.startDate,
-            endDate: t.endDate,
+            startDate: t.startDate.toISOString().split('T')[0],
+            endDate: t.endDate.toISOString().split('T')[0],
             amount: t.amount
           }))
         }
@@ -352,7 +352,7 @@ export function registerInvoiceHandlers() {
           where: { id: existing.id },
           data: {
             invoiceNumber: validatedData.invoiceNumber,
-            date: validatedData.date,
+            date: new Date(validatedData.date),
             diagnosis: validatedData.diagnosis || '',
             notes: validatedData.notes || '',
             paymentMethod: validatedData.paymentMethod || 'Cash',
@@ -380,8 +380,8 @@ export function registerInvoiceHandlers() {
               name: treatment.name,
               duration: treatment.duration || '',
               sessions: treatment.sessions,
-              startDate: treatment.startDate,
-              endDate: treatment.endDate,
+              startDate: new Date(treatment.startDate),
+              endDate: new Date(treatment.endDate),
               amount: treatment.amount,
               syncStatus: 'PENDING'
             }
