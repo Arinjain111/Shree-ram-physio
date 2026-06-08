@@ -112,6 +112,28 @@ export async function initializeDatabase(): Promise<void> {
                     }
                 }
 
+                // Lightweight migration: add discount and discount_type to invoices if missing.
+                const hasDiscount = invoiceCols.some(c => c.name === 'discount');
+                if (!hasDiscount) {
+                    logger.info('db', 'Migrating local DB: adding discount to invoices');
+                    try {
+                        db.exec('ALTER TABLE invoices ADD COLUMN discount REAL NOT NULL DEFAULT 0;');
+                        logger.info('db', 'discount column added');
+                    } catch (e) {
+                        logger.error('db', 'Failed to add discount column', { error: e instanceof Error ? e.message : String(e) });
+                    }
+                }
+                const hasDiscountType = invoiceCols.some(c => c.name === 'discount_type');
+                if (!hasDiscountType) {
+                    logger.info('db', 'Migrating local DB: adding discount_type to invoices');
+                    try {
+                        db.exec("ALTER TABLE invoices ADD COLUMN discount_type TEXT NOT NULL DEFAULT 'amount';");
+                        logger.info('db', 'discount_type column added');
+                    } catch (e) {
+                        logger.error('db', 'Failed to add discount_type column', { error: e instanceof Error ? e.message : String(e) });
+                    }
+                }
+
                 // Lightweight migration: add diagnosis_presets table if missing.
                 const existingTables: Array<{ name: string }> = db.prepare(
                     "SELECT name FROM sqlite_master WHERE type='table'"
@@ -144,6 +166,116 @@ export async function initializeDatabase(): Promise<void> {
                 );
               `);
                     logger.info('db', 'diagnosis_shortcuts table added');
+                }
+
+                const hasInventoryItems = existingTables.some(t => t.name === 'inventory_items');
+                if (!hasInventoryItems) {
+                    logger.info('db', 'Migrating local DB: adding inventory_items table');
+                    db.exec(`
+                      CREATE TABLE IF NOT EXISTS inventory_items (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        stock INTEGER NOT NULL DEFAULT 0,
+                        cost_price REAL NOT NULL DEFAULT 0,
+                        selling_price REAL NOT NULL DEFAULT 0,
+                        cloud_id INTEGER,
+                        sync_status TEXT NOT NULL DEFAULT 'PENDING',
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_sync_at TEXT
+                      );
+                    `);
+                    logger.info('db', 'inventory_items table added');
+                }
+
+                const hasInventoryTransactions = existingTables.some(t => t.name === 'inventory_transactions');
+                if (!hasInventoryTransactions) {
+                    logger.info('db', 'Migrating local DB: adding inventory_transactions table');
+                    db.exec(`
+                      CREATE TABLE IF NOT EXISTS inventory_transactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        item_id INTEGER NOT NULL,
+                        type TEXT NOT NULL,
+                        quantity INTEGER NOT NULL,
+                        price_per_unit REAL NOT NULL,
+                        total_amount REAL NOT NULL,
+                        date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        notes TEXT,
+                        cloud_id INTEGER,
+                        sync_status TEXT NOT NULL DEFAULT 'PENDING',
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_sync_at TEXT,
+                        FOREIGN KEY (item_id) REFERENCES inventory_items(id) ON DELETE CASCADE
+                      );
+                      CREATE INDEX IF NOT EXISTS inventory_transactions_item_id_idx ON inventory_transactions(item_id);
+                    `);
+                    logger.info('db', 'inventory_transactions table added');
+                }
+
+                const hasSessionNoteTemplates = existingTables.some(t => t.name === 'session_note_templates');
+                if (!hasSessionNoteTemplates) {
+                    logger.info('db', 'Migrating local DB: adding session_note_templates table');
+                    db.exec(`
+                      CREATE TABLE IF NOT EXISTS session_note_templates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        text TEXT NOT NULL UNIQUE,
+                        "order" INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                      );
+                    `);
+                    logger.info('db', 'session_note_templates table added');
+                }
+
+                const hasTreatmentSessions = existingTables.some(t => t.name === 'treatment_sessions');
+                if (!hasTreatmentSessions) {
+                    logger.info('db', 'Migrating local DB: adding treatment_sessions table');
+                    db.exec(`
+                      CREATE TABLE IF NOT EXISTS treatment_sessions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        treatment_id INTEGER NOT NULL,
+                        session_number INTEGER NOT NULL,
+                        date TEXT,
+                        attended INTEGER NOT NULL DEFAULT 0,
+                        pain_before INTEGER,
+                        pain_after INTEGER,
+                        notes TEXT NOT NULL DEFAULT '',
+                        exercises_performed TEXT NOT NULL DEFAULT '',
+                        progress TEXT,
+                        cancelled INTEGER NOT NULL DEFAULT 0,
+                        rescheduled_date TEXT,
+                        cloud_id INTEGER,
+                        sync_status TEXT NOT NULL DEFAULT 'PENDING',
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_sync_at TEXT,
+                        FOREIGN KEY (treatment_id) REFERENCES treatments(id) ON DELETE CASCADE
+                      );
+                      CREATE INDEX IF NOT EXISTS treatment_sessions_treatment_id_idx ON treatment_sessions(treatment_id);
+                      CREATE INDEX IF NOT EXISTS treatment_sessions_sync_status_idx ON treatment_sessions(sync_status);
+                    `);
+                    logger.info('db', 'treatment_sessions table added');
+                }
+
+                const hasExpenses = existingTables.some(t => t.name === 'expenses');
+                if (!hasExpenses) {
+                    logger.info('db', 'Migrating local DB: adding expenses table');
+                    db.exec(`
+                      CREATE TABLE IF NOT EXISTS expenses (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        category TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        notes TEXT,
+                        cloud_id INTEGER,
+                        sync_status TEXT NOT NULL DEFAULT 'PENDING',
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_sync_at TEXT
+                      );
+                    `);
+                    logger.info('db', 'expenses table added');
                 }
 
                 logger.info('db', 'Database already initialized');
@@ -196,6 +328,8 @@ export async function initializeDatabase(): Promise<void> {
         payment_method TEXT NOT NULL DEFAULT 'Cash',
         transaction_id TEXT,
         total REAL NOT NULL,
+        discount REAL NOT NULL DEFAULT 0,
+        discount_type TEXT NOT NULL DEFAULT 'amount',
         payment_status TEXT NOT NULL DEFAULT 'unpaid',
         amount_paid REAL NOT NULL DEFAULT 0,
         cloud_id INTEGER,
@@ -283,6 +417,96 @@ export async function initializeDatabase(): Promise<void> {
         db.exec('CREATE INDEX IF NOT EXISTS sync_logs_table_name_record_id_idx ON sync_logs(table_name, record_id);');
 
         db.exec('CREATE INDEX IF NOT EXISTS diagnosis_presets_name_idx ON diagnosis_presets(name);');
+
+        // Create inventory_items table
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS inventory_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            stock INTEGER NOT NULL DEFAULT 0,
+            cost_price REAL NOT NULL DEFAULT 0,
+            selling_price REAL NOT NULL DEFAULT 0,
+            cloud_id INTEGER,
+            sync_status TEXT NOT NULL DEFAULT 'PENDING',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_sync_at TEXT
+          );
+        `);
+
+        // Create inventory_transactions table
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS inventory_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            quantity INTEGER NOT NULL,
+            price_per_unit REAL NOT NULL,
+            total_amount REAL NOT NULL,
+            date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            notes TEXT,
+            cloud_id INTEGER,
+            sync_status TEXT NOT NULL DEFAULT 'PENDING',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_sync_at TEXT,
+            FOREIGN KEY (item_id) REFERENCES inventory_items(id) ON DELETE CASCADE
+          );
+        `);
+        db.exec('CREATE INDEX IF NOT EXISTS inventory_transactions_item_id_idx ON inventory_transactions(item_id);');
+
+        // Create session_note_templates table
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS session_note_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL UNIQUE,
+            "order" INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+
+        // Create treatment_sessions table
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS treatment_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            treatment_id INTEGER NOT NULL,
+            session_number INTEGER NOT NULL,
+            date TEXT,
+            attended INTEGER NOT NULL DEFAULT 0,
+            pain_before INTEGER,
+            pain_after INTEGER,
+            notes TEXT NOT NULL DEFAULT '',
+            exercises_performed TEXT NOT NULL DEFAULT '',
+            progress TEXT,
+            cancelled INTEGER NOT NULL DEFAULT 0,
+            rescheduled_date TEXT,
+            cloud_id INTEGER,
+            sync_status TEXT NOT NULL DEFAULT 'PENDING',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_sync_at TEXT,
+            FOREIGN KEY (treatment_id) REFERENCES treatments(id) ON DELETE CASCADE
+          );
+        `);
+        db.exec('CREATE INDEX IF NOT EXISTS treatment_sessions_treatment_id_idx ON treatment_sessions(treatment_id);');
+        db.exec('CREATE INDEX IF NOT EXISTS treatment_sessions_sync_status_idx ON treatment_sessions(sync_status);');
+
+        // Create expenses table
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            amount REAL NOT NULL,
+            date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            notes TEXT,
+            cloud_id INTEGER,
+            sync_status TEXT NOT NULL DEFAULT 'PENDING',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_sync_at TEXT
+          );
+        `);
 
         logger.info('db', 'Database tables created successfully');
 
