@@ -270,7 +270,10 @@ export class PrismaSyncEngine {
           diagnosis: inv.diagnosis || '',
           notes: inv.notes || '',
           paymentMethod: normalizePaymentMethodForSync(inv.paymentMethod),
+          TransactionId: inv.TransactionId,
           total: inv.total,
+          discount: inv.discount,
+          discountType: inv.discountType,
           paymentStatus: inv.paymentStatus,
           amountPaid: inv.amountPaid,
           updatedAt: inv.updatedAt.toISOString()
@@ -526,7 +529,14 @@ export class PrismaSyncEngine {
           patientId: localPatient.id,
           date: cloudInvoice.date,
           diagnosis: cloudInvoice.diagnosis,
+          notes: cloudInvoice.notes || '',
+          paymentMethod: normalizePaymentMethodForSync(cloudInvoice.paymentMethod),
+          TransactionId: cloudInvoice.TransactionId,
           total: cloudInvoice.total,
+          discount: cloudInvoice.discount,
+          discountType: cloudInvoice.discountType,
+          paymentStatus: cloudInvoice.paymentStatus,
+          amountPaid: cloudInvoice.amountPaid,
           syncStatus: 'SYNCED',
           lastSyncAt: new Date()
         };
