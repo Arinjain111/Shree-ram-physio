@@ -285,11 +285,19 @@ export default function Finances() {
     );
   };
 
-  const filteredInvoices = billingData?.invoices?.filter(inv => {
-    if (billingTab === 'all') return true;
-    if (billingTab === 'overdue') return inv.paymentStatus !== 'paid' && new Date(inv.date) < new Date(today);
-    return inv.paymentStatus === billingTab;
-  }) ?? [];
+  const filteredInvoices = useMemo(() => {
+    const list = billingData?.invoices?.filter(inv => {
+      if (billingTab === 'all') return true;
+      if (billingTab === 'overdue') return inv.paymentStatus !== 'paid' && new Date(inv.date) < new Date(today);
+      return inv.paymentStatus === billingTab;
+    }) ?? [];
+    // Sort by date desc (most recent first). Ties broken by id desc so the
+    // newer-created row wins when two invoices share a date.
+    return [...list].sort((a, b) => {
+      const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+      return dateDiff !== 0 ? dateDiff : b.id - a.id;
+    });
+  }, [billingData, billingTab, today]);
 
   const selectableInvoices = filteredInvoices.filter(inv => inv.total > inv.amountPaid);
   const isAllSelected = selectableInvoices.length > 0 && selectableInvoices.every(inv => selectedInvoiceIds.includes(inv.id));
