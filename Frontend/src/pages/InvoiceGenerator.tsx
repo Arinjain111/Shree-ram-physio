@@ -1,6 +1,6 @@
 import { useUI } from '@/context/UIContext';
 import { CustomSelect } from '@/components/ui/CustomSelect';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /* Components */
 import PageHeader from '@/components/layout/PageHeader';
@@ -45,28 +45,31 @@ const InvoiceGenerator = () => {
   } = useInvoiceForm();
 
   const [isPartialMode, setIsPartialMode] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid' | 'partial'>('unpaid');
+  const userHasSelectedStatus = useRef(false);
 
   const subTotal = Number(
     treatments.reduce((sum: any, t: any) => sum + (Number(t.sessions || 0) * Number(t.amount || 0)), 0).toFixed(2)
   );
-  const totalAmount = discountType === 'percentage' 
-    ? subTotal - (subTotal * (discount || 0)) / 100 
+  const totalAmount = discountType === 'percentage'
+    ? subTotal - (subTotal * (discount || 0)) / 100
     : subTotal - (discount || 0);
 
-  let currentPaymentStatus = 'unpaid';
-  if (isPartialMode) {
-    currentPaymentStatus = 'partial';
-  } else if (amountPaid > 0) {
+  useEffect(() => {
+    if (userHasSelectedStatus.current) return;
     if (amountPaid >= totalAmount && totalAmount > 0) {
-      currentPaymentStatus = 'paid';
+      setPaymentStatus('paid');
+    } else if (amountPaid > 0) {
+      setPaymentStatus('partial');
     } else {
-      currentPaymentStatus = 'partial';
+      setPaymentStatus('unpaid');
     }
-  }
+  }, [amountPaid, totalAmount]);
 
   // Clear partial mode if fully paid
   if (isPartialMode && amountPaid >= totalAmount && totalAmount > 0) {
     setIsPartialMode(false);
+    setPaymentStatus('paid');
   }
 
   return (
@@ -199,15 +202,18 @@ const InvoiceGenerator = () => {
                       Mark as Paid, Unpaid, or Partial
                     </p>
                     <CustomSelect
-                      value={currentPaymentStatus}
+                      value={paymentStatus}
                       onChange={(val) => {
-                        if (val === 'paid') {
+                        userHasSelectedStatus.current = true;
+                        const status = String(val) as 'paid' | 'unpaid' | 'partial';
+                        setPaymentStatus(status);
+                        if (status === 'paid') {
                           setIsPartialMode(false);
                           setAmountPaid(totalAmount);
-                        } else if (val === 'unpaid') {
+                        } else if (status === 'unpaid') {
                           setIsPartialMode(false);
                           setAmountPaid(0);
-                        } else if (val === 'partial') {
+                        } else if (status === 'partial') {
                           setIsPartialMode(true);
                           if (amountPaid >= totalAmount) {
                             setAmountPaid(0);
@@ -221,7 +227,7 @@ const InvoiceGenerator = () => {
                       ]}
                     />
                   </div>
-                  {currentPaymentStatus === 'partial' && (
+                  {paymentStatus === 'partial' && (
                     <div>
                       <h3 className="text-lg font-semibold text-[#5F3794]">Amount Paid (₹)</h3>
                       <p className="mb-2 text-xs text-gray-500">
