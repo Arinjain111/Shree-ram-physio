@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
+    />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>Shree Ram Physiotherapy and Rehabilitation Center</title>
     <script>
       // Early Error Handler
@@ -19,7 +24,7 @@
         errDiv.style.zIndex = '99999';
         errDiv.style.whiteSpace = 'pre-wrap';
         errDiv.style.fontFamily = 'monospace';
-        errDiv.innerHTML = '<h3>CRITICAL STARTUP ERROR</h3>' + 
+        errDiv.innerHTML = '<h3>CRITICAL STARTUP ERROR</h3>' +
           '<strong>' + message + '</strong><br>' +
           (source ? source + ':' + lineno + ':' + colno + '<br>' : '') +
           (error && error.stack ? error.stack : '');

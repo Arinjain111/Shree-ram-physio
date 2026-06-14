@@ -125,6 +125,7 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
               disabled={!invoice.id}
               className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
               title={!invoice.id ? 'Missing invoice id' : 'Edit this invoice (not synced yet)'}
+              aria-label={!invoice.id ? 'Missing invoice id' : 'Edit invoice'}
             >
               <EditIcon />
             </button>
@@ -134,6 +135,7 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
               disabled={!invoice.id}
               className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
               title={!invoice.id ? 'Missing invoice id' : 'Reissue: creates a new invoice based on this one'}
+              aria-label={!invoice.id ? 'Missing invoice id' : 'Reissue invoice'}
             >
               <CopyIcon />
             </button>
@@ -143,15 +145,17 @@ export const InvoiceHistoryCard = ({ invoice, index, totalCount, onPrint }: Invo
             onClick={() => onPrint(invoice)}
             className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
             title="Print Invoice"
+            aria-label="Print invoice"
           >
             <PrintIcon />
           </button>
-          
+
           <div className="relative" ref={deleteRef}>
             <button
               onClick={() => setShowDeleteOptions(!showDeleteOptions)}
               className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
               title="Delete Invoice"
+              aria-label="Delete invoice"
             >
               <DeleteIcon />
             </button>

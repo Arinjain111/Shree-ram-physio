@@ -72,7 +72,7 @@ const UpdateBanner: React.FC = () => {
           </button>
         )}
         {(status === 'error' || status === 'checking' || status === 'downloaded') && (
-          <button onClick={dismissError} className="p-1 hover:bg-slate-800 rounded transition-colors group" title="Dismiss">
+          <button onClick={dismissError} className="p-1 hover:bg-slate-800 rounded transition-colors group" title="Dismiss" aria-label="Dismiss">
             <svg className="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>

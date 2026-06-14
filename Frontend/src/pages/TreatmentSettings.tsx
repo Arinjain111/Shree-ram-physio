@@ -382,8 +382,8 @@ const TreatmentSettings = () => {
                                   <td className="px-6 py-4"><span className="font-semibold text-emerald-600">₹{(preset.defaultSessions * preset.pricePerSession).toFixed(2)}</span></td>
                                   <td className="px-6 py-4 text-right">
                                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button onClick={() => handleEditTreatment(preset)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit"><EditIcon /></button>
-                                      <button onClick={() => handleDeleteTreatment(preset.id!)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><TrashIcon /></button>
+                                    <button onClick={() => handleEditTreatment(preset)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit" aria-label="Edit treatment preset"><EditIcon /></button>
+                                    <button onClick={() => handleDeleteTreatment(preset.id!)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete" aria-label="Delete treatment preset"><TrashIcon /></button>
                                     </div>
                                   </td>
                                 </tr>
@@ -486,7 +486,7 @@ const TreatmentSettings = () => {
                                   </td>
                                   <td className="px-6 py-4 text-right">
                                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button onClick={() => handleDeleteDiagnosis(dp.id, dp.name)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><TrashIcon /></button>
+                                      <button onClick={() => handleDeleteDiagnosis(dp.id, dp.name)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete" aria-label="Delete diagnosis preset"><TrashIcon /></button>
                                     </div>
                                   </td>
                                 </tr>
