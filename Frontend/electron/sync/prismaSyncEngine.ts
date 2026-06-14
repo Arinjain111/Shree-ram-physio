@@ -32,9 +32,9 @@ export class PrismaSyncEngine {
   }
 
   /**
-   * Start automatic sync every 5 minutes (default)
+   * Start automatic sync every 10 minutes (default)
    */
-  startAutoSync(intervalMs: number = 5 * 60 * 1000) {
+  startAutoSync(intervalMs: number = 10 * 60 * 1000) {
     if (this.syncInterval) {
       logger.debug('sync', 'Auto-sync already running');
       return;

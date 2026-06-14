@@ -17,9 +17,9 @@ export function registerSyncHandlers(syncEngine: PrismaSyncEngine | null) {
 
             const result = await syncEngine.performSync(true);
 
-            // Reset auto-sync timer after manual sync (restart 5-minute countdown)
+            // Reset auto-sync timer after manual sync (restart 10-minute countdown)
             if (result.success) {
-                syncEngine.resetAutoSyncTimer(5 * 60 * 1000); // 5 minutes
+                syncEngine.resetAutoSyncTimer(10 * 60 * 1000); // 10 minutes
                 return { success: true, result };
             }
 

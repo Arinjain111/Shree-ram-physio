@@ -179,8 +179,8 @@ app.whenReady().then(async () => {
   const backendUrl = getBackendUrl();
   syncEngine = new PrismaSyncEngine(backendUrl);
 
-  // Start auto-sync (every 5 minutes)
-  syncEngine.startAutoSync();
+  // Start auto-sync (every 10 minutes)
+  syncEngine.startAutoSync(10 * 60 * 1000);
   // Run an initial sync on startup
   syncEngine.performSync().catch(() => {});
 
