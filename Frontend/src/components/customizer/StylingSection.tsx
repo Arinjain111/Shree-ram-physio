@@ -54,7 +54,7 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
                   }}
                   className={`group relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-500 ring-offset-2 shadow-md'
+                      ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500 ring-offset-2 shadow-md'
                       : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm'
                   }`}
                 >
@@ -62,31 +62,31 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
                   <div
                     className={`rounded-sm border-2 transition-colors ${
                       isActive 
-                        ? 'border-teal-400 bg-white' 
+                        ? 'border-indigo-400 bg-white' 
                         : 'border-slate-300 bg-slate-50 group-hover:border-slate-400'
                     }`}
                     style={{ width: opt.w, height: opt.h }}
                   >
                     {/* Mini content lines inside the paper */}
                     <div className="flex flex-col items-center justify-center h-full gap-1 p-1.5">
-                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-teal-300' : 'bg-slate-300'}`} style={{ width: '70%' }} />
-                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-teal-200' : 'bg-slate-200'}`} style={{ width: '50%' }} />
-                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-teal-200' : 'bg-slate-200'}`} style={{ width: '60%' }} />
-                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-teal-200' : 'bg-slate-200'}`} style={{ width: '40%' }} />
+                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-indigo-300' : 'bg-slate-300'}`} style={{ width: '70%' }} />
+                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-indigo-200' : 'bg-slate-200'}`} style={{ width: '50%' }} />
+                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-indigo-200' : 'bg-slate-200'}`} style={{ width: '60%' }} />
+                      <div className={`h-0.5 rounded-full ${isActive ? 'bg-indigo-200' : 'bg-slate-200'}`} style={{ width: '40%' }} />
                     </div>
                   </div>
                   {/* Label */}
                   <div className="text-center">
-                    <span className={`block text-xs font-semibold ${isActive ? 'text-teal-700' : 'text-slate-700'}`}>
+                    <span className={`block text-xs font-semibold ${isActive ? 'text-indigo-700' : 'text-slate-700'}`}>
                       {opt.label}
                     </span>
-                    <span className={`block text-[10px] ${isActive ? 'text-teal-500' : 'text-slate-400'}`}>
+                    <span className={`block text-[10px] ${isActive ? 'text-indigo-500' : 'text-slate-400'}`}>
                       {opt.desc}
                     </span>
                   </div>
                   {/* Active checkmark */}
                   {isActive && (
-                    <div className="absolute top-2 right-2 w-5 h-5 bg-teal-500 rounded-full flex items-center justify-center">
+                    <div className="absolute top-2 right-2 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center">
                       <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
@@ -100,75 +100,76 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
 
         <div className="border-t border-slate-100 pt-6">
           <h4 className="text-sm font-semibold text-slate-800 mb-4 uppercase tracking-wider">Alignment</h4>
-        {/* Header Alignment Controls */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-3">Left Section Alignment (Logo & Clinic Name)</label>
-          <div className="flex gap-3">
-            {['left', 'center', 'right'].map((align) => (
-              <button
-                key={align}
-                type="button"
-                onClick={() => onChange('headerLeftAlign', align)}
-                className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
-                  formData.headerLeftAlign === align
-                    ? 'bg-teal-600 text-white shadow-md ring-2 ring-teal-600 ring-offset-2'
-                    : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 hover:border-slate-400'
-                }`}
-              >
-                {align.charAt(0).toUpperCase() + align.slice(1)}
-              </button>
-            ))}
+          <div className="space-y-6">
+            {/* Header Alignment Controls */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-3">Left Section Alignment (Logo & Clinic Name)</label>
+              <div className="flex gap-3">
+                {['left', 'center', 'right'].map((align) => (
+                  <button
+                    key={align}
+                    type="button"
+                    onClick={() => onChange('headerLeftAlign', align)}
+                    className={`px-5 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                      formData.headerLeftAlign === align
+                        ? 'bg-indigo-600 text-white border border-indigo-600 shadow-md'
+                        : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 hover:border-slate-400'
+                    }`}
+                  >
+                    {align.charAt(0).toUpperCase() + align.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-3">Right Section Alignment (UAN & Reg No.)</label>
-            <div className="flex gap-3">
-              {['left', 'center', 'right'].map((align) => (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-3">Right Section Alignment (UAN & Reg No.)</label>
+              <div className="flex gap-3">
+                {['left', 'center', 'right'].map((align) => (
+                  <button
+                    key={align}
+                    type="button"
+                    onClick={() => onChange('headerRightAlign', align)}
+                    className={`px-5 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                      formData.headerRightAlign === align
+                        ? 'bg-indigo-600 text-white border border-indigo-600 shadow-md'
+                        : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 hover:border-slate-400'
+                    }`}
+                  >
+                    {align.charAt(0).toUpperCase() + align.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Logo Arrangement */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-3">Logo & Clinic Name Layout</label>
+              <div className="flex gap-3">
                 <button
-                  key={align}
                   type="button"
-                  onClick={() => onChange('headerRightAlign', align)}
-                  className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
-                    formData.headerRightAlign === align
-                      ? 'bg-teal-600 text-white shadow-md ring-2 ring-teal-600 ring-offset-2'
+                  onClick={() => onChange('logoArrangement', 'stack')}
+                  className={`px-5 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                    formData.logoArrangement === 'stack'
+                      ? 'bg-indigo-600 text-white border border-indigo-600 shadow-md'
                       : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 hover:border-slate-400'
                   }`}
                 >
-                  {align.charAt(0).toUpperCase() + align.slice(1)}
+                  Stack (Name Below Logo)
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => onChange('logoArrangement', 'inline')}
+                  className={`px-5 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                    formData.logoArrangement === 'inline'
+                      ? 'bg-indigo-600 text-white border border-indigo-600 shadow-md'
+                      : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 hover:border-slate-400'
+                  }`}
+                >
+                  Inline (Side by Side)
+                </button>
+              </div>
             </div>
           </div>
-
-        {/* Logo Arrangement */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-3">Logo & Clinic Name Layout</label>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => onChange('logoArrangement', 'stack')}
-              className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
-                formData.logoArrangement === 'stack'
-                  ? 'bg-teal-600 text-white shadow-md ring-2 ring-teal-600 ring-offset-2'
-                  : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 hover:border-slate-400'
-              }`}
-            >
-              Stack (Name Below Logo)
-            </button>
-            <button
-              type="button"
-              onClick={() => onChange('logoArrangement', 'inline')}
-              className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
-                formData.logoArrangement === 'inline'
-                  ? 'bg-teal-600 text-white shadow-md ring-2 ring-teal-600 ring-offset-2'
-                  : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 hover:border-slate-400'
-              }`}
-            >
-              Inline (Side by Side)
-            </button>
-          </div>
-        </div>
-
         </div>
 
         <div className="border-t border-slate-100 pt-6">
@@ -220,7 +221,7 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
                 max="48"
                 value={formData.fontSizeValue}
                 onChange={(e) => onChange('fontSizeValue', parseInt(e.target.value) || 16)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
                 placeholder="e.g., 20"
               />
             </div>
@@ -232,7 +233,7 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
                 max="16"
                 value={formData.metaFontSize}
                 onChange={(e) => onChange('metaFontSize', parseInt(e.target.value) || 8)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
                 placeholder="e.g., 12"
               />
             </div>
@@ -244,7 +245,7 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
                 max="800"
                 value={formData.clinicNameMaxWidth ?? 300}
                 onChange={(e) => onChange('clinicNameMaxWidth', parseInt(e.target.value) || 300)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
                 placeholder="e.g., 300"
               />
             </div>
@@ -256,7 +257,7 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
                 max="80"
                 value={formData.logoClinicNameSpacing ?? 20}
                 onChange={(e) => onChange('logoClinicNameSpacing', parseInt(e.target.value) || 0)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
                 placeholder="e.g., 20"
               />
             </div>
@@ -266,9 +267,9 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
                 <button
                   type="button"
                   onClick={() => onChange('clinicNameSingleLine', false)}
-                  className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                  className={`px-5 py-2.5 text-sm font-medium rounded-xl transition-all ${
                     (formData.clinicNameSingleLine !== true)
-                      ? 'bg-teal-600 text-white shadow-md ring-2 ring-teal-600 ring-offset-2'
+                      ? 'bg-indigo-600 text-white border border-indigo-600 shadow-md'
                       : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 hover:border-slate-400'
                   }`}
                 >
@@ -277,9 +278,9 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
                 <button
                   type="button"
                   onClick={() => onChange('clinicNameSingleLine', true)}
-                  className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                  className={`px-5 py-2.5 text-sm font-medium rounded-xl transition-all ${
                     (formData.clinicNameSingleLine === true)
-                      ? 'bg-teal-600 text-white shadow-md ring-2 ring-teal-600 ring-offset-2'
+                      ? 'bg-indigo-600 text-white border border-indigo-600 shadow-md'
                       : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 hover:border-slate-400'
                   }`}
                 >
@@ -302,7 +303,7 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
                 max="250"
                 value={formData.logoMaxWidth}
                 onChange={(e) => onChange('logoMaxWidth', parseInt(e.target.value) || 50)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
                 placeholder="e.g., 120"
               />
             </div>
@@ -314,7 +315,7 @@ const StylingSection = ({ formData, onChange }: StylingSectionProps) => {
                 max="150"
                 value={formData.logoMaxHeight}
                 onChange={(e) => onChange('logoMaxHeight', parseInt(e.target.value) || 50)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
                 placeholder="e.g., 80"
               />
             </div>

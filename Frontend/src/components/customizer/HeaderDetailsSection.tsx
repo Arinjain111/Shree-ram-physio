@@ -27,7 +27,7 @@ const HeaderDetailsSection = ({ formData, onChange }: HeaderDetailsSectionProps)
             type="text"
             value={formData.clinicName}
             onChange={(e) => onChange('clinicName', e.target.value)}
-            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+            className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
             placeholder="e.g. Shree Ram Physiotherapy and Rehabilitation Center"
           />
         </div>
@@ -36,7 +36,7 @@ const HeaderDetailsSection = ({ formData, onChange }: HeaderDetailsSectionProps)
           <textarea
             value={formData.address}
             onChange={(e) => onChange('address', e.target.value)}
-            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all resize-y min-h-20"
+            className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all resize-y min-h-20"
             rows={3}
             placeholder="Clinic address..."
           />
@@ -48,7 +48,7 @@ const HeaderDetailsSection = ({ formData, onChange }: HeaderDetailsSectionProps)
               type="text"
               value={formData.uan}
               onChange={(e) => onChange('uan', e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
               placeholder="Optional"
             />
           </div>
@@ -58,7 +58,7 @@ const HeaderDetailsSection = ({ formData, onChange }: HeaderDetailsSectionProps)
               type="text"
               value={formData.regNo}
               onChange={(e) => onChange('regNo', e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
               placeholder="Optional"
             />
           </div>
@@ -71,7 +71,7 @@ const HeaderDetailsSection = ({ formData, onChange }: HeaderDetailsSectionProps)
               type="text"
               value={formData.clinicPhone}
               onChange={(e) => onChange('clinicPhone', e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
               placeholder="e.g., 9123456789, 9876543210"
             />
           </div>
@@ -81,7 +81,7 @@ const HeaderDetailsSection = ({ formData, onChange }: HeaderDetailsSectionProps)
               type="email"
               value={formData.clinicEmail}
               onChange={(e) => onChange('clinicEmail', e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
               placeholder="e.g., clinic@example.com"
             />
           </div>
@@ -93,12 +93,12 @@ const HeaderDetailsSection = ({ formData, onChange }: HeaderDetailsSectionProps)
           <div className="flex items-center gap-4">
             <button
               onClick={handleLogoSelect}
-              className="px-4 py-2 bg-teal-50 text-teal-700 border border-teal-200 rounded-lg hover:bg-teal-100 transition-colors font-medium text-sm"
+              className="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors font-medium text-sm shadow-sm"
             >
               Select Logo
             </button>
             {formData.logoPath && (
-              <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-200 shadow-sm">
                 <img src={logoUrl} alt="Logo Preview" className="h-10 w-auto rounded object-contain" />
                 <button
                   onClick={handleLogoRemove}

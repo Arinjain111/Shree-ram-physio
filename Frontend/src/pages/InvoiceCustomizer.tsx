@@ -49,14 +49,14 @@ const InvoiceCustomizer = () => {
   };
 
   return (
-    <div className="w-full max-w-400 min-h-screen bg-slate-50/50 px-6 pb-6 mx-auto">
-      <div className="max-w-450 mx-auto">
+    <div className="w-full max-w-full min-h-screen bg-slate-50/50 px-4 sm:px-6 py-8 mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="max-w-full mx-auto pb-6">
         {/* Header Section */}
         <PageHeader 
           breadcrumb="Billing"
           title="Invoice Customizer"
           icon={
-            <div className="p-2 bg-teal-100 text-teal-700 rounded-lg">
+            <div className="p-2 bg-indigo-100 text-indigo-700 rounded-lg">
               <LayoutIcon />
             </div>
           }
@@ -71,7 +71,7 @@ const InvoiceCustomizer = () => {
               </button>
               <button
                 onClick={handleSave}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium shadow-sm transition-colors text-sm"
+                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm transition-all transform active:scale-95 text-sm"
               >
                 <SaveIcon />
                 Save Layout
@@ -80,10 +80,10 @@ const InvoiceCustomizer = () => {
           }
         />
 
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Settings Panel */}
-          <div className="xl:col-span-7 space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="lg:col-span-3 space-y-6">
+            <section className="bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
               <div className="p-6 border-b border-slate-100">
                 <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
                   Header & Clinic Details
@@ -92,9 +92,9 @@ const InvoiceCustomizer = () => {
               <div className="p-6">
                 <HeaderDetailsSection formData={formData} onChange={handleChange} />
               </div>
-            </div>
+            </section>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <section className="bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
               <div className="p-6 border-b border-slate-100">
                 <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
                   Footer & Signature
@@ -103,9 +103,9 @@ const InvoiceCustomizer = () => {
               <div className="p-6">
                 <FooterDetailsSection formData={formData} onChange={handleChange} />
               </div>
-            </div>
+            </section>
             
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <section className="bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
               <div className="p-6 border-b border-slate-100">
                 <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
                   Styling & Layout
@@ -114,13 +114,15 @@ const InvoiceCustomizer = () => {
               <div className="p-6">
                 <StylingSection formData={formData} onChange={handleChange} />
               </div>
-            </div>
+            </section>
           </div>
 
           {/* Preview Panel */}
-          <div className="xl:col-span-5 xl:sticky xl:top-6">
-            <div className="bg-slate-200 rounded-xl border border-slate-200 p-4">
-              <PreviewPanel formData={formData} />
+          <div className="lg:col-span-2 relative">
+            <div className="sticky top-6">
+              <div className="bg-slate-200/80 rounded-2xl border border-slate-300/80 shadow-inner overflow-hidden p-4 h-[calc(100vh-8rem)] flex flex-col">
+                <PreviewPanel formData={formData} />
+              </div>
             </div>
           </div>
         </div>

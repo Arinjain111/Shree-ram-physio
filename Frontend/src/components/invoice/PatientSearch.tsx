@@ -118,7 +118,7 @@ const PatientSearch = ({ invoices, onPatientSelect }: PatientSearchProps) => {
     <div ref={searchRef} className="relative">
       <div className="relative group">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <svg className="h-5 w-5 text-gray-400 group-focus-within:text-purple-500 transition-colors" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+          <svg className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
           </svg>
         </div>
@@ -130,7 +130,7 @@ const PatientSearch = ({ invoices, onPatientSelect }: PatientSearchProps) => {
           onKeyDown={handleKeyDown}
           onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
           placeholder="Search by contact number or invoice number..."
-          className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent sm:text-sm transition-shadow shadow-sm hover:shadow-md"
+          className="block w-full pl-10 pr-10 py-3 border border-slate-300 rounded-xl leading-5 bg-white placeholder-slate-400 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 sm:text-sm transition-all shadow-sm hover:shadow-md"
         />
         {searchQuery && (
           <button
@@ -148,14 +148,14 @@ const PatientSearch = ({ invoices, onPatientSelect }: PatientSearchProps) => {
         )}
         {isSearching && (
           <div className="absolute inset-y-0 right-10 flex items-center">
-            <div className="animate-spin h-4 w-4 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+            <div className="animate-spin h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
           </div>
         )}
       </div>
 
       {/* Dropdown Results */}
       {showDropdown && searchResults.length > 0 && (
-        <div className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden ring-1 ring-black ring-opacity-5">
+        <div className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-xl border border-slate-200/60 overflow-hidden">
           <div className="max-h-60 overflow-y-auto custom-scrollbar">
             {searchResults.map((patient, index) => (
               <button
@@ -164,10 +164,10 @@ const PatientSearch = ({ invoices, onPatientSelect }: PatientSearchProps) => {
                 onClick={() => handlePatientSelection(patient)}
                 onMouseDown={(e) => e.preventDefault()}
                 className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-3 ${
-                  index === selectedIndex ? 'bg-purple-50' : 'hover:bg-gray-50'
-                } border-b border-gray-50 last:border-none`}
+                  index === selectedIndex ? 'bg-indigo-50' : 'hover:bg-slate-50'
+                } border-b border-slate-100 last:border-none`}
               >
-                <div className="flex shrink-0 h-10 w-10 rounded-full bg-purple-100 items-center justify-center text-purple-600 font-bold text-lg">
+                <div className="flex shrink-0 h-10 w-10 rounded-full bg-indigo-100 items-center justify-center text-indigo-600 font-bold text-lg">
                   {(patient.firstName && patient.firstName[0]) || (patient.name && patient.name[0]) || '?'}
                 </div>
                 <div className="flex-1 min-w-0">

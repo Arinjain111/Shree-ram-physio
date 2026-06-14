@@ -24,7 +24,7 @@ const FooterDetailsSection = ({ formData, onChange }: FooterDetailsSectionProps)
             type="text"
             value={formData.clinicTagline || ''}
             onChange={(e) => onChange('clinicTagline', e.target.value)}
-            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+            className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
             placeholder="e.g. Pain Relief • Rehab • Sports Injury"
           />
         </div>
@@ -35,7 +35,7 @@ const FooterDetailsSection = ({ formData, onChange }: FooterDetailsSectionProps)
             type="text"
             value={formData.title || ''}
             onChange={(e) => onChange('title', e.target.value)}
-            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+            className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
             placeholder="e.g. PHYSIOTHERAPY RECEIPT"
           />
         </div>
@@ -47,7 +47,7 @@ const FooterDetailsSection = ({ formData, onChange }: FooterDetailsSectionProps)
               type="text"
               value={formData.footerNoteTitle || ''}
               onChange={(e) => onChange('footerNoteTitle', e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
               placeholder="Note:"
             />
           </div>
@@ -57,7 +57,7 @@ const FooterDetailsSection = ({ formData, onChange }: FooterDetailsSectionProps)
               type="text"
               value={formData.signatureLabel || ''}
               onChange={(e) => onChange('signatureLabel', e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
               placeholder="Authorized Signatory"
             />
           </div>
@@ -68,7 +68,7 @@ const FooterDetailsSection = ({ formData, onChange }: FooterDetailsSectionProps)
           <textarea
             value={formData.footerNotes || ''}
             onChange={(e) => onChange('footerNotes', e.target.value)}
-            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all resize-y min-h-24"
+            className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all resize-y min-h-24"
             rows={4}
             placeholder="This is a professional physiotherapy treatment receipt for medical reimbursement.\nNo refund after treatment taken."
           />
@@ -81,7 +81,7 @@ const FooterDetailsSection = ({ formData, onChange }: FooterDetailsSectionProps)
               type="text"
               value={formData.signatureName || ''}
               onChange={(e) => onChange('signatureName', e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
               placeholder="e.g. Dr. Ajay Gupta"
             />
           </div>
@@ -91,7 +91,7 @@ const FooterDetailsSection = ({ formData, onChange }: FooterDetailsSectionProps)
               type="text"
               value={formData.signatureQualification || ''}
               onChange={(e) => onChange('signatureQualification', e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
               placeholder="e.g. (BPT, MPT)"
             />
           </div>
@@ -102,12 +102,12 @@ const FooterDetailsSection = ({ formData, onChange }: FooterDetailsSectionProps)
           <div className="flex items-center gap-4">
             <button
               onClick={handleSignatureSelect}
-              className="px-4 py-2 bg-teal-50 text-teal-700 border border-teal-200 rounded-lg hover:bg-teal-100 transition-colors font-medium text-sm"
+              className="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors font-medium text-sm shadow-sm"
             >
               Select Signature
             </button>
             {formData.signatureImagePath && (
-              <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-200 shadow-sm">
                 <img src={signatureUrl} alt="Signature Preview" className="h-10 w-auto rounded object-contain" />
                 <button
                   onClick={handleSignatureRemove}

@@ -179,11 +179,16 @@ const TreatmentForm = ({
   };
 
   return (
-    <section>
-      <h3 className="text-lg font-semibold text-[#5F3794] mb-2">Treatment Details</h3>
+    <section className="bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 p-6">
+      <div className="flex items-center gap-2 mb-5">
+        <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <h3 className="text-lg font-semibold text-slate-800">Treatment Details</h3>
+      </div>
       <div className="space-y-4">
         {treatments.map((treatment, index) => (
-          <div key={`treatment-${index}`} className="bg-white p-4 rounded-lg border border-gray-200">
+          <div key={`treatment-${index}`} className="bg-slate-50/50 p-5 rounded-xl border border-slate-200 relative group">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="md:col-span-3 relative" ref={activeDropdown === index ? dropdownRef : null}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -205,33 +210,33 @@ const TreatmentForm = ({
                       setSelectedIndex(0);
                     }
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium text-slate-800 bg-white"
                   placeholder="Start typing to search treatments..."
                 />
                 
                 {/* Autocomplete Dropdown */}
                 {activeDropdown === index && filteredPresets.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-[300px] overflow-y-auto custom-scrollbar ring-1 ring-black ring-opacity-5">
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200/60 rounded-xl shadow-xl max-h-[300px] overflow-y-auto custom-scrollbar">
                     {filteredPresets.map((preset, presetIndex) => (
                       <div
                         key={preset.id}
                         onMouseDown={() => selectPreset(index, preset)}
                         onMouseEnter={() => setSelectedIndex(presetIndex)}
-                        className={`px-4 py-3 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors ${
+                        className={`px-4 py-3 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors ${
                           presetIndex === selectedIndex 
-                            ? 'bg-purple-50' 
-                            : 'hover:bg-gray-50'
+                            ? 'bg-indigo-50/80' 
+                            : 'hover:bg-slate-50'
                         }`}
                       >
                         <div className="flex justify-between items-center mb-1">
-                          <div className={`font-medium text-sm ${presetIndex === selectedIndex ? 'text-purple-900' : 'text-gray-900'}`}>
+                          <div className={`font-medium text-sm ${presetIndex === selectedIndex ? 'text-indigo-900' : 'text-slate-800'}`}>
                             {preset.name}
                           </div>
-                          <div className={`text-xs font-medium px-2 py-0.5 rounded-full ${presetIndex === selectedIndex ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                          <div className={`text-xs font-medium px-2 py-0.5 rounded-full ${presetIndex === selectedIndex ? 'bg-indigo-100/80 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
                             ₹{preset.pricePerSession}/sess
                           </div>
                         </div>
-                        <div className={`text-xs flex items-center gap-2 ${presetIndex === selectedIndex ? 'text-purple-600' : 'text-gray-500'}`}>
+                        <div className={`text-xs flex items-center gap-2 ${presetIndex === selectedIndex ? 'text-indigo-600' : 'text-slate-500'}`}>
                           <span>{preset.defaultSessions} sessions</span>
                           <span className="w-1 h-1 rounded-full bg-current opacity-50"></span>
                           <span>Total: ₹{(preset.defaultSessions * preset.pricePerSession).toFixed(2)}</span>
@@ -252,7 +257,7 @@ const TreatmentForm = ({
                     const val = e.target.value;
                     handleSessionsChange(index, val === '' ? 0 : parseInt(val));
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium text-slate-800 bg-white"
                   placeholder="e.g., 10"
                 />
               </div>
@@ -266,8 +271,8 @@ const TreatmentForm = ({
                   min="2000-01-01"
                   max={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
                   onChange={(e) => handleStartDateChange(index, e.target.value)}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-shadow ${
-                    getDateError(treatment.startDate) ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-transparent'
+                  className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-medium text-slate-800 bg-white ${
+                    getDateError(treatment.startDate) ? 'border-red-500 bg-red-50' : 'border-slate-300 focus:border-indigo-500'
                   }`}
                 />
                 {getDateError(treatment.startDate) && (
@@ -282,7 +287,7 @@ const TreatmentForm = ({
                   type="date"
                   value={treatment.endDate}
                   onChange={(e) => handleEndDateChange(index, e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium text-slate-800 bg-white"
                 />
               </div>
               <div className="md:col-span-1">
@@ -297,7 +302,7 @@ const TreatmentForm = ({
                     const val = e.target.value;
                     updateTreatment(index, 'amount', val === '' ? 0 : parseFloat(val));
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium text-slate-800 bg-white"
                 />
               </div>
             </div>
@@ -306,7 +311,7 @@ const TreatmentForm = ({
                 <button
                   type="button"
                   onClick={() => removeTreatmentItem(index)}
-                  className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm"
+                  className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded-lg text-sm transition-colors"
                 >
                   Remove
                 </button>
@@ -318,9 +323,10 @@ const TreatmentForm = ({
       <button
         type="button"
         onClick={addTreatmentItem}
-        className="mt-4 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+        className="mt-4 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors flex items-center gap-2"
       >
-        + Add Treatment Item
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        Add Treatment Item
       </button>
     </section>
   );

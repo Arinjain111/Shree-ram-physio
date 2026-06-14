@@ -1,6 +1,6 @@
 {
   "name": "shri-ram-physio-invoicing",
-  "version": "2.5.6",
+  "version": "2.5.7",
   "description": "Physiotherapy clinic invoicing and patient management system",
   "main": "dist-electron/main.js",
   "scripts": {

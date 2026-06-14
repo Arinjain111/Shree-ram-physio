@@ -236,9 +236,15 @@ const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, pay
   ];
 
   return (
-    <section>
-      <h3 className="text-lg font-semibold text-[#5F3794] mb-2">Patient Information</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+    <section className="bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 p-6">
+      <div className="flex items-center gap-2 mb-5">
+        <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <h3 className="text-lg font-semibold text-slate-800">Patient Information</h3>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <div className="relative">
           <label className="block text-sm font-medium text-gray-600 mb-1">
             First Name<span className="text-red-500">*</span> <span className='text-xs'>(can include Middle Names)</span>
@@ -249,13 +255,13 @@ const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, pay
               required
               value={patient.firstName || ''}
               onChange={(e) => handleFirstNameChange(e.target.value)}
-              className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 ${
+              className={`w-full px-4 py-2.5 pr-10 border rounded-xl bg-slate-50/50 focus:ring-2 transition-all outline-none ${
                 firstNameTouched && firstNameErrors.length > 0 && patient.firstName
-                  ? 'border-red-500 focus:ring-red-500'
+                  ? 'border-red-300 focus:ring-red-500/50 focus:border-red-500'
                   : firstNameTouched && patient.firstName && firstNameErrors.length === 0
-                  ? 'border-green-500 focus:ring-green-500'
-                  : 'border-gray-300 focus:ring-blue-500'
-              } placeholder-gray-400`}
+                  ? 'border-green-300 focus:ring-green-500/50 focus:border-green-500'
+                  : 'border-slate-300 focus:ring-indigo-500/50 focus:border-indigo-500'
+              } placeholder-slate-400 text-slate-800 font-medium`}
               placeholder='e.g., John Michael'
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -285,13 +291,13 @@ const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, pay
               required
               value={patient.lastName || ''}
               onChange={(e) => handleLastNameChange(e.target.value)}
-              className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 ${
+              className={`w-full px-4 py-2.5 pr-10 border rounded-xl bg-slate-50/50 focus:ring-2 transition-all outline-none ${
                 lastNameTouched && lastNameErrors.length > 0 && patient.lastName
-                  ? 'border-red-500 focus:ring-red-500'
+                  ? 'border-red-300 focus:ring-red-500/50 focus:border-red-500'
                   : lastNameTouched && patient.lastName && lastNameErrors.length === 0
-                  ? 'border-green-500 focus:ring-green-500'
-                  : 'border-gray-300 focus:ring-blue-500'
-              } placeholder-gray-400`}
+                  ? 'border-green-300 focus:ring-green-500/50 focus:border-green-500'
+                  : 'border-slate-300 focus:ring-indigo-500/50 focus:border-indigo-500'
+              } placeholder-slate-400 text-slate-800 font-medium`}
               placeholder='e.g., Doe'
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -322,13 +328,13 @@ const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, pay
               max="100"
               value={patient.age || ''}
               onChange={(e) => handleAgeChange(e.target.value)}
-              className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 ${
+              className={`w-full px-4 py-2.5 pr-10 border rounded-xl bg-slate-50/50 focus:ring-2 transition-all outline-none ${
                 ageTouched && ageErrors.length > 0 && patient.age
-                  ? 'border-red-500 focus:ring-red-500'
+                  ? 'border-red-300 focus:ring-red-500/50 focus:border-red-500'
                   : ageTouched && patient.age && ageErrors.length === 0
-                  ? 'border-green-500 focus:ring-green-500'
-                  : 'border-gray-300 focus:ring-blue-500'
-              } placeholder-gray-400`}
+                  ? 'border-green-300 focus:ring-green-500/50 focus:border-green-500'
+                  : 'border-slate-300 focus:ring-indigo-500/50 focus:border-indigo-500'
+              } placeholder-slate-400 text-slate-800 font-medium`}
               placeholder="e.g., 30"
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -376,13 +382,13 @@ const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, pay
               maxLength={10}
               value={patient.phone}
               onChange={(e) => handlePhoneChange(e.target.value)}
-              className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 ${
+              className={`w-full px-4 py-2.5 pr-10 border rounded-xl bg-slate-50/50 focus:ring-2 transition-all outline-none ${
                 phoneTouched && phoneErrors.length > 0 && patient.phone
-                  ? 'border-red-500 focus:ring-red-500'
+                  ? 'border-red-300 focus:ring-red-500/50 focus:border-red-500'
                   : phoneTouched && patient.phone && phoneErrors.length === 0
-                  ? 'border-green-500 focus:ring-green-500'
-                  : 'border-gray-300 focus:ring-blue-500'
-              } placeholder-gray-400`}
+                  ? 'border-green-300 focus:ring-green-500/50 focus:border-green-500'
+                  : 'border-slate-300 focus:ring-indigo-500/50 focus:border-indigo-500'
+              } placeholder-slate-400 text-slate-800 font-medium`}
               placeholder="e.g., 9876543210"
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -414,8 +420,8 @@ const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, pay
               value={TransactionId || ''}
               onChange={(e) => setTransactionId && setTransactionId(e.target.value)}
               disabled={!(paymentMethod === 'UPI' || paymentMethod === 'Card')}
-              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 placeholder-gray-400 ${
-                !(paymentMethod === 'UPI' || paymentMethod === 'Card') ? 'bg-gray-100 cursor-not-allowed text-gray-500' : 'bg-white'
+              className={`w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all outline-none font-medium ${
+                !(paymentMethod === 'UPI' || paymentMethod === 'Card') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-slate-50/50 text-slate-800'
               }`}
               placeholder={paymentMethod === 'UPI' || paymentMethod === 'Card' ? "Enter transaction ID" : "Requires UPI or Card"}
             />
@@ -454,13 +460,13 @@ const PatientForm = ({ patient, setPatient, TransactionId, setTransactionId, pay
                 type="text"
                 value={patient.uhid}
                 onChange={(e) => handleUhidChange(e.target.value)}
-                className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 ${
+                className={`w-full px-4 py-2.5 pr-10 border rounded-xl bg-slate-50/50 focus:ring-2 transition-all outline-none ${
                   uhidTouched && uhidErrors.length > 0 && patient.uhid
-                    ? 'border-red-500 focus:ring-red-500'
+                    ? 'border-red-300 focus:ring-red-500/50 focus:border-red-500'
                     : uhidTouched && patient.uhid && uhidErrors.length === 0
-                    ? 'border-green-500 focus:ring-green-500'
-                    : 'border-gray-300 focus:ring-blue-500'
-                } placeholder-gray-400`}
+                    ? 'border-green-300 focus:ring-green-500/50 focus:border-green-500'
+                    : 'border-slate-300 focus:ring-indigo-500/50 focus:border-indigo-500'
+                } placeholder-slate-400 text-slate-800 font-medium`}
                 placeholder="e.g., ABC123"
               />
               <div className="absolute inset-y-0 right-0 flex items-center pr-3">
