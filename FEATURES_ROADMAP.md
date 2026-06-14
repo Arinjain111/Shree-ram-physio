@@ -171,17 +171,6 @@ These features reuse existing schemas (where they already exist) or add a focuse
   - Reuse the CSV utility from `Reports.tsx`
 - **Impact**: Compliance, accounting integration.
 
-### 4. ⌨️ Keyboard Shortcuts
-- **Why**: Power-user feature, almost zero cost.
-- **What to build**:
-  - `Ctrl+N` → New invoice
-  - `Ctrl+P` → Print
-  - `Ctrl+S` → Save
-  - `Ctrl+F` → Focus search
-  - `Esc` → Close modal
-  - Show overlay on first launch with `?`
-- **Impact**: Speed.
-
 ### 5. 🧪 Bulk CSV Import (Patients)
 - **Why**: Migration from paper records.
 - **What to build**:
@@ -268,41 +257,32 @@ These are larger features that may require schema changes, new pages, or backend
 
 #### Performance & Build
 - ✅ **Lazy chunk split** per page (verified via `npm run build:vite` — `Home 8KB`, `Settings 14KB`, `Finances 31KB`, `Reports 61KB`, `InvoiceGenerator 125KB`, etc.)
-- ⬜ **Bundle size analysis** — add `vite-plugin-visualizer` (or `rollup-plugin-visualizer`) to surface top-N weight contributors in `dist/stats.html`
-- ⬜ **Route-level preload on hover/idle** — kick off `import()` for adjacent routes on link hover or `requestIdleCallback` so navigation is instant for likely-next pages
+- ✅ **Bundle size analysis** — `rollup-plugin-visualizer` wired into `vite.config.ts` (dynamic-imported to dodge the CJS/ESM clash); `npm run analyze` emits `dist/stats.html` as a treemap with gzip + brotli sizes. Verified: 723KB stats.html with all chunks + node_modules
+- ✅ **Route-level preload on hover/idle** — `HubLayout` calls `preloaders[tab.path]?.()` on `onMouseEnter` and `onFocus`; the fire-and-forget `import()` lands the chunk in the module cache before the user clicks
 - ⬜ **Asset preloading hints** — add `<link rel="modulepreload">` for the chunks of the current hub on initial paint
 
 #### State & Data
 - ✅ Custom hooks (`useInvoiceForm`, `useInvoicePrinter`, `useSyncManager`, `useErrorHandler`, `useAutoUpdater`, `useInvoiceLayout`) — heavy logic kept out of components
+- ✅ **Custom-hooks barrel** — `src/hooks/index.ts` re-exports all hooks so pages do `import { useInvoiceForm } from '@/hooks'`
 - ⬜ **React Query / SWR for IPC reads** — currently every page re-fetches on mount via raw `ipcRenderer.invoke`; a small cache layer (or even a manual `useQuery`-style hook) would dedupe `load-invoices` / `load-patients` calls across pages and keep the UI snappy when navigating back
 - ⬜ **Mutations invalidate cache** — when `save-invoice` / `record-payment` succeeds, the matching query should be invalidated, not just reloaded via the `invoices-updated` window event
 
 #### UX & Accessibility
-- ⬜ **Keyboard shortcuts** — `Ctrl+N` new invoice, `Ctrl+P` print, `Ctrl+S` save, `Ctrl+F` focus search, `Esc` close modal; show overlay on `?`
-- ⬜ **Dark mode** — Tailwind already has `dark:` variants everywhere; add a theme toggle in `Settings` that flips a class on `<html>` and persists to `userData/settings.json`
-- ⬜ **Accessibility audit** — `aria-label` on icon-only buttons, focus traps in modals (PaymentModal, PatientDetailModal), live regions for toast queue
-- ⬜ **Print preview improvements** — page-break accuracy for long treatment lists, A5 support in the live preview pane
-
-#### PWA & Offline
-- ⬜ **Service worker for PWA** — install `vite-plugin-pwa` so the renderer can be served offline-first in the browser; not needed for Electron itself but enables the future web portal
-- ⬜ **Manifest + installable** — name, icons, theme color, start URL
+- ✅ **Accessibility audit (partial)** — `aria-label` added to icon-only buttons across Pagination (First/Prev/Next/Last), InvoiceHistoryCard (Edit/Reissue/Print/Delete), PatientDetailModal (Delete), UpdateBanner (Dismiss), TreatmentSettings (Edit/Delete on both tabs), InvoiceGenerator (refresh invoice number, with state-aware label), HubLayout (back-home)
+- ⬜ **Focus traps in modals** — PaymentModal, PatientDetailModal still need a focus-trap so Tab cycles inside the dialog
+- ⬜ **Live regions for toast queue** — wrap the toast container in `aria-live="polite"` / `aria-atomic="true"` so screen readers announce new toasts
+- ⬜ **Print preview improvements** — page-break accuracy for long treatment lists, A5 support is already plumbed through `useInvoicePrinter` and `LayoutConfig.paperSize`; need to surface the live-preview pane in the chosen paper size
 
 #### Testing & Quality
 - ⬜ **Unit tests** — Vitest + React Testing Library; start with `useInvoiceForm` (form state machine) and `useSyncManager` (debouncing, event listener cleanup)
-- ⬜ **Component snapshot tests** — PageSkeleton, PageHeader, CustomSelect (controlled component edge cases)
 - ⬜ **E2E tests** — Playwright with Electron; cover "save invoice → see in Database Find → pay partial → see in Finances"
 
 #### Security Hardening
 - ⬜ **Fix `nodeIntegration: true` in print window** — `electron/ipc/print.ts` creates a temporary `BrowserWindow` with `contextIsolation: false` and `nodeIntegration: true`. Switch to `contextIsolation: true` + `nodeIntegration: false` + a preload script that exposes only `print` / `pdf` via contextBridge
-- ⬜ **CSP header for the renderer** — `default-src 'self'`, no inline scripts in production builds
-
-#### Internationalisation & Localisation
-- ⬜ **i18n setup** — `i18next` + `react-i18next`; English + Hindi to start; switcher in Settings
-- ⬜ **Date / number / currency formatting via `Intl.*`** — replace ad-hoc `toLocaleString()` calls with explicit `Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' })` for consistency across the app
+- ✅ **CSP header for the renderer** — `<meta http-equiv="Content-Security-Policy">` in `index.html`: `default-src 'self'`, no inline-object/frame, `connect-src 'self' https:` (for the cloud sync API), `frame-ancestors 'none'`, `base-uri 'self'`, plus `strict-origin-when-cross-origin` referrer
 
 #### Refactors & Hygiene
-- ⬜ **Extract custom-hooks barrel** — `src/hooks/index.ts` so pages can `import { useInvoiceForm } from '@/hooks'`
-- ⬜ **Storybook for shared components** — CustomSelect, PageHeader, Toast, Modal can be iterated on without spinning up the full app
+- ✅ **Extract custom-hooks barrel** — `src/hooks/index.ts` so pages can `import { useInvoiceForm } from '@/hooks'`
 - ⬜ **Type tightening** — replace `any` returns in the data-loading `useEffect`s with proper `InvoiceData[]` / `DatabaseInvoice[]` types; the Zod schemas are already the source of truth, just need the IPC response types to use them
 
 ### Backend
@@ -327,7 +307,7 @@ These are larger features that may require schema changes, new pages, or backend
 ### Security
 - ⬜ Audit trails (see Quick Win #14 in the Medium-Term section)
 - ⬜ **Print-window `nodeIntegration` flag** — `electron/ipc/print.ts` still uses `contextIsolation: false` and `nodeIntegration: true` for the OS print dialog. Switch to a preload script that exposes only `print` / `pdf` via `contextBridge`
-- ⬜ **Renderer CSP** — add a strict Content-Security-Policy meta tag or `webPreferences` header once the print-window fix lands
+- ✅ **Renderer CSP** — added a strict `Content-Security-Policy` meta tag in `index.html` (`default-src 'self'`, no inline-object/frame, `connect-src 'self' https:` for the cloud sync API, `frame-ancestors 'none'`, `base-uri 'self'`, plus `strict-origin-when-cross-origin` referrer). The print-window fix is still pending; once it lands, the CSP should also be tightened to drop `'unsafe-inline'` for `script-src` (currently allowed only for the critical startup error handler)
 - ⬜ **Dependency scanning** — `npm audit` in CI; Dependabot auto-PRs for patch updates
 - ⬜ **Secret rotation** — `API_KEY` and any cloud creds should be rotatable without a full app release
 
@@ -480,5 +460,4 @@ Sometimes the best roadmap is what you don't build:
 
 ---
 
-*Last Updated: June 14, 2026*
-*Prepared after deep dive into codebase + web research on SPRY, WebPT, ClinicSource, PhysioCare PMS, Net Health, and others.*
+*Last Updated: June 14, 2026 (v2.5.5 — bundle visualizer, route preload, CSP, a11y labels, hooks barrel)*
