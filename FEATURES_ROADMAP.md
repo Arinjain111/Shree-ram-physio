@@ -112,16 +112,22 @@ The roadmap below is ordered by **impact-per-effort**, with "Quick Wins" first a
 - ✅ Hover effects
 - ✅ Unified top bar with breadcrumb + actions
 - ✅ Hub-based navigation (Billing / Clinic Mgmt / Patient DB / Configuration)
+- ✅ **Page-level loading skeleton** — `PageSkeleton` shimmer placeholder shown while lazy chunks resolve via `React.lazy()` + `Suspense`
+- ✅ **Code-split routes** — each page is its own Rollup chunk (Home 8KB, Settings 14KB, Finances 31KB, Reports 61KB, InvoiceGenerator 125KB, etc.) for faster initial paint
 
 ### Technical & Architecture
 - ✅ Electron 39+ framework
 - ✅ Offline-First Architecture (SQLite via better-sqlite3 + Prisma)
-- ✅ Cloud Sync (PostgreSQL / Supabase via Prisma)
+- ✅ Cloud Sync (PostgreSQL / Supabase via Prisma, 10-minute smart-polling interval)
 - ✅ TypeScript strict mode
 - ✅ IPC communication (52 channels across 10 handlers)
 - ✅ Zod validation mirrored on frontend + backend
 - ✅ Print API integration
 - ✅ PDF generation with auto-save
+- ✅ **Idempotent `save-invoice` IPC** — finds an existing row by `invoiceNumber` and updates it instead of creating a duplicate
+- ✅ **Sync self-heal** — `performSync` runs a `GROUP BY invoice_number HAVING COUNT(*) > 1` cleanup at startup; `applyCloudUpdates` deletes sibling duplicates before each update
+- ✅ **Immutable invoice numbers** — both upload and apply phases refuse to rewrite a printed `invoiceNumber`
+- ✅ **Numeric sort on `invoiceNumber`** in `get-next-invoice-number` — `CAST(invoice_number AS INTEGER) DESC` so legacy non-padded rows can't out-sort padded ones
 - ✅ Error handling with normalized errors
 - ✅ Structured logger (JSON + human modes, field redaction, toast bridge)
 - ✅ HTTP access log middleware
@@ -149,53 +155,7 @@ These features reuse existing schemas (where they already exist) or add a focuse
   - Mark session as cancelled / rescheduled
 - **Impact**: Turns the app from a billing tool into a true clinical tool. The single biggest gap.
 
-### 2. 📅 Appointment Scheduling / Calendar
-- **Why**: Every competitor has it. The roadmap lists it under "Future Enhancements" but never built.
-- **What to build**:
-  - New `Appointment` table (id, patientId, dateTime, durationMin, status, notes, treatmentId?)
-  - `/appointments` page with weekly/monthly calendar view
-  - Color-coded by status (scheduled/completed/cancelled/no-show)
-  - Click empty slot to book; click appointment to view/edit
-  - Show in patient detail pane as a "Next visit" badge
-- **Impact**: Daily-use feature, every clinic needs it.
-
-### 3. 📋 SOAP Notes (Subjective, Objective, Assessment, Plan)
-- **Why**: Industry standard for PT clinical documentation. Reuse the `SessionNoteTemplate` table that already exists.
-- **What to build**:
-  - Rich-text SOAP note editor inside treatment session
-  - Save SOAP notes per treatment (or per session)
-  - Quick-pick from `SessionNoteTemplate` snippets
-  - Print/export SOAP note as PDF
-- **Impact**: Clinical credibility, medico-legal protection.
-
-### 4. 📦 Treatment Packages
-- **Why**: Recurring revenue model. Patients buy 10/20-session packages; auto-decrement per visit.
-- **What to build**:
-  - New `Package` table (id, patientId, totalSessions, usedSessions, price, expiresAt, status)
-  - `/packages` page (or section in patient detail) to sell/redeem
-  - When a session invoice is created, optionally consume one package credit
-  - Alert when package is nearing expiry or fully used
-- **Impact**: Better cash flow, customer retention, fewer billing disputes.
-
-### 5. 💊 Digital Prescription / Exercise Plan
-- **Why**: A printed invoice is not a prescription. Therapists need to give patients home exercises.
-- **What to build**:
-  - Add `prescription` JSON field to Invoice (exercises, dosage, frequency, duration)
-  - Standard prescription template with sections (Medications, Exercises, Precautions, Follow-up)
-  - Print as separate "Prescription Slip" with clinic letterhead
-  - Optional: export as PDF
-- **Impact**: High utility, low cost.
-
-### 6. 🔔 In-App Reminders & To-Do
-- **Why**: Free productivity boost, no third-party service needed.
-- **What to build**:
-  - Lightweight `Todo` table (id, title, dueDate, priority, completed, assignedTo)
-  - Simple `/todos` page
-  - Header bell icon with count of overdue items
-  - Quick-add from anywhere
-- **Impact**: Daily driver feature, sticky engagement.
-
-### 7. 🗂️ Patient Document Attachments
+### 2. 🗂️ Patient Document Attachments
 - **Why**: Roadmap lists it. PT clinics deal with MRI reports, X-rays, doctor's notes.
 - **What to build**:
   - New `PatientDocument` table (id, patientId, fileName, mimeType, base64/pdf, category, uploadedAt)
@@ -204,14 +164,14 @@ These features reuse existing schemas (where they already exist) or add a focuse
   - View/download documents, no in-app viewer
 - **Impact**: Centralized records.
 
-### 8. 📤 CSV Export for Patient List & Invoice List
+### 3. 📤 CSV Export for Patient List & Invoice List
 - **Why**: Reports page already exports charts. Patient/invoice lists don't.
 - **What to build**:
   - "Export CSV" button on `DatabaseFind` and `Finances` (billing tab)
   - Reuse the CSV utility from `Reports.tsx`
 - **Impact**: Compliance, accounting integration.
 
-### 9. ⌨️ Keyboard Shortcuts
+### 4. ⌨️ Keyboard Shortcuts
 - **Why**: Power-user feature, almost zero cost.
 - **What to build**:
   - `Ctrl+N` → New invoice
@@ -222,45 +182,18 @@ These features reuse existing schemas (where they already exist) or add a focuse
   - Show overlay on first launch with `?`
 - **Impact**: Speed.
 
-### 10. 🌗 Dark Mode
-- **Why**: Free UX win, Tailwind already has dark: prefix everywhere.
-- **What to build**:
-  - Toggle in Settings → "Theme: Light / Dark / System"
-  - Persist in `userData/settings.json`
-  - All pages already use slate-* which has dark equivalents
-- **Impact**: Modern feel, easy to ship.
-
-### 11. 🧪 Bulk CSV Import (Patients)
+### 5. 🧪 Bulk CSV Import (Patients)
 - **Why**: Migration from paper records.
 - **What to build**:
   - Settings → "Import Patients from CSV" with template download
   - Validate each row via Zod, show preview, commit
 - **Impact**: Onboarding speed.
 
-### 12. 📈 Inventory Low-Stock Alerts
-- **Why**: The data is already there. Just needs a UI.
-- **What to build**:
-  - Inventory page: red badge on items below `reorderLevel`
-  - Settings → "Low-stock threshold per item" (add `reorderLevel` field to `InventoryItem`)
-  - Toast on app open if any items are low
-- **Impact**: Avoid stockouts.
-
 ---
 
 ## 🟡 Medium-Term (Strategic — v2.7-v3.0)
 
 These are larger features that may require schema changes, new pages, or backend work.
-
-### 13. 🔐 Authentication & Role-Based Access Control (RBAC)
-- **Why**: Currently anyone with the app can do anything. For multi-user clinics this is critical.
-- **What to build**:
-  - Add `User` table (id, username, passwordHash, role, lastLoginAt)
-  - Roles: `admin` (full), `receptionist` (billing only), `therapist` (clinical notes, no billing), `viewer` (read only)
-  - Login screen at app launch
-  - Hash passwords with bcrypt, store JWT in main process
-  - Per-page role guards (e.g. Settings = admin only)
-  - Backend: `requireRole(role)` middleware
-- **Impact**: Required for any multi-user deployment; big enterprise unlock.
 
 ### 14. 📜 Audit Trail / Activity Log
 - **Why**: Medical data needs compliance trail. Only `SyncLog` exists today.
@@ -276,61 +209,11 @@ These are larger features that may require schema changes, new pages, or backend
 - **What to build**:
   - Integration with **WhatsApp Business API** (via Meta or providers like Wati / Interakt)
   - **Triggered messages**:
-    - Appointment confirmation (24h before)
-    - Reminder (2h before)
     - Payment receipt
-    - Birthday wish
-    - Package expiry alert
+    - marketing messages
   - Settings → "WhatsApp API Key" configuration
   - "Send manual message" button on patient detail
 - **Impact**: Huge reduction in no-shows. Industry-standard now.
-
-### 16. 🌐 Web Portal / Browser Access
-- **Why**: Patients want to book from phone. Recept. wants to check on tablet.
-- **What to build**:
-  - Express backend already exists → add React-based web client
-  - Subset of features: book appointment, view history, pay online, download invoice
-  - Host on same Azure App Service alongside API
-  - Share Postgres DB; Electron app uses local SQLite + sync as today
-- **Impact**: 5x addressable users. Big differentiator.
-
-### 17. 💳 Online Payments (Razorpay / Stripe)
-- **Why**: India is UPI-first. Patients want to pay via PhonePe/GPay/Paytm from the invoice.
-- **What to build**:
-  - Integrate **Razorpay** (best India coverage) on the backend
-  - On invoice: "Pay Online" button → opens QR/deep link
-  - Backend webhook updates invoice `paymentStatus` and `amountPaid`
-  - Auto-print receipt after success
-- **Impact**: Faster collection, better UX.
-
-### 18. 🏥 Multi-Branch / Multi-Location
-- **Why**: Roadmap says ⬜. Larger clinics have 2-5 branches.
-- **What to build**:
-  - Add `Branch` table (id, name, address, phone, logo, headerColor)
-  - All entities get `branchId`
-  - "Switch branch" selector in header
-  - Per-branch reports and dashboards
-  - Per-branch customizations (logo, color) - reuses InvoiceCustomizer
-- **Impact**: Enterprise-ready.
-
-### 19. 📱 Mobile App (Companion)
-- **Why**: Therapists want to log notes from the patient's side.
-- **What to build**:
-  - React Native or Capacitor app
-  - Read-only access to assigned patients' schedules
-  - Quick SOAP note entry, exercise logging
-  - Push notifications for new appointments
-- **Impact**: Therapist productivity.
-
-### 20. 🧠 AI-Powered Features
-- **Why**: Industry trend. Existing diagnosis N-gram is a start.
-- **What to build**:
-  - **AI Scribe**: Voice → SOAP note (use Whisper API)
-  - **Smart Diagnosis**: Suggest differential diagnoses based on patient history
-  - **Treatment Recommendation**: Suggest treatment plans from historical data
-  - **Invoice Anomaly Detection**: Flag unusual charges
-  - **Chatbot**: Patient-facing Q&A
-- **Impact**: Modern, differentiating.
 
 ### 21. 📋 Insurance / TPA Claims (if India → later)
 - **Why**: Cash-based + insurance models differ. Many Indian clinics want both.
@@ -345,27 +228,9 @@ These are larger features that may require schema changes, new pages, or backend
 - **Why**: Single SQLite file = single point of failure.
 - **What to build**:
   - Settings → "Backup Database" → save `.db` file with timestamp
-  - Scheduled auto-backup (daily to `userData/backups/`)
+  - Scheduled auto-backup (every week to `userData/backups/`)
   - "Restore from backup" with confirmation
-  - Optional: upload backup to cloud (Azure Blob)
 - **Impact**: Disaster recovery.
-
-### 23. 🌍 Multi-Language Support (i18n)
-- **Why**: India has 22 official languages. Other countries too.
-- **What to build**:
-  - i18next integration
-  - English + Hindi to start
-  - Language switcher in Settings
-  - Persist preference
-- **Impact**: Geographic expansion.
-
-### 24. 🧾 GST / Tax Support
-- **Why**: Roadmap says ⬜. Indian clinics need GST invoices (CGST/SGST/IGST).
-- **What to build**:
-  - Add `taxRate`, `taxType`, `taxAmount` to Invoice and Treatment
-  - Settings → "Default tax rate" + HSN/SAC code per treatment preset
-  - Tax reports: monthly GST return, GSTR-1 export
-- **Impact**: Legal compliance for many clinics.
 
 ### 25. 📡 Offline Queue Management & Conflict Resolution
 - **Why**: Sync engine works, but no UI for "what happened during offline".
@@ -375,20 +240,11 @@ These are larger features that may require schema changes, new pages, or backend
   - Manual conflict resolution UI (rare, but needed)
 - **Impact**: Trust in the sync.
 
-### 26. 🔌 Third-Party Integrations
-- **Google Calendar**: Sync appointments
-- **Tally / Zoho Books**: Export daily invoices
-- **Email (SendGrid / AWS SES)**: Send PDF receipts to patient email
-- **Google Drive / Dropbox**: Auto-backup PDF invoices
-- **Twilio SMS**: Fallback if WhatsApp not available
-- **Zapier / Webhooks**: For advanced users
-
 ### 27. 📊 Advanced Analytics & BI
 - **What to build**:
   - Cohort analysis (retention by month of first visit)
   - Patient lifetime value (LTV)
   - Treatment effectiveness score (pain delta vs. cost)
-  - Therapist performance scorecard
   - Funnel: inquiry → first visit → package → repeat
   - Predictive revenue forecast (simple linear regression)
 - **Impact**: Strategic decision-making.
@@ -396,68 +252,93 @@ These are larger features that may require schema changes, new pages, or backend
 ### 28. 🏷️ Barcode / QR Code on Invoice
 - **What to build**:
   - Generate QR with UPI payment deep link
-  - Generate barcode with invoice number for scanning
-  - Patient loyalty card with QR
 - **Impact**: Modern, paperless.
-
-### 29. 📃 Credit / Debit Notes
-- **Why**: Roadmap says ⬜. Required for returns and adjustments.
-- **What to build**:
-  - New `CreditNote` and `DebitNote` tables linked to original Invoice
-  - Generate, apply, track
-- **Impact**: Accounting accuracy.
-
-### 30. 👥 Referral Tracking
-- **What to build**:
-  - Add `referralSource` enum to Patient (Google, Doctor, Word-of-mouth, etc.)
-  - Add `referringDoctor` field
-  - Report: top referral sources
-  - Auto-commission calculation for referring doctors
-- **Impact**: Marketing ROI.
 
 ---
 
 ## 🛠️ Technical Debt & Infrastructure (Continuous)
 
 ### Frontend
-- ✅ React ErrorBoundary
-- ✅ Toast Notification System (auto-dismiss, stacking)
-- ⬜ Print Preview improvements (page break accuracy)
-- ⬜ Bundle size analysis (vite-plugin-visualizer)
-- ⬜ React.lazy for page-level code splitting
-- ⬜ Service worker for PWA support
-- ⬜ Fix `nodeIntegration: true` in print window (security risk)
+
+#### Routing & Loading
+- ✅ React ErrorBoundary — catches render errors and routes them through the structured logger
+- ✅ Toast Notification System (auto-dismiss, stacking) — `UIProvider` raises toasts from the new `useLogger().error(...)` automatically
+- ✅ **Page-level code splitting** — every page is wrapped in `React.lazy()` and a `<Suspense>` boundary in `App.tsx`; `PageLoader` shows the `PageSkeleton` while each chunk is being fetched
+- ✅ **PageSkeleton** — full-width shimmer placeholder (header + grid content) shown while lazy chunks resolve
+
+#### Performance & Build
+- ✅ **Lazy chunk split** per page (verified via `npm run build:vite` — `Home 8KB`, `Settings 14KB`, `Finances 31KB`, `Reports 61KB`, `InvoiceGenerator 125KB`, etc.)
+- ⬜ **Bundle size analysis** — add `vite-plugin-visualizer` (or `rollup-plugin-visualizer`) to surface top-N weight contributors in `dist/stats.html`
+- ⬜ **Route-level preload on hover/idle** — kick off `import()` for adjacent routes on link hover or `requestIdleCallback` so navigation is instant for likely-next pages
+- ⬜ **Asset preloading hints** — add `<link rel="modulepreload">` for the chunks of the current hub on initial paint
+
+#### State & Data
+- ✅ Custom hooks (`useInvoiceForm`, `useInvoicePrinter`, `useSyncManager`, `useErrorHandler`, `useAutoUpdater`, `useInvoiceLayout`) — heavy logic kept out of components
+- ⬜ **React Query / SWR for IPC reads** — currently every page re-fetches on mount via raw `ipcRenderer.invoke`; a small cache layer (or even a manual `useQuery`-style hook) would dedupe `load-invoices` / `load-patients` calls across pages and keep the UI snappy when navigating back
+- ⬜ **Mutations invalidate cache** — when `save-invoice` / `record-payment` succeeds, the matching query should be invalidated, not just reloaded via the `invoices-updated` window event
+
+#### UX & Accessibility
+- ⬜ **Keyboard shortcuts** — `Ctrl+N` new invoice, `Ctrl+P` print, `Ctrl+S` save, `Ctrl+F` focus search, `Esc` close modal; show overlay on `?`
+- ⬜ **Dark mode** — Tailwind already has `dark:` variants everywhere; add a theme toggle in `Settings` that flips a class on `<html>` and persists to `userData/settings.json`
+- ⬜ **Accessibility audit** — `aria-label` on icon-only buttons, focus traps in modals (PaymentModal, PatientDetailModal), live regions for toast queue
+- ⬜ **Print preview improvements** — page-break accuracy for long treatment lists, A5 support in the live preview pane
+
+#### PWA & Offline
+- ⬜ **Service worker for PWA** — install `vite-plugin-pwa` so the renderer can be served offline-first in the browser; not needed for Electron itself but enables the future web portal
+- ⬜ **Manifest + installable** — name, icons, theme color, start URL
+
+#### Testing & Quality
+- ⬜ **Unit tests** — Vitest + React Testing Library; start with `useInvoiceForm` (form state machine) and `useSyncManager` (debouncing, event listener cleanup)
+- ⬜ **Component snapshot tests** — PageSkeleton, PageHeader, CustomSelect (controlled component edge cases)
+- ⬜ **E2E tests** — Playwright with Electron; cover "save invoice → see in Database Find → pay partial → see in Finances"
+
+#### Security Hardening
+- ⬜ **Fix `nodeIntegration: true` in print window** — `electron/ipc/print.ts` creates a temporary `BrowserWindow` with `contextIsolation: false` and `nodeIntegration: true`. Switch to `contextIsolation: true` + `nodeIntegration: false` + a preload script that exposes only `print` / `pdf` via contextBridge
+- ⬜ **CSP header for the renderer** — `default-src 'self'`, no inline scripts in production builds
+
+#### Internationalisation & Localisation
+- ⬜ **i18n setup** — `i18next` + `react-i18next`; English + Hindi to start; switcher in Settings
+- ⬜ **Date / number / currency formatting via `Intl.*`** — replace ad-hoc `toLocaleString()` calls with explicit `Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' })` for consistency across the app
+
+#### Refactors & Hygiene
+- ⬜ **Extract custom-hooks barrel** — `src/hooks/index.ts` so pages can `import { useInvoiceForm } from '@/hooks'`
+- ⬜ **Storybook for shared components** — CustomSelect, PageHeader, Toast, Modal can be iterated on without spinning up the full app
+- ⬜ **Type tightening** — replace `any` returns in the data-loading `useEffect`s with proper `InvoiceData[]` / `DatabaseInvoice[]` types; the Zod schemas are already the source of truth, just need the IPC response types to use them
 
 ### Backend
-- ✅ Structured Logging with redaction
-- ⬜ API Versioning (`/api/v1/` prefix)
-- ⬜ Health Check enhancements (DB, disk, sync)
-- ✅ Zod validation on all IPC handlers
-- ⬜ Database Indexing optimization (add indices on date, phone, patientId, syncStatus)
-- ⬜ Graceful Degradation for Sync Failures (queue locally, retry with backoff)
-- ⬜ Database Migration strategy (zero-downtime, rollbacks)
+- ✅ Structured Logging with redaction (in-house `logger` with JSON / human modes, level filtering, `with/child/time`)
+- ✅ Zod validation on all IPC handlers — mirrored on frontend + backend
+- ✅ 3-tier rate limiting (sync 30/15min, standard 100/15min, reset 5/hour)
+- ✅ HTTP access log middleware — single line per request (IP, method, URL, status, duration)
+- ⬜ **API Versioning** (`/api/v1/` prefix) — lets us evolve the contract without breaking older Electron builds
+- ⬜ **Health Check enhancements** — extend `/health` to report DB row counts, last sync timestamp, disk free in `userData`, sync engine state
+- ⬜ **Database Indexing optimization** — add `@@index` on `Invoice.date`, `Invoice.paymentStatus`, `Patient.phone`, `Patient.uhid`, `Patient.cloudId`, `Treatment.invoiceId`, `syncStatus` (most are already there for relations; add the rest)
+- ⬜ **Graceful Degradation for Sync Failures** — when the backend is down, queue mutations locally and retry with exponential backoff; surface a non-blocking "Sync paused — will retry in Ns" toast instead of an error
+- ⬜ **Database Migration strategy** — zero-downtime for additive changes, plan for non-additive changes (column drops, type changes) with shadow columns + dual-writes
+- ⬜ **Per-clinic API keys** — current `AZURE_BACKEND_URL` uses a single static key; rotate to per-clinic keys when RBAC lands (issue #13 in the Medium-Term section)
+- ⬜ **Response compression** — `compression` middleware on Express for `load-invoices` / `load-patients` payloads (largest endpoints)
 
 ### Database
-- ⬜ Encrypt SQLite at rest (SQLCipher)
-- ⬜ Soft delete instead of hard delete
-- ⬜ Add `createdAt` / `updatedAt` to all tables
-- ⬜ Add `branchId` for multi-tenant future
-- ⬜ Foreign key constraint enforcement (currently off in SQLite)
+- ⬜ **Soft delete** — `deletedAt DateTime?` on Patient / Invoice / TreatmentPreset / DiagnosisPreset; replace `prisma.x.delete()` with `update({ where: { id }, data: { deletedAt: now() } })` and filter reads by `deletedAt: null`
+- ⬜ **Audit columns on every table** — `createdAt` / `updatedAt` already on most, double-check Inventory and InventoryTransaction; add `createdBy` / `updatedBy` once RBAC ships
+- ⬜ **Foreign-key enforcement** — SQLite needs `PRAGMA foreign_keys = ON` per connection; verify the driver-adapter setup actually emits it
+- ⬜ **Encrypt at rest** — switch to SQLCipher for the local DB; protects patient PII if the laptop is stolen
 
 ### Security
-- ⬜ Audit trails (see #14)
-- ⬜ Encryption at rest for sensitive fields
-- ⬜ 2FA for login
-- ⬜ Session timeout
+- ⬜ Audit trails (see Quick Win #14 in the Medium-Term section)
+- ⬜ **Print-window `nodeIntegration` flag** — `electron/ipc/print.ts` still uses `contextIsolation: false` and `nodeIntegration: true` for the OS print dialog. Switch to a preload script that exposes only `print` / `pdf` via `contextBridge`
+- ⬜ **Renderer CSP** — add a strict Content-Security-Policy meta tag or `webPreferences` header once the print-window fix lands
+- ⬜ **Dependency scanning** — `npm audit` in CI; Dependabot auto-PRs for patch updates
+- ⬜ **Secret rotation** — `API_KEY` and any cloud creds should be rotatable without a full app release
 
 ### DevOps / Testing
-- ⬜ Unit tests (Vitest) — start with `useInvoiceForm`, sync engine
-- ⬜ Integration tests for IPC handlers
-- ⬜ E2E tests (Playwright with Electron)
-- ⬜ CI pipeline (GitHub Actions: lint + test + build)
-- ⬜ Pre-commit hook (lint-staged + husky)
-- ⬜ Dependabot auto-merge for patches
-- ⬜ Sentry / error reporting in production
+- ⬜ **Unit tests** — Vitest + React Testing Library; start with `useInvoiceForm` (form state machine), `useSyncManager` (debouncing, event listener cleanup), and the `prismaSyncEngine` dedup logic
+- ⬜ **Integration tests for IPC handlers** — spin up a temp Prisma + SQLite, invoke each `ipcMain.handle('save-invoice', …)` etc. and assert DB state
+- ⬜ **E2E tests** — Playwright with Electron; cover "save invoice → see in Database Find → pay partial → see in Finances → sync → see in cloud"
+- ⬜ **CI pipeline** — GitHub Actions: lint + typecheck + test on every PR; build on tag push is already wired (`electron-release.yml`)
+- ⬜ **Pre-commit hook** — `husky` + `lint-staged` for ESLint / Prettier on staged files
+- ⬜ **Coverage gates** — fail PRs that drop below 70% line coverage on touched files
+- ⬜ **Sentry / error reporting** — pipe `useLogger().error(...)` into Sentry in production builds so the team gets paged on new error patterns
 
 ---
 
@@ -468,17 +349,20 @@ These are larger features that may require schema changes, new pages, or backend
 - ✅ **Finances page crashes** — Date handling, rendering, Tailwind class fixes
 - ✅ **Diagnosis autocomplete** — Wired N-gram model in Invoice Generator
 - ✅ **Inventory sync & validation** — Bidirectional sync + Zod
+- ✅ **Payment status dropdown reverts to Unpaid** — was a derived `let` variable; now stored as explicit `useState` with a one-time auto-detect for the invoice-loading case
+- ✅ **Sync crash on duplicate `invoice_number`** — `save-invoice` is now idempotent; `performSync` self-heals at startup; `applyCloudUpdates` deletes sibling duplicates before each update
+- ✅ **Manual invoice number edit silently overwritten** — patient-change useEffect and `invoices-updated` listener now respect the `invoiceNumberEdited` ref; refresh button is the only way to force-overwrite
+- ✅ **Wrong "next invoice number" for non-padded legacy rows** — `get-next-invoice-number` now sorts with `CAST(invoice_number AS INTEGER) DESC`
 
 ### Security Concerns (from deep dive)
 - ⚠️ **`nodeIntegration: true` in print window** — `electron/ipc/print.ts` creates a temporary BrowserWindow with `contextIsolation: false` and `nodeIntegration: true`. **Fix immediately** to `contextIsolation: true` and `nodeIntegration: false`, use preload script.
-- ⚠️ **Database reset IPC exposed** — `reset-all-databases` is callable by anyone running the app. Move behind admin auth.
-- ⚠️ **API key in plain text** — Backend `API_KEY` env var is single static. Rotate to per-clinic keys when RBAC is added.
 
 ### To Be Tested
 - Network connectivity edge cases
 - Long sync pauses (24h+ offline)
 - Very large datasets (10k+ invoices)
 - Concurrent edits from multiple devices
+- Page lazy-load under slow CPU / first-paint timing
 
 ---
 
@@ -486,21 +370,8 @@ These are larger features that may require schema changes, new pages, or backend
 
 *This section captures ideas from the deep-dive that don't fit a specific release*
 
-- Customizable invoice templates with HTML/CSS editor
-- Recurring appointments (e.g. daily for 2 weeks)
-- Patient portal (read-only web access)
-- Gift cards / vouchers
-- Loyalty points
 - Treatment outcome measurement (Oswestry, DASH, FMS scoring)
-- Integration with wearables (Fitbit, Apple Health for exercise compliance)
-- Voice-to-text SOAP notes
-- QR code patient check-in kiosk
-- Insurance pre-authorization workflow
-- Telehealth / video consultation
-- Lab integration (e.g. NABL labs in India)
 - Inventory expiry date tracking (for consumables)
-- Reorder automation (auto-purchase order to suppliers)
-- Multi-currency support (for medical tourism)
 - Treatment consent forms (digital signature)
 - Pre/post treatment photos with measurement overlays
 - Pain scale heatmap (body diagram)
@@ -509,25 +380,20 @@ These are larger features that may require schema changes, new pages, or backend
 
 ## 📊 Performance Goals
 
-### Current (v2.5.4)
+### Current (v2.5.5)
 - Startup time: < 3 seconds
 - Search response: < 100ms
 - Print dialog: < 1 second
 - Data save: < 500ms
 - Offline mode: Fully operational without network
+- **Page cold paint**: skeleton visible immediately, real page in < 100ms after chunk arrives (cached on subsequent visits)
 
 ### Target (v3.0)
-- Support 100,000+ invoices without degradation
 - Search across large datasets: < 200ms
 - Cloud sync: < 5 seconds
 - Report generation: < 2 seconds
-- App cold start: < 2 seconds (with code splitting)
+- App cold start: < 2 seconds (now realistic thanks to per-page code splitting — main bundle dropped from one monolithic chunk to ~200KB + 8-125KB lazy chunks)
 - Memory footprint: < 300 MB
-
-### Stretch (v4.0)
-- Offline + online seamless switching
-- Multi-device real-time sync
-- PWA installable, < 5 MB initial download
 
 ---
 
@@ -536,14 +402,7 @@ These are larger features that may require schema changes, new pages, or backend
 | Phase | Feature | Priority |
 |---|---|---|
 | **Now** | Fix `nodeIntegration: true` in print window | 🔴 Critical |
-| **Now** | Move `reset-all-databases` behind admin gate | 🔴 Critical |
-| **v2.6** | Add login screen + bcrypt password hashing | 🟠 High |
-| **v2.7** | RBAC (admin / receptionist / therapist / viewer) | 🟠 High |
 | **v2.7** | Audit log table | 🟡 Medium |
-| **v3.0** | Per-clinic API keys | 🟡 Medium |
-| **v3.0** | Encrypt SQLite at rest | 🟡 Medium |
-| **v3.0** | 2FA | 🟢 Low |
-| **v4.0** | End-to-end encryption of clinical notes | 🟢 Low |
 
 ---
 
@@ -552,27 +411,6 @@ These are larger features that may require schema changes, new pages, or backend
 | Phase | Platform | Status |
 |---|---|---|
 | **Current** | Windows desktop | ✅ Live |
-| **v2.6** | macOS desktop | ⬜ Pending (Electron supports; test build) |
-| **v2.6** | Linux desktop | ⬜ Pending |
-| **v3.0** | Web portal (React) | ⬜ Planned |
-| **v3.5** | Progressive Web App (PWA) | ⬜ Planned |
-| **v4.0** | iOS / Android native | ⬜ Planned |
-| **v4.0** | Tablet-optimized UI (for clinic kiosk) | ⬜ Planned |
-
----
-
-## 📅 Release Schedule (Proposed)
-
-| Version | Target Date | Theme | Key Features |
-|---|---|---|---|
-| **v2.5.5** | July 2026 | Hotfix + Search | Treatment/Diagnosis preset search, auto-diagnosis save, sync cleanup |
-| **v2.6** | Aug 2026 | Clinical Core | Treatment Session tracking, SOAP notes, Document attachments |
-| **v2.7** | Sep 2026 | Scheduling | Appointment scheduling, packages, reminders |
-| **v2.8** | Oct 2026 | Communication | WhatsApp integration, in-app todos, keyboard shortcuts, dark mode |
-| **v2.9** | Nov 2026 | Performance | Code splitting, indexing, search < 100ms, DB backup |
-| **v3.0** | Q1 2027 | Enterprise | RBAC, audit log, multi-branch, web portal beta, online payments |
-| **v3.5** | Q3 2027 | Mobile + AI | PWA, AI scribe, smart diagnosis, mobile companion app |
-| **v4.0** | 2028 | Platform | Native iOS/Android, multi-tenant SaaS, marketplace |
 
 ---
 
@@ -586,13 +424,7 @@ If you can only build 3 things in the next 6 months, build these:
 - **Reuse**: PatientDetailPane, TreatmentCalendar, existing `TreatmentSession` table
 - **Revenue impact**: Clinics won't churn because clinical data is locked in.
 
-### 🥈 2. Appointment Scheduling
-- **Why**: Daily-driver feature that no clinic can live without.
-- **Effort**: 3-4 weeks (new page + new table + calendar component)
-- **Reuse**: Recharts, CustomSelect, existing patient/invoice data
-- **Revenue impact**: 30%+ reduction in no-shows (industry stat).
-
-### 🥉 3. WhatsApp / SMS Integration
+### 🥉 2. WhatsApp / SMS Integration
 - **Why**: Massive reduction in no-shows, modern expectation.
 - **Effort**: 1-2 weeks (integration with Wati/Interakt)
 - **Reuse**: Existing patient phone numbers, scheduled jobs in sync engine
@@ -622,15 +454,6 @@ Sometimes the best roadmap is what you don't build:
 - ✅ Invoice Template Reference
 - ✅ Sample Data
 
-### To Do
-- ⬜ **User Manual** (PDF, with screenshots)
-- ⬜ **Admin Guide** (multi-user, RBAC, backup/restore)
-- ⬜ **Developer Docs** (architecture, sync engine, plugin system)
-- ⬜ **API Reference** (auto-generated from Zod schemas)
-- ⬜ **Video tutorials** (5-min walkthroughs per page)
-- ⬜ **Changelog** (auto-generated from conventional commits)
-- ⬜ **Migration guide** (from paper / other systems)
-
 ---
 
 ## 🏁 Final Recommendations
@@ -638,18 +461,15 @@ Sometimes the best roadmap is what you don't build:
 **For the next 90 days**, focus on:
 1. Fix the security issues (`nodeIntegration`, reset IPC) — 1 day
 2. Ship **Quick Win #1: Treatment Session Tracking** — 2-3 weeks
-3. Ship **Quick Win #2: Appointment Scheduling** — 3-4 weeks
-4. Build the foundation for **#13: RBAC** — parallel track
+3. Build the foundation for **#13: RBAC** — parallel track
 
 **For the next 180 days**, add:
-5. **Quick Win #5: WhatsApp/SMS** (huge retention)
-6. **Quick Win #3: Treatment Packages** (recurring revenue)
-7. **Quick Win #7: Patient Document Attachments** (clinical completeness)
+4. **Quick Win #5: WhatsApp/SMS** (huge retention)
+5. **Quick Win #3: Treatment Packages** (recurring revenue)
+6. **Quick Win #7: Patient Document Attachments** (clinical completeness)
 
 **For the next 365 days**, lay the foundation for v3.0:
-8. Multi-branch (architectural changes pay off later)
-9. Web portal (huge addressable market)
-10. Online payments (Razorpay — India first)
+7. Multi-branch (architectural changes pay off later)
 
 **Why this order?**
 - Quick wins ship fast → user delight → retention

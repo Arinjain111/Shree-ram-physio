@@ -65,13 +65,39 @@ React UI → IPC → Electron Main → Prisma Client (SQLite)
                             Prisma Client (Azure SQL)
 ```
 
+### Renderer code-splitting
+
+Every page is wrapped in `React.lazy()` + `<Suspense>` inside `App.tsx`, with the
+`PageLoader` component as the Suspense fallback. Vite/Rollup splits each page into
+its own chunk so the initial bundle stays small; the `PageSkeleton` is shown
+while the chunk is being fetched/parsed on first navigation. After the chunk is
+loaded, the module system caches it and subsequent navigations are instant.
+
+Verified chunk sizes from `npm run build:vite` (gzip in parentheses):
+
+| Page              | Chunk size   |
+|-------------------|--------------|
+| Home              | 8 KB         |
+| Settings          | 14 KB        |
+| Inventory         | 14 KB        |
+| TreatmentSettings | 17 KB        |
+| InvoiceCustomizer | 24 KB        |
+| Finances          | 31 KB        |
+| DatabaseFind      | 34 KB        |
+| Reports           | 61 KB        |
+| InvoiceGenerator  | 125 KB       |
+
+Main bundle (`index-*.js`) is ~199 KB (gzip ~57 KB) and contains the App,
+HubLayout, PageHeader, IPC bridges, and the routing layer.
+
 ### Data Flow
 
 1. **User creates invoice** → Saved to local SQLite (instant)
 2. **Record marked** → `syncStatus = 'PENDING'`
-3. **Sync engine** → Uploads to Azure SQL every 5 minutes
+3. **Sync engine** → Smart-polling upload to Azure SQL every 10 minutes
 4. **Downloads changes** → From other devices
 5. **Updates local DB** → Marks as `syncStatus = 'SYNCED'`
+6. **Self-heal pass** → `performSync` runs a `GROUP BY invoice_number HAVING COUNT(*) > 1` cleanup at startup so legacy duplicates can't crash the apply phase
 
 ## Tech Stack
 
