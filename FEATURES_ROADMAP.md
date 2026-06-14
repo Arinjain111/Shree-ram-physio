@@ -278,7 +278,7 @@ These are larger features that may require schema changes, new pages, or backend
 - ⬜ **E2E tests** — Playwright with Electron; cover "save invoice → see in Database Find → pay partial → see in Finances"
 
 #### Security Hardening
-- ⬜ **Fix `nodeIntegration: true` in print window** — `electron/ipc/print.ts` creates a temporary `BrowserWindow` with `contextIsolation: false` and `nodeIntegration: true`. Switch to `contextIsolation: true` + `nodeIntegration: false` + a preload script that exposes only `print` / `pdf` via contextBridge
+- ✅ **Fix `nodeIntegration: true` in print window** — `electron/ipc/print.ts` now uses a single `PRINT_WEB_PREFS` constant for all four print / preview `BrowserWindow` constructors: `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, no preload (these windows just render invoice HTML and call `webContents.print` / `printToPDF` from the main process; they don't need any IPC bridge). A misbehaving print template can no longer reach `process` / `require`.
 - ✅ **CSP header for the renderer** — `<meta http-equiv="Content-Security-Policy">` in `index.html`: `default-src 'self'`, no inline-object/frame, `connect-src 'self' https:` (for the cloud sync API), `frame-ancestors 'none'`, `base-uri 'self'`, plus `strict-origin-when-cross-origin` referrer
 
 #### Refactors & Hygiene
@@ -306,10 +306,10 @@ These are larger features that may require schema changes, new pages, or backend
 
 ### Security
 - ⬜ Audit trails (see Quick Win #14 in the Medium-Term section)
-- ⬜ **Print-window `nodeIntegration` flag** — `electron/ipc/print.ts` still uses `contextIsolation: false` and `nodeIntegration: true` for the OS print dialog. Switch to a preload script that exposes only `print` / `pdf` via `contextBridge`
-- ✅ **Renderer CSP** — added a strict `Content-Security-Policy` meta tag in `index.html` (`default-src 'self'`, no inline-object/frame, `connect-src 'self' https:` for the cloud sync API, `frame-ancestors 'none'`, `base-uri 'self'`, plus `strict-origin-when-cross-origin` referrer). The print-window fix is still pending; once it lands, the CSP should also be tightened to drop `'unsafe-inline'` for `script-src` (currently allowed only for the critical startup error handler)
+- ✅ **Print-window `nodeIntegration` flag** — `electron/ipc/print.ts` now uses a single `PRINT_WEB_PREFS` constant (`nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, no preload) for all four print / preview `BrowserWindow` constructors. A misbehaving print template can no longer reach `process` / `require`.
+- ✅ **Renderer CSP** — added a strict `Content-Security-Policy` meta tag in `index.html` (`default-src 'self'`, no inline-object/frame, `connect-src 'self' https:` for the cloud sync API, `frame-ancestors 'none'`, `base-uri 'self'`, plus `strict-origin-when-cross-origin` referrer). Next step: drop `'unsafe-inline'` for `script-src` once the critical startup error handler is moved to a non-inlined source.
+- ⬜ **`reset-all-databases` IPC guard** — registered but currently a dead handler (nothing in the UI invokes it). Once a UI surface ships, gate it behind a typed-confirmation string from the renderer (e.g. `await ipcRenderer.invoke('reset-all-databases', { confirm: 'RESET' })`) so a stray IPC call from any context can't wipe both DBs.
 - ⬜ **Dependency scanning** — `npm audit` in CI; Dependabot auto-PRs for patch updates
-- ⬜ **Secret rotation** — `API_KEY` and any cloud creds should be rotatable without a full app release
 
 ### DevOps / Testing
 - ⬜ **Unit tests** — Vitest + React Testing Library; start with `useInvoiceForm` (form state machine), `useSyncManager` (debouncing, event listener cleanup), and the `prismaSyncEngine` dedup logic
@@ -335,7 +335,7 @@ These are larger features that may require schema changes, new pages, or backend
 - ✅ **Wrong "next invoice number" for non-padded legacy rows** — `get-next-invoice-number` now sorts with `CAST(invoice_number AS INTEGER) DESC`
 
 ### Security Concerns (from deep dive)
-- ⚠️ **`nodeIntegration: true` in print window** — `electron/ipc/print.ts` creates a temporary BrowserWindow with `contextIsolation: false` and `nodeIntegration: true`. **Fix immediately** to `contextIsolation: true` and `nodeIntegration: false`, use preload script.
+- ✅ **`nodeIntegration: true` in print window** — FIXED in v2.5.5. `electron/ipc/print.ts` now uses a single `PRINT_WEB_PREFS` constant (`nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, no preload) for all four print / preview `BrowserWindow` constructors. A misbehaving print template can no longer reach `process` / `require`.
 
 ### To Be Tested
 - Network connectivity edge cases
@@ -381,7 +381,8 @@ These are larger features that may require schema changes, new pages, or backend
 
 | Phase | Feature | Priority |
 |---|---|---|
-| **Now** | Fix `nodeIntegration: true` in print window | 🔴 Critical |
+| **Done (v2.5.5)** | Print-window `nodeIntegration: true` | ✅ Fixed (see Security section) |
+| **Now** | Add a confirmation-typed guard to `reset-all-databases` IPC when it gets a UI surface | 🟠 High |
 | **v2.7** | Audit log table | 🟡 Medium |
 
 ---
@@ -439,7 +440,7 @@ Sometimes the best roadmap is what you don't build:
 ## 🏁 Final Recommendations
 
 **For the next 90 days**, focus on:
-1. Fix the security issues (`nodeIntegration`, reset IPC) — 1 day
+1. ~~Fix the security issues (`nodeIntegration`, reset IPC) — 1 day~~ ✅ Done in v2.5.5
 2. Ship **Quick Win #1: Treatment Session Tracking** — 2-3 weeks
 3. Build the foundation for **#13: RBAC** — parallel track
 
@@ -460,4 +461,4 @@ Sometimes the best roadmap is what you don't build:
 
 ---
 
-*Last Updated: June 14, 2026 (v2.5.5 — bundle visualizer, route preload, CSP, a11y labels, hooks barrel)*
+*Last Updated: June 14, 2026 (v2.5.5 — bundle visualizer, route preload, CSP, a11y labels, hooks barrel, print-window sandboxed)*

@@ -5,6 +5,27 @@ import * as os from 'os';
 import { logError } from '../utils/errorLogger';
 import { getSettings } from './settings';
 
+/**
+ * Web-prefs for every print / preview BrowserWindow.
+ *
+ * SECURITY (was 🔴 Critical in FEATURES_ROADMAP.md):
+ *  - `nodeIntegration: false` — these windows never need Node APIs
+ *  - `contextIsolation: true`  — keeps the renderer's main world isolated
+ *    from any future preload; a misbehaving print template can't reach
+ *    `process` / `require` anymore
+ *  - `sandbox: true`            — sandbox the renderer so it can't escape
+ *    even if a template injected hostile markup
+ *  - `preload: undefined`       — there's no preload script because
+ *    these windows just render the invoice HTML and call `webContents.print`
+ *    / `printToPDF` from the main process; they don't need any IPC bridge
+ */
+const PRINT_WEB_PREFS: Electron.WebPreferences = {
+    nodeIntegration: false,
+    contextIsolation: true,
+    sandbox: true,
+    javascript: true, // the invoice HTML may include <script> blocks for layout
+};
+
 export function registerPrintHandlers() {
 
     ipcMain.handle('print-invoice', async (_event, htmlContent: string) => {
@@ -13,10 +34,7 @@ export function registerPrintHandlers() {
                 show: false,
                 width: 1200,
                 height: 800,
-                webPreferences: {
-                    nodeIntegration: true,
-                    contextIsolation: false
-                }
+                webPreferences: PRINT_WEB_PREFS,
             });
 
             await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
@@ -54,10 +72,7 @@ export function registerPrintHandlers() {
                 show: false,
                 width: 1200,
                 height: 800,
-                webPreferences: {
-                    nodeIntegration: true,
-                    contextIsolation: false
-                }
+                webPreferences: PRINT_WEB_PREFS,
             });
 
             await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
@@ -93,10 +108,7 @@ export function registerPrintHandlers() {
                 show: false,
                 width: 1200,
                 height: 800,
-                webPreferences: {
-                    nodeIntegration: true,
-                    contextIsolation: false
-                }
+                webPreferences: PRINT_WEB_PREFS,
             });
 
             await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
@@ -176,10 +188,7 @@ export function registerPrintHandlers() {
                 show: false,
                 width: 1200,
                 height: 800,
-                webPreferences: {
-                    nodeIntegration: true,
-                    contextIsolation: false
-                }
+                webPreferences: PRINT_WEB_PREFS,
             });
 
             await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
@@ -199,12 +208,12 @@ export function registerPrintHandlers() {
 
             const tempFilePath = path.join(os.tmpdir(), `Invoice_Preview_${Date.now()}.pdf`);
             fs.writeFileSync(tempFilePath, pdfBuffer);
-            
+
             printWindow.close();
-            
+
             // Open PDF with default system viewer
             await shell.openPath(tempFilePath);
-            
+
             return { success: true };
         } catch (error: any) {
             logError('Preview only', error);
