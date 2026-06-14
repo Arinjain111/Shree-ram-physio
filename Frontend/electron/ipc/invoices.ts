@@ -545,18 +545,27 @@ export function registerInvoiceHandlers() {
 
       let lastInvoice;
       if (localPatientId) {
-        // Get last invoice for this specific patient
-        lastInvoice = await prisma.invoice.findFirst({
-          where: { patientId: localPatientId },
-          orderBy: { invoiceNumber: 'desc' },
-          select: { invoiceNumber: true }
-        });
+        // Get last invoice for this specific patient.
+        // Sort by the numeric tail of invoiceNumber so legacy non-padded
+        // rows ("401", "10000") don't out-sort padded rows ("1000", "10000").
+        // The trailing-digits regex keeps alphanumeric IDs (e.g. "INV-001")
+        // contributing their numeric portion without crashing.
+        const lastRows = await prisma.$queryRawUnsafe<{ invoice_number: string }[]>(
+          `SELECT invoice_number FROM invoices
+             WHERE patient_id = ?
+             ORDER BY CAST(invoice_number AS INTEGER) DESC
+             LIMIT 1`,
+          localPatientId
+        );
+        lastInvoice = lastRows[0] ? { invoiceNumber: lastRows[0].invoice_number } : null;
       } else {
         // Fallback: get highest invoice overall
-        lastInvoice = await prisma.invoice.findFirst({
-          orderBy: { invoiceNumber: 'desc' },
-          select: { invoiceNumber: true }
-        });
+        const lastRows = await prisma.$queryRawUnsafe<{ invoice_number: string }[]>(
+          `SELECT invoice_number FROM invoices
+             ORDER BY CAST(invoice_number AS INTEGER) DESC
+             LIMIT 1`
+        );
+        lastInvoice = lastRows[0] ? { invoiceNumber: lastRows[0].invoice_number } : null;
       }
 
       let localMax = 0;

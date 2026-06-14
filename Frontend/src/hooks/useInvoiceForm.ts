@@ -217,12 +217,17 @@ export const useInvoiceForm = () => {
     initialize();
   }, [fetchInvoiceNumber, handleError, showToast, location.state]);
 
-  // Refresh invoice number when patient changes
+  // Refresh invoice number when patient changes.
+  // IMPORTANT: respect the user's manual edit. If they typed a custom number,
+  // changing the patient must NOT silently overwrite it. The user can hit the
+  // refresh button next to the input to force a re-fetch.
   useEffect(() => {
     if (editingInvoiceId) {
       return;
     }
-    setInvoiceNumberEdited(false);
+    if (invoiceNumberEditedRef.current) {
+      return;
+    }
     fetchInvoiceNumber(true);
   }, [patient?.id, patient?.cloudId, editingInvoiceId, fetchInvoiceNumber]);
 
@@ -233,7 +238,11 @@ export const useInvoiceForm = () => {
             const result = await ipcRenderer.invoke('load-invoices');
             if (result?.invoices) {
                 setExistingInvoices(result.invoices);
-                fetchInvoiceNumber(true); // Update number as well
+                // Respect the user's manual edit — a sync completing in the
+                // background must not clobber what the user just typed.
+                if (!invoiceNumberEditedRef.current) {
+                  fetchInvoiceNumber(true);
+                }
             }
         } catch (e) { log.error('invoice', 'Failed to reload invoices after update event', { error: e instanceof Error ? e.message : String(e) }); }
       };
