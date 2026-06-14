@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useUI } from '@/context/UIContext';
 import { useLogger } from '@/utils/logger';
 import PageHeader from '@/components/layout/PageHeader';
@@ -23,27 +23,20 @@ const TreatmentSettings = () => {
     defaultSessions: 1,
     pricePerSession: 0,
   });
+  const [treatmentSearch, setTreatmentSearch] = useState('');
 
   // Diagnosis preset state
   const [diagnosisPresets, setDiagnosisPresets] = useState<DiagnosisPreset[]>([]);
   const [isAddingDiagnosis, setIsAddingDiagnosis] = useState(false);
   const [newDiagnosisName, setNewDiagnosisName] = useState('');
+  const [diagnosisSearch, setDiagnosisSearch] = useState('');
   const log = useLogger();
-
-  const syncAttempted = useRef(false);
 
   useEffect(() => {
     if (activeTab === 'treatment') {
       loadPresets();
     } else {
       loadDiagnosisPresets();
-    }
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (activeTab === 'treatment' && !syncAttempted.current) {
-      syncAttempted.current = true;
-      syncPresetsFromCloud();
     }
   }, [activeTab]);
 
@@ -61,23 +54,29 @@ const TreatmentSettings = () => {
     }
   };
 
-  const syncPresetsFromCloud = async () => {
+  const syncAllPresetsFromCloud = async () => {
     try {
-      showToast('info', 'Syncing presets from cloud...');
-      const result = await ipcRenderer.invoke('sync-presets-from-cloud');
-      if (result.success) {
-        await loadPresets();
-        const { created, updated, fetched } = result.stats;
-        if (fetched === 0) {
-          showToast('info', 'Server has no presets — add them locally, or set AZURE_BACKEND_URL to sync from production');
-        } else if (created > 0 || updated > 0) {
-          showToast('success', `Synced: ${created} new, ${updated} updated`);
-        } else {
-          showToast('info', 'All presets are up to date');
-        }
+      showToast('info', 'Syncing all presets from cloud...');
+      
+      const treatmentResult = await ipcRenderer.invoke('sync-presets-from-cloud');
+      const diagnosisResult = await ipcRenderer.invoke('sync-diagnosis-presets-from-cloud');
+      
+      await loadPresets();
+      await loadDiagnosisPresets();
+      
+      const treatmentStats = treatmentResult.success ? treatmentResult.stats : { created: 0, updated: 0, fetched: 0 };
+      const diagnosisStats = diagnosisResult.success ? diagnosisResult.stats : { created: 0, updated: 0, fetched: 0 };
+      
+      const totalCreated = treatmentStats.created + diagnosisStats.created;
+      const totalUpdated = treatmentStats.updated + diagnosisStats.updated;
+      const totalFetched = treatmentStats.fetched + diagnosisStats.fetched;
+      
+      if (totalFetched === 0) {
+        showToast('info', 'Server has no presets');
+      } else if (totalCreated > 0 || totalUpdated > 0) {
+        showToast('success', `Synced: ${totalCreated} new, ${totalUpdated} updated`);
       } else {
-        const errorMsg = result.error?.split('\n')[0] || 'Sync failed';
-        showToast('error', errorMsg);
+        showToast('info', 'All presets are up to date');
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -224,6 +223,16 @@ const TreatmentSettings = () => {
         breadcrumb="Config"
         title="Presets Manager"
         icon={<div className="p-2 bg-slate-100 text-slate-700 rounded-lg"><ClipboardListIcon /></div>}
+        actions={
+          <button
+            onClick={syncAllPresetsFromCloud}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-50 text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors shadow-xs font-medium text-sm"
+            title="Sync all presets from cloud"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+            Sync from Cloud
+          </button>
+        }
       />
 
       <div className="flex-1 flex flex-col lg:flex-row gap-6 mt-4">
@@ -277,23 +286,27 @@ const TreatmentSettings = () => {
               {activeTab === 'treatment' && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                   {/* Action buttons */}
-                  <div className="flex gap-3 mb-6">
-                    <button
-                      onClick={syncPresetsFromCloud}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors shadow-xs font-medium text-sm"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-                      Sync from Cloud
-                    </button>
-                    {!isAddingTreatment && (
-                      <button
-                        onClick={() => setIsAddingTreatment(true)}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-teal-50 text-teal-700 border border-teal-100 rounded-xl hover:bg-teal-100 transition-colors shadow-sm font-medium text-sm"
-                      >
-                        <PlusIcon />
-                        Add Treatment
-                      </button>
-                    )}
+                  <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                    <div className="flex gap-3 w-full sm:w-auto">
+                      {!isAddingTreatment && (
+                        <button
+                          onClick={() => setIsAddingTreatment(true)}
+                          className="flex items-center gap-2 px-6 py-2.5 bg-teal-50 text-teal-700 border border-teal-100 rounded-xl hover:bg-teal-100 transition-colors shadow-sm font-medium text-sm"
+                        >
+                          <PlusIcon />
+                          Add Treatment
+                        </button>
+                      )}
+                    </div>
+                    <div className="w-full sm:w-64">
+                      <input
+                        type="text"
+                        value={treatmentSearch}
+                        onChange={(e) => setTreatmentSearch(e.target.value)}
+                        placeholder="Search treatments..."
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all shadow-inner text-sm"
+                      />
+                    </div>
                   </div>
 
                   {/* Treatment Add/Edit Form */}
@@ -357,20 +370,24 @@ const TreatmentSettings = () => {
                               </td>
                             </tr>
                           ) : (
-                            presets.map((preset) => (
-                              <tr key={preset.id} className="hover:bg-slate-50/50 transition-colors group">
-                                <td className="px-6 py-4"><div className="font-medium text-slate-800">{preset.name}</div></td>
-                                <td className="px-6 py-4"><span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-teal-50 text-teal-700 border border-teal-100">{preset.defaultSessions} sessions</span></td>
-                                <td className="px-6 py-4 text-slate-600 font-medium">₹{preset.pricePerSession.toFixed(2)}</td>
-                                <td className="px-6 py-4"><span className="font-semibold text-emerald-600">₹{(preset.defaultSessions * preset.pricePerSession).toFixed(2)}</span></td>
-                                <td className="px-6 py-4 text-right">
-                                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleEditTreatment(preset)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit"><EditIcon /></button>
-                                    <button onClick={() => handleDeleteTreatment(preset.id!)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><TrashIcon /></button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
+                            presets
+                              .filter((preset) =>
+                                preset.name.toLowerCase().includes(treatmentSearch.toLowerCase())
+                              )
+                              .map((preset) => (
+                                <tr key={preset.id} className="hover:bg-slate-50/50 transition-colors group">
+                                  <td className="px-6 py-4"><div className="font-medium text-slate-800">{preset.name}</div></td>
+                                  <td className="px-6 py-4"><span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-teal-50 text-teal-700 border border-teal-100">{preset.defaultSessions} sessions</span></td>
+                                  <td className="px-6 py-4 text-slate-600 font-medium">₹{preset.pricePerSession.toFixed(2)}</td>
+                                  <td className="px-6 py-4"><span className="font-semibold text-emerald-600">₹{(preset.defaultSessions * preset.pricePerSession).toFixed(2)}</span></td>
+                                  <td className="px-6 py-4 text-right">
+                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button onClick={() => handleEditTreatment(preset)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit"><EditIcon /></button>
+                                      <button onClick={() => handleDeleteTreatment(preset.id!)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><TrashIcon /></button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
                           )}
                         </tbody>
                       </table>
@@ -383,39 +400,27 @@ const TreatmentSettings = () => {
               {activeTab === 'diagnosis' && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                   {/* Action buttons */}
-                  <div className="flex gap-3 mb-6">
-                    <button
-                      onClick={async () => {
-                        showToast('info', 'Syncing diagnosis presets from cloud...');
-                        const result = await ipcRenderer.invoke('sync-diagnosis-presets-from-cloud');
-                        if (result.success) {
-                          await loadDiagnosisPresets();
-                          const { created, updated, fetched } = result.stats;
-                          if (fetched === 0) {
-                            showToast('info', 'Server has no diagnosis presets');
-                          } else if (created > 0 || updated > 0) {
-                            showToast('success', `Synced: ${created} new, ${updated} updated`);
-                          } else {
-                            showToast('info', 'All diagnosis presets are up to date');
-                          }
-                        } else {
-                          showToast('error', result.error?.split('\n')[0] || 'Sync failed');
-                        }
-                      }}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors shadow-xs font-medium text-sm"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-                      Sync from Cloud
-                    </button>
-                    {!isAddingDiagnosis && (
-                      <button
-                        onClick={() => setIsAddingDiagnosis(true)}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-xl hover:bg-purple-100 transition-colors shadow-sm font-medium text-sm"
-                      >
-                        <PlusIcon />
-                        Add Diagnosis
-                      </button>
-                    )}
+                  <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                    <div className="flex gap-3 w-full sm:w-auto">
+                      {!isAddingDiagnosis && (
+                        <button
+                          onClick={() => setIsAddingDiagnosis(true)}
+                          className="flex items-center gap-2 px-6 py-2.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-xl hover:bg-purple-100 transition-colors shadow-sm font-medium text-sm"
+                        >
+                          <PlusIcon />
+                          Add Diagnosis
+                        </button>
+                      )}
+                    </div>
+                    <div className="w-full sm:w-64">
+                      <input
+                        type="text"
+                        value={diagnosisSearch}
+                        onChange={(e) => setDiagnosisSearch(e.target.value)}
+                        placeholder="Search diagnoses..."
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all shadow-inner text-sm"
+                      />
+                    </div>
                   </div>
 
                   {/* Add Diagnosis Form */}
@@ -467,21 +472,25 @@ const TreatmentSettings = () => {
                               </td>
                             </tr>
                           ) : (
-                            diagnosisPresets.map((dp) => (
-                              <tr key={dp.id} className="hover:bg-slate-50/50 transition-colors group">
-                                <td className="px-6 py-4"><div className="font-medium text-slate-800">{dp.name}</div></td>
-                                <td className="px-6 py-4">
-                                  <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                                    {dp.frequency} time{dp.frequency !== 1 ? 's' : ''}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleDeleteDiagnosis(dp.id, dp.name)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><TrashIcon /></button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
+                            diagnosisPresets
+                              .filter((dp) =>
+                                dp.name.toLowerCase().includes(diagnosisSearch.toLowerCase())
+                              )
+                              .map((dp) => (
+                                <tr key={dp.id} className="hover:bg-slate-50/50 transition-colors group">
+                                  <td className="px-6 py-4"><div className="font-medium text-slate-800">{dp.name}</div></td>
+                                  <td className="px-6 py-4">
+                                    <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                                      {dp.frequency} time{dp.frequency !== 1 ? 's' : ''}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button onClick={() => handleDeleteDiagnosis(dp.id, dp.name)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><TrashIcon /></button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
                           )}
                         </tbody>
                       </table>
