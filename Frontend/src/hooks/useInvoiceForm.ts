@@ -330,6 +330,10 @@ export const useInvoiceForm = () => {
           if (!saveResult.success) throw saveResult;
           showToast('success', editingInvoiceId ? `Invoice ${data.invoiceNumber} updated!` : `Invoice ${data.invoiceNumber} saved!`);
 
+          if (validatedData.diagnosis && validatedData.diagnosis.trim()) {
+            await ipcRenderer.invoke('increment-diagnosis-frequency', validatedData.diagnosis.trim()).catch(() => {});
+          }
+
           // Push immediately to cloud; ignore failures so user can still print
           await ipcRenderer.invoke('sync-now').catch(() => {});
 
