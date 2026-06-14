@@ -104,28 +104,37 @@ export function registerInvoiceHandlers() {
         ? parseFloat(validatedData.discount) || 0
         : (validatedData.discount ?? 0);
 
-      // Create invoice
-      const invoice = await prisma.invoice.create({
-        data: {
-          invoiceNumber: validatedData.invoiceNumber,
-          patientId: patient.id,
-          date: new Date(validatedData.date),
-          diagnosis: validatedData.diagnosis || '',
-          notes: validatedData.notes || '',
-          paymentMethod: validatedData.paymentMethod || 'Cash',
-          TransactionId: validatedData.TransactionId || null,
-          total: totalAmount,
-          discount: discountAmount,
-          discountType: validatedData.discountType || 'amount',
-          paymentStatus: validatedData.amountPaid && validatedData.amountPaid >= totalAmount
-            ? 'paid'
-            : validatedData.amountPaid && validatedData.amountPaid > 0
-              ? 'partial'
-              : 'unpaid',
-          amountPaid: validatedData.amountPaid ?? 0,
-          syncStatus: 'PENDING'
-        }
+      // Idempotent save: if an invoice with the same number already exists
+      // (e.g. user re-clicked Save & Print after canceling the print dialog,
+      // or a previous save left a PENDING row), update it instead of creating
+      // a duplicate that would later break the unique constraint on sync.
+      const existing = await prisma.invoice.findFirst({
+        where: { invoiceNumber: validatedData.invoiceNumber }
       });
+
+      const invoiceRow = {
+        invoiceNumber: validatedData.invoiceNumber,
+        patientId: patient.id,
+        date: new Date(validatedData.date),
+        diagnosis: validatedData.diagnosis || '',
+        notes: validatedData.notes || '',
+        paymentMethod: validatedData.paymentMethod || 'Cash',
+        TransactionId: validatedData.TransactionId || null,
+        total: totalAmount,
+        discount: discountAmount,
+        discountType: validatedData.discountType || 'amount',
+        paymentStatus: validatedData.amountPaid && validatedData.amountPaid >= totalAmount
+          ? 'paid'
+          : validatedData.amountPaid && validatedData.amountPaid > 0
+            ? 'partial'
+            : 'unpaid',
+        amountPaid: validatedData.amountPaid ?? 0,
+        syncStatus: 'PENDING'
+      };
+
+      const invoice = existing
+        ? await prisma.invoice.update({ where: { id: existing.id }, data: invoiceRow })
+        : await prisma.invoice.create({ data: invoiceRow });
 
       // Create treatments
       for (const treatment of validatedData.treatments) {

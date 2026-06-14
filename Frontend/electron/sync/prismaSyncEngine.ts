@@ -139,6 +139,48 @@ export class PrismaSyncEngine {
     this.isSyncing = true;
 
     try {
+      // Self-heal: remove duplicate local invoices (same invoiceNumber, different ids).
+      // This was previously created by double-clicked Save & Print buttons leaving
+      // two PENDING rows with the same number. Apply phase below would then crash
+      // on the unique constraint when one of them got its cloudId bound.
+      // Keep the row that already has a cloudId (the "blessed" one); fall back to
+      // the lowest id (oldest row) if none have a cloudId.
+      try {
+        const dupGroups: { invoice_number: string }[] = await this.prisma.$queryRawUnsafe(
+          `SELECT invoice_number FROM invoices GROUP BY invoice_number HAVING COUNT(*) > 1`
+        );
+        let totalDeleted = 0;
+        for (const { invoice_number } of dupGroups) {
+          const rows = await this.prisma.invoice.findMany({
+            where: { invoiceNumber: invoice_number },
+            orderBy: [{ cloudId: 'desc' }, { id: 'asc' }]
+          });
+          const keep = rows[0];
+          const drop = rows.slice(1);
+          for (const d of drop) {
+            const droppedTreatments = await this.prisma.treatment.count({ where: { invoiceId: d.id } });
+            logger.warn('sync', 'Deduplicating local invoice (same invoiceNumber)', {
+              invoiceNumber: invoice_number,
+              keptId: keep.id,
+              keptCloudId: keep.cloudId,
+              droppedId: d.id,
+              droppedCloudId: d.cloudId,
+              droppedTreatments
+            });
+            await this.prisma.invoice.delete({ where: { id: d.id } });
+            totalDeleted++;
+          }
+        }
+        if (totalDeleted > 0) {
+          logger.info('sync', 'Removed duplicate local invoices', { totalDeleted, groups: dupGroups.length });
+        }
+      } catch (dedupError) {
+        // Don't block sync on cleanup failure — log and continue.
+        logger.warn('sync', 'Duplicate-invoice cleanup failed (continuing)', {
+          error: dedupError instanceof Error ? dedupError.message : String(dedupError)
+        });
+      }
+
       // Check connectivity
       if (!await this.checkConnectivity()) {
         return { success: false, message: 'No internet connection' };
@@ -525,7 +567,6 @@ export class PrismaSyncEngine {
 
         const invoicePayload = {
           cloudId: cloudInvoice.id,
-          invoiceNumber: cloudInvoice.invoiceNumber,
           patientId: localPatient.id,
           date: new Date(cloudInvoice.date),
           diagnosis: cloudInvoice.diagnosis,
@@ -539,9 +580,35 @@ export class PrismaSyncEngine {
           amountPaid: cloudInvoice.amountPaid,
           syncStatus: 'SYNCED',
           lastSyncAt: new Date()
+          // NOTE: invoiceNumber is intentionally omitted. Invoice numbers are
+          // immutable — the upload phase already enforces this, and the
+          // download phase must agree or we'll silently rewrite numbers the
+          // user has already printed.
         };
 
         if (localInvoice) {
+          // Self-heal: if a previous bug (e.g. double-clicked Save & Print)
+          // left two local rows with the same invoiceNumber, the unique
+          // constraint on invoice_number would blow up the update below.
+          // Find the surviving one (prefer the one with a matching cloudId,
+          // else the one we're about to update) and delete the rest.
+          const siblings = await this.prisma.invoice.findMany({
+            where: {
+              invoiceNumber: cloudInvoice.invoiceNumber,
+              id: { not: localInvoice.id }
+            }
+          });
+          for (const dup of siblings) {
+            logger.warn('sync', 'Deleting duplicate local invoice (same invoiceNumber)', {
+              duplicateId: dup.id,
+              duplicateCloudId: dup.cloudId,
+              keepId: localInvoice.id,
+              keepCloudId: localInvoice.cloudId,
+              invoiceNumber: cloudInvoice.invoiceNumber
+            });
+            await this.prisma.invoice.delete({ where: { id: dup.id } });
+          }
+
           // Update existing
           await this.prisma.invoice.update({
             where: { id: localInvoice.id },
@@ -550,7 +617,9 @@ export class PrismaSyncEngine {
         } else {
           // Create new from cloud
           logger.debug('sync', `Creating invoice from cloud`, { invoiceNumber: cloudInvoice.invoiceNumber, cloudId: cloudInvoice.id });
-          await this.prisma.invoice.create({ data: invoicePayload });
+          await this.prisma.invoice.create({
+            data: { ...invoicePayload, invoiceNumber: cloudInvoice.invoiceNumber }
+          });
         }
       }
 
