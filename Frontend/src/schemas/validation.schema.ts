@@ -401,6 +401,26 @@ export const RecordPurchaseSchema = z.object({
 
 export type RecordPurchaseInput = z.infer<typeof RecordPurchaseSchema>;
 
+export const DeleteInventoryItemSchema = z.object({
+  id: z.number().int().positive(),
+});
+
+export type DeleteInventoryItemInput = z.infer<typeof DeleteInventoryItemSchema>;
+
+export const UndoInventoryTransactionSchema = z.object({
+  id: z.number().int().positive(),
+});
+
+export type UndoInventoryTransactionInput = z.infer<typeof UndoInventoryTransactionSchema>;
+
+export const AdjustStockSchema = z.object({
+  itemId: z.number().int().positive(),
+  adjustment: z.number().int().refine(v => v !== 0, 'Adjustment must not be zero'),
+  reason: z.string().max(500).nullish(),
+});
+
+export type AdjustStockInput = z.infer<typeof AdjustStockSchema>;
+
 export const RecordSaleSchema = z.object({
   itemId: z.number().int().positive(),
   quantity: z.number().int().min(1, 'Quantity must be at least 1'),

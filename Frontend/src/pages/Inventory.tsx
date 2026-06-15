@@ -7,6 +7,8 @@ import { format } from 'date-fns';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import type { InventoryItem, InventoryTransaction } from '@/types/inventory.types';
 
+type ConfirmAction = { type: 'delete-item'; item: InventoryItem } | { type: 'undo-transaction'; transaction: InventoryTransaction } | null;
+
 export default function Inventory() {
   const { showToast } = useUI();
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -19,6 +21,12 @@ export default function Inventory() {
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<'PURCHASE' | 'SALE'>('PURCHASE');
   const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [isAdjustStockModalOpen, setAdjustStockModalOpen] = useState(false);
+  const [adjustItem, setAdjustItem] = useState<InventoryItem | null>(null);
+  const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('increase');
+  const [adjustQty, setAdjustQty] = useState(1);
+  const [adjustReason, setAdjustReason] = useState('');
 
   // Form states
   const [itemName, setItemName] = useState('');
@@ -76,6 +84,69 @@ export default function Inventory() {
       loadData();
     } catch (e) {
       showToast('error', 'Failed to save item');
+    }
+  };
+
+  const deleteItem = async (id: number) => {
+    try {
+      const res = await ipcRenderer.invoke('delete-inventory-item', id);
+      if (res.success) {
+        showToast('success', 'Item deleted successfully');
+        loadData();
+      } else {
+        showToast('error', res.error || 'Failed to delete item');
+      }
+    } catch (e) {
+      showToast('error', 'Failed to delete item');
+    }
+  };
+
+  const undoTransaction = async (id: number) => {
+    try {
+      const res = await ipcRenderer.invoke('undo-inventory-transaction', id);
+      if (res.success) {
+        showToast('success', 'Transaction undone successfully');
+        loadData();
+      } else {
+        showToast('error', res.error || 'Failed to undo transaction');
+      }
+    } catch (e) {
+      showToast('error', 'Failed to undo transaction');
+    }
+  };
+
+  const executeConfirmAction = async () => {
+    if (!confirmAction) return;
+    if (confirmAction.type === 'delete-item') {
+      await deleteItem(confirmAction.item.id);
+    } else if (confirmAction.type === 'undo-transaction') {
+      await undoTransaction(confirmAction.transaction.id);
+    }
+    setConfirmAction(null);
+  };
+
+  const openAdjustStockModal = (item: InventoryItem) => {
+    setAdjustItem(item);
+    setAdjustDirection('increase');
+    setAdjustQty(1);
+    setAdjustReason('');
+    setAdjustStockModalOpen(true);
+  };
+
+  const saveStockAdjustment = async () => {
+    if (!adjustItem) return;
+    const adjustment = adjustDirection === 'increase' ? adjustQty : -adjustQty;
+    try {
+      const res = await ipcRenderer.invoke('adjust-stock', adjustItem.id, adjustment, adjustReason || undefined);
+      if (res.success) {
+        showToast('success', `Stock ${adjustDirection === 'increase' ? 'increased' : 'decreased'} successfully`);
+        setAdjustStockModalOpen(false);
+        loadData();
+      } else {
+        showToast('error', res.error || 'Failed to adjust stock');
+      }
+    } catch (e) {
+      showToast('error', 'Failed to adjust stock');
     }
   };
 
@@ -185,7 +256,7 @@ export default function Inventory() {
                     <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Stock</th>
                     <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Cost Price</th>
                     <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Selling Price</th>
-                    <th className="text-center px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Action</th>
+                    <th className="text-center px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -207,9 +278,17 @@ export default function Inventory() {
                       <td className="px-6 py-4 text-sm text-right text-slate-600">₹{item.costPrice.toLocaleString()}</td>
                       <td className="px-6 py-4 text-sm text-right font-medium text-emerald-600">₹{item.sellingPrice.toLocaleString()}</td>
                       <td className="px-6 py-4 text-center">
-                        <button onClick={() => openItemModal(item)} className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors">
-                          <EditIcon />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => openItemModal(item)} className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors" title="Edit">
+                            <EditIcon />
+                          </button>
+                          <button onClick={() => openAdjustStockModal(item)} className="p-1.5 text-slate-400 hover:text-amber-600 transition-colors" title="Adjust Stock">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                          </button>
+                          <button onClick={() => setConfirmAction({ type: 'delete-item', item })} className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors" title="Delete">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -231,12 +310,13 @@ export default function Inventory() {
                     <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Qty</th>
                     <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Price/Unit</th>
                     <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Total Amount</th>
+                    <th className="text-center px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {transactions.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-slate-400">No transactions recorded yet.</td>
+                      <td colSpan={7} className="text-center py-12 text-slate-400">No transactions recorded yet.</td>
                     </tr>
                   ) : transactions.map(t => (
                     <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/50">
@@ -252,6 +332,11 @@ export default function Inventory() {
                       <td className="px-6 py-4 text-sm text-right text-slate-600">{t.quantity}</td>
                       <td className="px-6 py-4 text-sm text-right text-slate-600">₹{t.pricePerUnit.toLocaleString()}</td>
                       <td className="px-6 py-4 text-sm text-right font-medium text-slate-800">₹{t.totalAmount.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-center">
+                        <button onClick={() => setConfirmAction({ type: 'undo-transaction', transaction: t })} className="p-1.5 text-slate-400 hover:text-amber-600 transition-colors" title="Undo / Reverse Transaction">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4m-4 4l4 4" /></svg>
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -342,6 +427,87 @@ export default function Inventory() {
               <button onClick={() => setTransactionModalOpen(false)} className="px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
               <button onClick={saveTransaction} disabled={!selectedItemId || quantity < 1} className={`px-5 py-2.5 rounded-xl font-semibold text-white shadow-md transition-all disabled:opacity-50 ${transactionType === 'PURCHASE' ? 'bg-teal-600 hover:bg-teal-500 shadow-teal-500/20' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20'}`}>
                 Record {transactionType}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Adjust Stock Modal */}
+      {isAdjustStockModalOpen && adjustItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity">
+          <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 w-full max-w-md overflow-visible animate-in zoom-in-95 duration-200">
+            <div className="rounded-t-3xl px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white/50">
+              <h3 className="font-semibold text-slate-800 text-lg">Adjust Stock: {adjustItem.name}</h3>
+              <button onClick={() => setAdjustStockModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
+                <div className="text-sm text-slate-500 mb-1">Current Stock</div>
+                <div className="text-3xl font-bold text-slate-800">{adjustItem.stock}</div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Direction</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="adjustDirection" value="increase" checked={adjustDirection === 'increase'} onChange={() => setAdjustDirection('increase')} className="w-4 h-4 text-amber-600 border-slate-300 focus:ring-amber-500" />
+                    <span className="text-sm font-medium text-slate-700">Increase (+)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="adjustDirection" value="decrease" checked={adjustDirection === 'decrease'} onChange={() => setAdjustDirection('decrease')} className="w-4 h-4 text-rose-600 border-slate-300 focus:ring-rose-500" />
+                    <span className="text-sm font-medium text-slate-700">Decrease (-)</span>
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Quantity</label>
+                <input type="number" min="1" value={adjustQty} onChange={e => setAdjustQty(Number(e.target.value))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">New Stock</label>
+                <div className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800">
+                  {adjustDirection === 'increase' ? adjustItem.stock + adjustQty : Math.max(0, adjustItem.stock - adjustQty)}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Reason (Optional)</label>
+                <input type="text" value={adjustReason} onChange={e => setAdjustReason(e.target.value)} placeholder="e.g., Damaged goods, Inventory count correction" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all outline-none" />
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-end gap-3 rounded-b-3xl">
+              <button onClick={() => setAdjustStockModalOpen(false)} className="px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
+              <button onClick={saveStockAdjustment} disabled={adjustQty < 1} className="px-5 py-2.5 rounded-xl font-semibold text-white bg-amber-600 hover:bg-amber-500 shadow-md shadow-amber-500/20 transition-all disabled:opacity-50">
+                Apply Adjustment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity">
+          <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 w-full max-w-sm overflow-visible animate-in zoom-in-95 duration-200">
+            <div className="rounded-t-3xl px-6 py-5 border-b border-slate-100 bg-white/50">
+              <h3 className="font-semibold text-slate-800 text-lg">{confirmAction.type === 'delete-item' ? 'Delete Product' : 'Undo Transaction'}</h3>
+            </div>
+            <div className="p-6">
+              {confirmAction.type === 'delete-item' ? (
+                <p className="text-sm text-slate-600">
+                  Are you sure you want to delete <span className="font-semibold text-slate-800">{confirmAction.item.name}</span>? This will also remove all its purchase and sale history. This action cannot be undone.
+                </p>
+              ) : (
+                <p className="text-sm text-slate-600">
+                  Are you sure you want to reverse this <span className={`font-semibold ${confirmAction.transaction.type === 'PURCHASE' ? 'text-amber-700' : 'text-emerald-700'}`}>{confirmAction.transaction.type}</span> of <span className="font-semibold text-slate-800">{confirmAction.transaction.quantity} units</span>{confirmAction.transaction.item ? ` of ${confirmAction.transaction.item.name}` : ''}? The stock will be adjusted accordingly and the transaction will be removed.
+                </p>
+              )}
+            </div>
+            <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-end gap-3 rounded-b-3xl">
+              <button onClick={() => setConfirmAction(null)} className="px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
+              <button onClick={executeConfirmAction} className={`px-5 py-2.5 rounded-xl font-semibold text-white shadow-md transition-all ${confirmAction.type === 'delete-item' ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-500/20' : 'bg-amber-600 hover:bg-amber-500 shadow-amber-500/20'}`}>
+                {confirmAction.type === 'delete-item' ? 'Delete' : 'Undo'}
               </button>
             </div>
           </div>
