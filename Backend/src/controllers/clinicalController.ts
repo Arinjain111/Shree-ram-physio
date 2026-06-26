@@ -3,18 +3,26 @@ import prisma from '../lib/prisma';
 import { ApiError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 
+type ClinicalCategory = 'diagnosis' | 'exercise';
+
+function parseCategory(input: unknown): ClinicalCategory {
+  return input === 'exercise' ? 'exercise' : 'diagnosis';
+}
+
 export const getAllPresets = async (req: Request, res: Response) => {
+  const category = parseCategory(req.query.category);
   const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
   const pageSize = req.query.pageSize ? parseInt(req.query.pageSize as string, 10) : undefined;
 
-  const presets = await prisma.diagnosisPreset.findMany({
+  const presets = await prisma.clinicalPreset.findMany({
+    where: { category },
     orderBy: { frequency: 'desc' },
     ...(page !== undefined && pageSize !== undefined
       ? { skip: (page - 1) * pageSize, take: pageSize }
       : {}),
   });
 
-  const total = await prisma.diagnosisPreset.count();
+  const total = await prisma.clinicalPreset.count({ where: { category } });
 
   res.json({
     success: true,
@@ -47,27 +55,29 @@ export const syncPresets = async (req: Request, res: Response) => {
 
   for (const preset of presets) {
     try {
-      const existing = await prisma.diagnosisPreset.findFirst({
-        where: { name: preset.name },
+      const category = parseCategory(preset.category);
+      const existing = await prisma.clinicalPreset.findFirst({
+        where: { name: preset.name, category },
       });
 
       if (existing) {
-        await prisma.diagnosisPreset.update({
+        await prisma.clinicalPreset.update({
           where: { id: existing.id },
           data: { frequency: preset.frequency ?? existing.frequency },
         });
         results.updated++;
       } else {
-        await prisma.diagnosisPreset.create({
+        await prisma.clinicalPreset.create({
           data: {
             name: preset.name,
+            category,
             frequency: preset.frequency ?? 0,
           },
         });
         results.created++;
       }
     } catch (error) {
-      logger.error('diagnosis', 'Error syncing diagnosis preset', { preset: preset?.name, error: error instanceof Error ? error.message : String(error) });
+      logger.error('clinical', 'Error syncing clinical preset', { preset: preset?.name, error: error instanceof Error ? error.message : String(error) });
       results.failed++;
     }
   }
@@ -76,24 +86,26 @@ export const syncPresets = async (req: Request, res: Response) => {
 };
 
 export const incrementFrequency = async (req: Request, res: Response) => {
-  const { name } = req.body;
+  const { name, category } = req.body;
 
   if (!name || typeof name !== 'string') {
     throw new ApiError(400, 'name is required', { code: 'NAME_REQUIRED' });
   }
 
-  const existing = await prisma.diagnosisPreset.findFirst({
-    where: { name },
+  const cat = parseCategory(category);
+
+  const existing = await prisma.clinicalPreset.findFirst({
+    where: { name, category: cat },
   });
 
   if (existing) {
-    await prisma.diagnosisPreset.update({
+    await prisma.clinicalPreset.update({
       where: { id: existing.id },
       data: { frequency: { increment: 1 } },
     });
   } else {
-    await prisma.diagnosisPreset.create({
-      data: { name, frequency: 1 },
+    await prisma.clinicalPreset.create({
+      data: { name, category: cat, frequency: 1 },
     });
   }
 

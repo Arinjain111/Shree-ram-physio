@@ -208,6 +208,7 @@ export function registerInvoiceHandlers() {
         paymentMethod: invoice.paymentMethod,
         TransactionId: invoice.TransactionId,
         treatments: invoice.treatments.map(t => ({
+          id: t.id,
           name: t.name,
           duration: t.duration,
           sessions: t.sessions,
@@ -286,6 +287,7 @@ export function registerInvoiceHandlers() {
           cloudId: invoice.cloudId,
           lastSyncAt: invoice.lastSyncAt,
           treatments: invoice.treatments.map(t => ({
+            id: t.id,
             name: t.name,
             duration: t.duration,
             sessions: t.sessions,

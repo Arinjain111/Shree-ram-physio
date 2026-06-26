@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
-import { SyncRequestSchema, validateOrThrow, type SyncRequest, type PatientSync, type InvoiceSync, type TreatmentSync, type InventoryItemSync, type InventoryTransactionSync } from '../schemas/validation.schema';
+import { SyncRequestSchema, validateOrThrow, type SyncRequest, type PatientSync, type InvoiceSync, type TreatmentSync, type InventoryItemSync, type InventoryTransactionSync, type TreatmentSessionSync } from '../schemas/validation.schema';
 import { logger } from '../utils/logger';
 
 interface SyncResult {
@@ -10,6 +10,7 @@ interface SyncResult {
     treatments: Array<{ localId?: number; cloudId: number }>;
     inventoryItems: Array<{ localId?: number; cloudId: number }>;
     inventoryTransactions: Array<{ localId?: number; cloudId: number }>;
+    treatmentSessions: Array<{ localId?: number; cloudId: number }>;
   };
   updates: {
     patients: Array<{ id: number; firstName: string; lastName: string; age: number; gender: string; phone: string; uhid: string | null; createdAt: Date; updatedAt: Date }>;
@@ -17,6 +18,7 @@ interface SyncResult {
     treatments: Array<{ id: number; invoiceId: number; name: string; duration: string; sessions: number; startDate: Date; endDate: Date; amount: number; createdAt: Date; updatedAt: Date }>;
     inventoryItems: Array<{ id: number; name: string; description: string | null; stock: number; costPrice: number; sellingPrice: number; createdAt: Date; updatedAt: Date }>;
     inventoryTransactions: Array<{ id: number; itemId: number; type: string; quantity: number; pricePerUnit: number; totalAmount: number; date: Date; notes: string | null; createdAt: Date; updatedAt: Date }>;
+    treatmentSessions: Array<{ id: number; treatmentId: number; sessionNumber: number; date: Date | null; attended: number; painBefore: number | null; painAfter: number | null; notes: string; exercisesPerformed: string; progress: string | null; cancelled: number; rescheduledDate: Date | null; createdAt: Date; updatedAt: Date }>;
   };
   conflicts: Array<{ localId?: number; originalNumber: string; newNumber: string; reason: string }>;
 }
@@ -32,7 +34,7 @@ export const syncData = async (req: Request, res: Response) => {
   log.debug('sync', 'Request received');
 
   try {
-    const { lastSyncTime, patients, invoices, treatments, inventoryItems, inventoryTransactions } = validateOrThrow<SyncRequest>(
+    const { lastSyncTime, patients, invoices, treatments, inventoryItems, inventoryTransactions, treatmentSessions } = validateOrThrow<SyncRequest>(
       SyncRequestSchema,
       req.body
     );
@@ -44,6 +46,7 @@ export const syncData = async (req: Request, res: Response) => {
         treatments: treatments?.length || 0,
         inventoryItems: inventoryItems?.length || 0,
         inventoryTransactions: inventoryTransactions?.length || 0,
+        treatmentSessions: treatmentSessions?.length || 0,
       },
       mode: lastSyncTime ? 'incremental' : 'full',
     });
@@ -54,20 +57,23 @@ export const syncData = async (req: Request, res: Response) => {
         invoices: [],
         treatments: [],
         inventoryItems: [],
-        inventoryTransactions: []
+        inventoryTransactions: [],
+        treatmentSessions: []
       },
       updates: {
         patients: [],
         invoices: [],
         treatments: [],
         inventoryItems: [],
-        inventoryTransactions: []
+        inventoryTransactions: [],
+        treatmentSessions: []
       },
       conflicts: []
     };
     const patientIdMap = new Map<number, number>();
     const invoiceIdMap = new Map<number, number>();
     const inventoryItemIdMap = new Map<number, number>();
+    const treatmentIdMap = new Map<number, number>();
 
     // === SYNC PATIENTS ===
     if (patients && patients.length > 0) {
@@ -281,6 +287,10 @@ export const syncData = async (req: Request, res: Response) => {
         cloudId: cloudTreatment.id,
         ...(treatment.id !== undefined ? { localId: treatment.id } : {}),
       });
+
+      if (treatment.id) {
+        treatmentIdMap.set(treatment.id, cloudTreatment.id);
+      }
     }
   }
 
@@ -399,6 +409,71 @@ export const syncData = async (req: Request, res: Response) => {
     }
   }
 
+  // === SYNC TREATMENT SESSIONS ===
+  if (treatmentSessions && treatmentSessions.length > 0) {
+    for (const ts of treatmentSessions) {
+      try {
+        const session = ts as TreatmentSessionSync;
+        const resolvedTreatmentId =
+          session.treatmentCloudId || (session.treatmentId ? treatmentIdMap.get(session.treatmentId) : undefined);
+
+        if (!resolvedTreatmentId) {
+          log.warn('sync', 'Cannot resolve treatment ID for session', { treatmentId: session.treatmentId, sessionNumber: session.sessionNumber });
+          continue;
+        }
+
+        const sessionData: any = {
+          treatmentId: resolvedTreatmentId,
+          sessionNumber: session.sessionNumber,
+          date: session.date ? new Date(session.date) : null,
+          attended: session.attended ?? 0,
+          painBefore: session.painBefore ?? null,
+          painAfter: session.painAfter ?? null,
+          notes: session.notes ?? '',
+          exercisesPerformed: session.exercisesPerformed ?? '',
+          progress: session.progress ?? null,
+          cancelled: session.cancelled ?? 0,
+          rescheduledDate: session.rescheduledDate ? new Date(session.rescheduledDate) : null,
+        };
+
+        let cloudSession;
+        if (session.cloudId) {
+          cloudSession = await prisma.treatmentSession.upsert({
+            where: { id: session.cloudId },
+            update: sessionData,
+            create: sessionData,
+          });
+        } else {
+          const existing = await prisma.treatmentSession.findFirst({
+            where: {
+              treatmentId: resolvedTreatmentId,
+              sessionNumber: session.sessionNumber,
+            },
+          });
+          if (existing) {
+            cloudSession = await prisma.treatmentSession.update({
+              where: { id: existing.id },
+              data: sessionData,
+            });
+          } else {
+            cloudSession = await prisma.treatmentSession.create({ data: sessionData });
+          }
+        }
+
+        result.synced.treatmentSessions.push({
+          cloudId: cloudSession.id,
+          ...(session.id !== undefined ? { localId: session.id } : {}),
+        });
+      } catch (err) {
+        log.error('sync', 'Failed to sync treatment session', {
+          treatmentId: (ts as any)?.treatmentId,
+          sessionNumber: (ts as any)?.sessionNumber,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+
   // === FETCH UPDATES FROM CLOUD ===
   // On first sync (no lastSyncTime), fetch ALL records
   // On subsequent syncs, only fetch records updated since last sync
@@ -452,6 +527,12 @@ export const syncData = async (req: Request, res: Response) => {
     orderBy: { updatedAt: 'desc' },
   });
 
+  // Get updated treatment sessions
+  result.updates.treatmentSessions = await prisma.treatmentSession.findMany({
+    where: whereClause,
+    orderBy: { updatedAt: 'desc' },
+  });
+
   log.info('sync', 'Sync completed', {
     synced: {
       patients: result.synced.patients.length,
@@ -459,6 +540,7 @@ export const syncData = async (req: Request, res: Response) => {
       treatments: result.synced.treatments.length,
       inventoryItems: result.synced.inventoryItems.length,
       inventoryTransactions: result.synced.inventoryTransactions.length,
+      treatmentSessions: result.synced.treatmentSessions.length,
     },
     updates: {
       patients: result.updates.patients.length,
@@ -466,6 +548,7 @@ export const syncData = async (req: Request, res: Response) => {
       treatments: result.updates.treatments.length,
       inventoryItems: result.updates.inventoryItems.length,
       inventoryTransactions: result.updates.inventoryTransactions.length,
+      treatmentSessions: result.updates.treatmentSessions.length,
     },
     conflicts: result.conflicts.length,
   });
@@ -488,7 +571,7 @@ export const syncData = async (req: Request, res: Response) => {
 
 export const getSyncStatus = async (req: Request, res: Response) => {
   try {
-    const [lastPatient, lastInvoice, lastTreatment, lastInvItem, lastInvTxn] = await Promise.all([
+    const [lastPatient, lastInvoice, lastTreatment, lastInvItem, lastInvTxn, lastSession] = await Promise.all([
       prisma.patient.findFirst({
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
@@ -509,6 +592,10 @@ export const getSyncStatus = async (req: Request, res: Response) => {
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
       }),
+      prisma.treatmentSession.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
     ]);
 
     const timestamps = [
@@ -516,7 +603,8 @@ export const getSyncStatus = async (req: Request, res: Response) => {
       lastInvoice?.updatedAt,
       lastTreatment?.updatedAt,
       lastInvItem?.updatedAt,
-      lastInvTxn?.updatedAt
+      lastInvTxn?.updatedAt,
+      lastSession?.updatedAt
     ].filter((d): d is Date => !!d);
 
     const lastModified = timestamps.length > 0

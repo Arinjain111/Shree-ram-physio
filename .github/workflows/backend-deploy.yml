@@ -92,6 +92,16 @@ jobs:
           cd Backend
           npm ci
 
+      - name: Pre-migrate clinical presets (diagnosis_presets/exercise_presets → clinical_presets)
+        run: |
+          cd Backend
+          if [ -f "scripts/migrate-clinical-presets.sql" ]; then
+            echo "Running clinical presets migration..."
+            psql "${{ secrets.DIRECT_URL }}" -f scripts/migrate-clinical-presets.sql || echo "Migration script failed (may already be applied)"
+          else
+            echo "No migration script found, skipping"
+          fi
+
       - name: Apply Prisma schema (migrations or push)
         run: |
           cd Backend

@@ -3,7 +3,10 @@ import { useUI } from '@/context/UIContext';
 import { useLogger } from '@/utils/logger';
 import type { DatabaseInvoice } from '@/types/database.types';
 import { InvoiceHistoryCard } from './InvoiceHistoryCard';
+import { TreatmentSessionPanel } from './TreatmentSessionPanel';
 import { ipcRenderer } from '@/lib/ipc';
+
+type TabKey = 'history' | 'sessions';
 
 interface PatientDetailModalProps {
     invoices: DatabaseInvoice[] | null;
@@ -13,6 +16,7 @@ interface PatientDetailModalProps {
 
 export const PatientDetailModal = ({ invoices, onClose, onPrintInvoice }: PatientDetailModalProps) => {
   const { showToast, showModal } = useUI();
+  const [activeTab, setActiveTab] = useState<TabKey>('history');
   const [modalVisibleCount, setModalVisibleCount] = useState(5);
   const [showDeleteOptions, setShowDeleteOptions] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -180,28 +184,61 @@ export const PatientDetailModal = ({ invoices, onClose, onPrintInvoice }: Patien
           </div>
         </div>
 
+        {/* Tab Bar */}
+        <div className="bg-white border-b border-slate-100 px-8 shrink-0">
+          <div className="flex gap-1">
+            {([
+              { key: 'history' as TabKey, label: 'Invoice History' },
+              { key: 'sessions' as TabKey, label: 'Sessions' },
+            ]).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-4 py-3 text-sm font-semibold transition-colors border-b-2 ${
+                  activeTab === tab.key
+                    ? 'text-indigo-600 border-indigo-600'
+                    : 'text-slate-500 border-transparent hover:text-slate-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Modal Content */}
         <div className="overflow-y-auto p-8 bg-slate-50/50">
           <div className="space-y-6">
-            {invoices.slice(0, modalVisibleCount).map((invoice, idx) => (
-              <InvoiceHistoryCard
-                key={invoice.invoiceNumber}
-                invoice={invoice}
-                index={idx}
-                totalCount={invoices.length}
-                onPrint={onPrintInvoice}
-              />
-            ))}
+            {activeTab === 'history' && (
+              <>
+                {invoices.slice(0, modalVisibleCount).map((invoice, idx) => (
+                  <InvoiceHistoryCard
+                    key={invoice.invoiceNumber}
+                    invoice={invoice}
+                    index={idx}
+                    totalCount={invoices.length}
+                    onPrint={onPrintInvoice}
+                  />
+                ))}
 
-            {modalVisibleCount < invoices.length && (
-              <div className="flex justify-center pt-4 pb-2">
-                <button
-                  onClick={() => setModalVisibleCount(prev => prev + 5)}
-                  className="px-6 py-2.5 bg-white text-slate-600 ring-1 ring-inset ring-slate-200 rounded-xl hover:bg-slate-50 font-medium shadow-sm transition-colors"
-                >
-                  Load More History (Showing {modalVisibleCount} of {invoices.length})
-                </button>
-              </div>
+                {modalVisibleCount < invoices.length && (
+                  <div className="flex justify-center pt-4 pb-2">
+                    <button
+                      onClick={() => setModalVisibleCount(prev => prev + 5)}
+                      className="px-6 py-2.5 bg-white text-slate-600 ring-1 ring-inset ring-slate-200 rounded-xl hover:bg-slate-50 font-medium shadow-sm transition-colors"
+                    >
+                      Load More History (Showing {modalVisibleCount} of {invoices.length})
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === 'sessions' && invoices && invoices.length > 0 && invoices[0].patient && (
+              <TreatmentSessionPanel
+                patientId={invoices[0].patient.id!}
+                patientName={`${invoices[0].patient.firstName} ${invoices[0].patient.lastName}`}
+              />
             )}
           </div>
         </div>

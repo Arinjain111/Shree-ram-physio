@@ -438,6 +438,33 @@ export const AddExpenseSchema = z.object({
 });
 
 // ============================================
+// TREATMENT SESSION SCHEMAS
+// ============================================
+
+export const TreatmentSessionUpdateSchema = z.object({
+  attended: z.number().int().min(0).max(1).optional(),
+  painBefore: z.number().int().min(0).max(10).nullable().optional(),
+  painAfter: z.number().int().min(0).max(10).nullable().optional(),
+  notes: z.string().max(1000).optional(),
+  exercisesPerformed: z.string().max(1000).optional(),
+  progress: z.enum(['improving', 'stable', 'worsening', '']).nullable().optional(),
+  cancelled: z.number().int().min(0).max(1).optional(),
+  rescheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+});
+
+export type TreatmentSessionUpdate = z.infer<typeof TreatmentSessionUpdateSchema>;
+
+export const HolidayLeaveSchema = z.object({
+  treatmentId: z.number().int().positive(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+  type: z.enum(['holiday', 'patient_leave', 'doctor_leave']),
+  notes: z.string().max(500).optional(),
+});
+
+export type HolidayLeaveInput = z.infer<typeof HolidayLeaveSchema>;
+
+// ============================================
 // UTILITY FUNCTIONS
 // ============================================
 

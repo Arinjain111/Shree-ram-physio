@@ -3,7 +3,10 @@ import { useUI } from '@/context/UIContext';
 import { useLogger } from '@/utils/logger';
 import type { DatabaseInvoice } from '@/types/database.types';
 import { InvoiceHistoryCard } from './InvoiceHistoryCard';
+import { TreatmentSessionPanel } from './TreatmentSessionPanel';
 import { ipcRenderer } from '@/lib/ipc';
+
+type TabKey = 'history' | 'sessions';
 
 interface PatientDetailPaneProps {
     invoices: DatabaseInvoice[] | null;
@@ -12,6 +15,7 @@ interface PatientDetailPaneProps {
 
 export const PatientDetailPane = ({ invoices, onPrintInvoice }: PatientDetailPaneProps) => {
   const { showToast, showModal } = useUI();
+  const [activeTab, setActiveTab] = useState<TabKey>('history');
   const [modalVisibleCount, setModalVisibleCount] = useState(5);
   const [showDeleteOptions, setShowDeleteOptions] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -161,32 +165,61 @@ export const PatientDetailPane = ({ invoices, onPrintInvoice }: PatientDetailPan
           </div>
         </div>
 
+        {/* Tab Bar */}
+        <div className="bg-white border-b border-slate-100 px-8 shrink-0">
+          <div className="flex gap-1 max-w-4xl mx-auto">
+            {([
+              { key: 'history' as TabKey, label: 'Invoice History' },
+              { key: 'sessions' as TabKey, label: 'Sessions' },
+            ]).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-4 py-3 text-sm font-semibold transition-colors border-b-2 ${
+                  activeTab === tab.key
+                    ? 'text-indigo-600 border-indigo-600'
+                    : 'text-slate-500 border-transparent hover:text-slate-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Content */}
         <div className="overflow-y-auto p-8 bg-slate-50/30 flex-1 custom-scrollbar">
           <div className="space-y-6 max-w-4xl mx-auto">
-            <h3 className="text-lg font-bold text-slate-800 tracking-tight mb-4">
-                Invoice History
-            </h3>
-            
-            {sortedInvoices.slice(0, modalVisibleCount).map((invoice, idx) => (
-              <InvoiceHistoryCard
-                key={invoice.invoiceNumber}
-                invoice={invoice}
-                index={idx}
-                totalCount={sortedInvoices.length}
-                onPrint={onPrintInvoice}
-              />
-            ))}
+            {activeTab === 'history' && (
+              <>
+                {sortedInvoices.slice(0, modalVisibleCount).map((invoice, idx) => (
+                  <InvoiceHistoryCard
+                    key={invoice.invoiceNumber}
+                    invoice={invoice}
+                    index={idx}
+                    totalCount={sortedInvoices.length}
+                    onPrint={onPrintInvoice}
+                  />
+                ))}
 
-            {modalVisibleCount < sortedInvoices.length && (
-              <div className="flex justify-center pt-4 pb-2">
-                <button
-                  onClick={() => setModalVisibleCount(prev => prev + 5)}
-                  className="px-6 py-2.5 bg-white text-slate-600 border border-slate-300 rounded-xl hover:bg-slate-50 font-semibold shadow-xs transition-all active:scale-95"
-                >
-                  Load More History (Showing {modalVisibleCount} of {invoices.length})
-                </button>
-              </div>
+                {modalVisibleCount < sortedInvoices.length && (
+                  <div className="flex justify-center pt-4 pb-2">
+                    <button
+                      onClick={() => setModalVisibleCount(prev => prev + 5)}
+                      className="px-6 py-2.5 bg-white text-slate-600 border border-slate-300 rounded-xl hover:bg-slate-50 font-semibold shadow-xs transition-all active:scale-95"
+                    >
+                      Load More History (Showing {modalVisibleCount} of {invoices.length})
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === 'sessions' && patient && (
+              <TreatmentSessionPanel
+                patientId={patient.id!}
+                patientName={`${patient.firstName} ${patient.lastName}`}
+              />
             )}
           </div>
         </div>

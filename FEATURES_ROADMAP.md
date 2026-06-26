@@ -146,13 +146,19 @@ The roadmap below is ordered by **impact-per-effort**, with "Quick Wins" first a
 
 These features reuse existing schemas (where they already exist) or add a focused module without architectural changes.
 
-### 1. 🩺 Treatment Session Tracking (use existing `TreatmentSession` table)
+### 1. 🩺 Treatment Session Tracking (use existing `TreatmentSession` table) — ✅ DONE
 - **Why**: Schema already has `painBefore`, `painAfter`, `exercisesPerformed`, `attended`, `rescheduledDate` — but no UI.
-- **What to build**:
-  - "Sessions" tab inside `PatientDetailPane` showing all sessions for a treatment
-  - Per-session modal to log attendance, pain scale (0-10), exercises, progress
-  - Visual pain-trend chart (line chart over time)
+- **What was built**:
+  - Sessions tab inside patient detail showing all sessions per treatment
+  - Per-session modal to log attendance, pain scale (0-10), exercises performed
+  - Visual pain-trend chart (SVG line chart over time)
   - Mark session as cancelled / rescheduled
+  - Log holidays and custom leave (holiday / patient leave / doctor leave)
+  - Right-click context menu for quick actions (mark attended, reset, delete)
+  - Session delete and reset with confirmation modal
+  - Merged DiagnosisPreset + ExercisePreset → unified ClinicalPreset (category field)
+  - Exercise autocomplete with comma/newline token awareness
+  - Treatment sessions included in cloud sync (bidirectional)
 - **Impact**: Turns the app from a billing tool into a true clinical tool. The single biggest gap.
 
 ### 2. 🗂️ Patient Document Attachments
@@ -399,7 +405,7 @@ These are larger features that may require schema changes, new pages, or backend
 
 If you can only build 3 things in the next 6 months, build these:
 
-### 🥇 1. Treatment Session Tracking
+### 🥇 1. Treatment Session Tracking — ✅ DONE
 - **Why**: Turns the app from "billing" into "clinical workflow". Highest user stickiness.
 - **Effort**: 2-3 weeks (UI + use existing schema)
 - **Reuse**: PatientDetailPane, TreatmentCalendar, existing `TreatmentSession` table
@@ -441,7 +447,7 @@ Sometimes the best roadmap is what you don't build:
 
 **For the next 90 days**, focus on:
 1. ~~Fix the security issues (`nodeIntegration`, reset IPC) — 1 day~~ ✅ Done in v2.5.5
-2. Ship **Quick Win #1: Treatment Session Tracking** — 2-3 weeks
+2. ~~Ship **Quick Win #1: Treatment Session Tracking** — 2-3 weeks~~ ✅ Done in v2.6
 3. Build the foundation for **#13: RBAC** — parallel track
 
 **For the next 180 days**, add:
@@ -461,4 +467,4 @@ Sometimes the best roadmap is what you don't build:
 
 ---
 
-*Last Updated: June 14, 2026 (v2.5.5 — bundle visualizer, route preload, CSP, a11y labels, hooks barrel, print-window sandboxed)*
+*Last Updated: June 26, 2026 (v2.6 — treatment session tracking, clinical presets merge, session context menu, delete/reset)*

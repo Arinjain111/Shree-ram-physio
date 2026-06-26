@@ -154,6 +154,86 @@ const DIAGNOSIS_PRESETS = [
   'Pelvic Floor Dysfunction',
 ];
 
+const EXERCISE_PRESETS = [
+  'Quadriceps Sets',
+  'Hamstring Curls',
+  'Straight Leg Raises',
+  'Heel Slides',
+  'Ankle Pumps',
+  'Glute Bridges',
+  'Wall Squats',
+  'Calf Raises',
+  'Bird Dog',
+  'Cat-Cow Stretch',
+  'Pelvic Tilts',
+  'Knee to Chest Stretch',
+  'Child Pose',
+  'Cobra Stretch',
+  'Bridge Exercise',
+  'Side Leg Raises',
+  'Hip Abduction',
+  'Hip Adduction',
+  'Mini Squats',
+  'Step Ups',
+  'Single Leg Stance',
+  'Tandem Walking',
+  'Heel-Toe Walking',
+  'Toe Raises',
+  'Resisted Row',
+  'Shoulder Flexion',
+  'Shoulder Abduction',
+  'External Rotation',
+  'Internal Rotation',
+  'Pendulum Exercise',
+  'Wall Push-Ups',
+  'Scapular Retraction',
+  'Chin Tucks',
+  'Cervical Retraction',
+  'Upper Trapezius Stretch',
+  'Levator Scapulae Stretch',
+  'Pec Stretch',
+  'Thoracic Extension',
+  'Diaphragmatic Breathing',
+  'Active Cycle of Breathing',
+  'Pursed Lip Breathing',
+  'Incentive Spirometry',
+  'Postural Correction',
+  'Scapular Squeezes',
+  'Wrist Flexor Stretch',
+  'Wrist Extensor Stretch',
+  'Tendon Gliding',
+  'Grip Strengthening',
+  'Finger Tapping',
+  'Thumb Opposition',
+  'Pelvic Floor Kegels',
+  'Transverse Abdominis Activation',
+  'Core Stabilization',
+  'Dead Bug',
+  'Plank',
+  'Side Plank',
+  'Superman Exercise',
+  'Balance Board Training',
+  'BOSU Ball Exercises',
+  'Resistance Band Rows',
+  'Theraband Exercises',
+  'Foam Roller Release',
+  'Self Myofascial Release',
+  'Static Stretching',
+  'Dynamic Stretching',
+  'PNF Stretching',
+  'Range of Motion Exercises',
+  'Strengthening Exercises',
+  'Endurance Training',
+  'Aerobic Conditioning',
+  'Gait Training',
+  'Stair Training',
+  'Sit to Stand',
+  'Transfer Training',
+  'Proprioception Training',
+  'Agility Drills',
+  'Sport-Specific Training',
+];
+
 const SHORTCUTS: Array<{ shortcut: string; expands: string }> = [
   { shortcut: 'lbp', expands: 'Low Back Pain' },
   { shortcut: 'cs', expands: 'Cervical Spondylosis' },
@@ -177,7 +257,7 @@ const SHORTCUTS: Array<{ shortcut: string; expands: string }> = [
   { shortcut: 'bppv', expands: 'Vertigo / BPPV' },
 ];
 
-export function seedDiagnosisData(): void {
+export function seedClinicalData(): void {
   const Database = loadBetterSqlite3();
   const dbPath = path.join(app.getPath('userData'), 'shri-ram-physio.db');
 
@@ -189,23 +269,37 @@ export function seedDiagnosisData(): void {
   const db = new Database(dbPath);
 
   try {
-    const existingCount = db.prepare('SELECT COUNT(*) as count FROM diagnosis_presets').get() as { count: number };
-    if (existingCount.count > 0) {
+    const existingDiagnosis = db.prepare('SELECT COUNT(*) as count FROM clinical_presets WHERE category = \'diagnosis\'').get() as { count: number };
+    const existingExercise = db.prepare('SELECT COUNT(*) as count FROM clinical_presets WHERE category = \'exercise\'').get() as { count: number };
+
+    if (existingDiagnosis.count === 0) {
+      logger.info('db', 'Seeding diagnosis presets');
+      const insertDiagnosis = db.prepare('INSERT OR IGNORE INTO clinical_presets (name, category, frequency) VALUES (?, \'diagnosis\', ?)');
+      const insertMany = db.transaction((items: string[]) => {
+        for (const name of items) {
+          insertDiagnosis.run(name, 0);
+        }
+      });
+      insertMany(DIAGNOSIS_PRESETS);
+      logger.info('db', 'Seeded diagnosis presets', { count: DIAGNOSIS_PRESETS.length });
+    }
+
+    if (existingExercise.count === 0) {
+      logger.info('db', 'Seeding exercise presets');
+      const insertExercise = db.prepare('INSERT OR IGNORE INTO clinical_presets (name, category, frequency) VALUES (?, \'exercise\', ?)');
+      const insertMany = db.transaction((items: string[]) => {
+        for (const name of items) {
+          insertExercise.run(name, 0);
+        }
+      });
+      insertMany(EXERCISE_PRESETS);
+      logger.info('db', 'Seeded exercise presets', { count: EXERCISE_PRESETS.length });
+    }
+
+    if (existingDiagnosis.count > 0 && existingExercise.count > 0) {
       db.close();
       return;
     }
-
-    logger.info('db', 'Seeding diagnosis presets');
-    const insertPreset = db.prepare('INSERT OR IGNORE INTO diagnosis_presets (name, frequency) VALUES (?, ?)');
-
-    const insertMany = db.transaction((items: string[]) => {
-      for (const name of items) {
-        insertPreset.run(name, 0);
-      }
-    });
-
-    insertMany(DIAGNOSIS_PRESETS);
-    logger.info('db', 'Seeded diagnosis presets', { count: DIAGNOSIS_PRESETS.length });
 
     logger.info('db', 'Seeding diagnosis shortcuts');
     const insertShortcut = db.prepare('INSERT OR IGNORE INTO diagnosis_shortcuts (shortcut, expands) VALUES (?, ?)');

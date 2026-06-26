@@ -193,6 +193,26 @@ export const InventoryTransactionSyncSchema = z.object({
 
 export type InventoryTransactionSync = z.infer<typeof InventoryTransactionSyncSchema>;
 
+export const TreatmentSessionSyncSchema = z.object({
+  id: z.number().int().positive().optional(),
+  cloudId: z.number().int().positive().nullish(),
+  treatmentCloudId: z.number().int().positive().nullish(),
+  treatmentId: z.number().int().positive(),
+  sessionNumber: z.number().int().min(1),
+  date: z.string().nullish(),
+  attended: z.number().int().min(0).max(1).default(0),
+  painBefore: z.number().int().min(0).max(10).nullish(),
+  painAfter: z.number().int().min(0).max(10).nullish(),
+  notes: z.string().max(2000).nullish(),
+  exercisesPerformed: z.string().max(2000).nullish(),
+  progress: z.enum(['improving', 'stable', 'worsening']).nullish(),
+  cancelled: z.number().int().min(0).max(1).default(0),
+  rescheduledDate: z.string().nullish(),
+  updatedAt: z.iso.datetime().optional(),
+});
+
+export type TreatmentSessionSync = z.infer<typeof TreatmentSessionSyncSchema>;
+
 // ============================================
 // REQUEST SCHEMAS - API request validation
 // ============================================
@@ -207,6 +227,7 @@ export const SyncRequestSchema = z.object({
   treatments: z.array(TreatmentSyncSchema).max(2000, 'Maximum 2000 treatments per sync batch').optional(),
   inventoryItems: z.array(InventoryItemSyncSchema).max(500, 'Maximum 500 inventory items per sync batch').optional(),
   inventoryTransactions: z.array(InventoryTransactionSyncSchema).max(2000, 'Maximum 2000 inventory transactions per sync batch').optional(),
+  treatmentSessions: z.array(TreatmentSessionSyncSchema).max(5000, 'Maximum 5000 treatment sessions per sync batch').optional(),
 });
 
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;
@@ -301,11 +322,32 @@ export const SyncResponseSchema = z.object({
         cloudId: z.number().int(),
       })
     ),
+    inventoryItems: z.array(
+      z.object({
+        localId: z.number().int().optional(),
+        cloudId: z.number().int(),
+      })
+    ).optional(),
+    inventoryTransactions: z.array(
+      z.object({
+        localId: z.number().int().optional(),
+        cloudId: z.number().int(),
+      })
+    ).optional(),
+    treatmentSessions: z.array(
+      z.object({
+        localId: z.number().int().optional(),
+        cloudId: z.number().int(),
+      })
+    ).optional(),
   }),
   updates: z.object({
     patients: z.array(PatientSchema),
     invoices: z.array(InvoiceSchema),
     treatments: z.array(TreatmentSchema),
+    inventoryItems: z.array(z.any()).optional(),
+    inventoryTransactions: z.array(z.any()).optional(),
+    treatmentSessions: z.array(z.any()).optional(),
   }),
   conflicts: z.array(
     z.object({

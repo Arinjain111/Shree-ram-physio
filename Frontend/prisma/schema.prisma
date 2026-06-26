@@ -109,13 +109,13 @@ model TreatmentPreset {
   @@map("treatment_presets")
 }
 
-// Diagnosis presets for autocomplete suggestions
-model DiagnosisPreset {
+// Clinical presets for autocomplete suggestions (diagnoses, exercises, etc.)
+model ClinicalPreset {
   id         Int       @id @default(autoincrement())
-  name       String    @unique
+  name       String
+  category   String
   frequency  Int       @default(0)
 
-  // Sync tracking
   cloudId    Int?      @map("cloud_id")
   syncStatus String    @default("PENDING") @map("sync_status")
 
@@ -123,7 +123,9 @@ model DiagnosisPreset {
   updatedAt  DateTime  @updatedAt @map("updated_at")
   lastSyncAt DateTime? @map("last_sync_at")
 
-  @@map("diagnosis_presets")
+  @@unique([name, category])
+  @@map("clinical_presets")
+  @@index([category])
 }
 
 // Diagnosis shortcuts — expand short texts to full diagnosis names

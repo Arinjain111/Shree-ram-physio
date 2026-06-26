@@ -97,19 +97,20 @@ model TreatmentPreset {
   @@map("treatment_presets")
 }
 
-// Diagnosis presets for autocomplete suggestions
-model DiagnosisPreset {
+model ClinicalPreset {
   id        Int      @id @default(autoincrement())
-  name      String   @unique
+  name      String
+  category  String
   frequency Int      @default(0)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("diagnosis_presets")
+  @@unique([name, category])
+  @@map("clinical_presets")
+  @@index([category])
 }
 
-// Diagnosis shortcuts — expand short texts to full diagnosis names
 model DiagnosisShortcut {
   id       Int    @id @default(autoincrement())
   shortcut String @unique

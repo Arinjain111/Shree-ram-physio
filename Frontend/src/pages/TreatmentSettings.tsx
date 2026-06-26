@@ -3,12 +3,12 @@ import { useUI } from '@/context/UIContext';
 import { useLogger } from '@/utils/logger';
 import PageHeader from '@/components/layout/PageHeader';
 import type { TreatmentPreset } from '@/types/treatmentPreset.types';
-import type { DiagnosisPreset } from '@/types/diagnosisPreset.types';
+import type { ClinicalPreset } from '@/types/clinicalPreset.types';
 import { handleFrontendError } from '@/services/errorHandler';
 import { PlusIcon, EditIcon, TrashIcon, SaveIcon, XIcon, ClipboardListIcon, SettingsIcon } from '@/components/icons';
 import { ipcRenderer } from '@/lib/ipc';
 
-type Tab = 'treatment' | 'diagnosis';
+type Tab = 'treatment' | 'diagnosis' | 'exercise';
 
 const TreatmentSettings = () => {
   const { showToast, showModal } = useUI();
@@ -26,17 +26,25 @@ const TreatmentSettings = () => {
   const [treatmentSearch, setTreatmentSearch] = useState('');
 
   // Diagnosis preset state
-  const [diagnosisPresets, setDiagnosisPresets] = useState<DiagnosisPreset[]>([]);
+  const [diagnosisPresets, setDiagnosisPresets] = useState<ClinicalPreset[]>([]);
   const [isAddingDiagnosis, setIsAddingDiagnosis] = useState(false);
   const [newDiagnosisName, setNewDiagnosisName] = useState('');
   const [diagnosisSearch, setDiagnosisSearch] = useState('');
+
+  // Exercise preset state
+  const [exercisePresets, setExercisePresets] = useState<ClinicalPreset[]>([]);
+  const [isAddingExercise, setIsAddingExercise] = useState(false);
+  const [newExerciseName, setNewExerciseName] = useState('');
+  const [exerciseSearch, setExerciseSearch] = useState('');
   const log = useLogger();
 
   useEffect(() => {
     if (activeTab === 'treatment') {
       loadPresets();
-    } else {
+    } else if (activeTab === 'diagnosis') {
       loadDiagnosisPresets();
+    } else {
+      loadExercisePresets();
     }
   }, [activeTab]);
 
@@ -59,17 +67,18 @@ const TreatmentSettings = () => {
       showToast('info', 'Syncing all presets from cloud...');
       
       const treatmentResult = await ipcRenderer.invoke('sync-presets-from-cloud');
-      const diagnosisResult = await ipcRenderer.invoke('sync-diagnosis-presets-from-cloud');
+      const clinicalResult = await ipcRenderer.invoke('sync-clinical-presets-from-cloud');
       
       await loadPresets();
       await loadDiagnosisPresets();
+      await loadExercisePresets();
       
       const treatmentStats = treatmentResult.success ? treatmentResult.stats : { created: 0, updated: 0, fetched: 0 };
-      const diagnosisStats = diagnosisResult.success ? diagnosisResult.stats : { created: 0, updated: 0, fetched: 0 };
+      const clinicalStats = clinicalResult.success ? clinicalResult.stats : { created: 0, updated: 0, fetched: 0 };
       
-      const totalCreated = treatmentStats.created + diagnosisStats.created;
-      const totalUpdated = treatmentStats.updated + diagnosisStats.updated;
-      const totalFetched = treatmentStats.fetched + diagnosisStats.fetched;
+      const totalCreated = treatmentStats.created + clinicalStats.created;
+      const totalUpdated = treatmentStats.updated + clinicalStats.updated;
+      const totalFetched = treatmentStats.fetched + clinicalStats.fetched;
       
       if (totalFetched === 0) {
         showToast('info', 'Server has no presets');
@@ -157,7 +166,7 @@ const TreatmentSettings = () => {
 
   const loadDiagnosisPresets = async () => {
     try {
-      const result = await ipcRenderer.invoke('load-diagnosis-presets');
+      const result = await ipcRenderer.invoke('load-clinical-presets', 'diagnosis');
       if (result.success) {
         setDiagnosisPresets(result.presets || []);
       }
@@ -174,7 +183,7 @@ const TreatmentSettings = () => {
       return;
     }
     try {
-      const result = await ipcRenderer.invoke('add-custom-diagnosis', name);
+      const result = await ipcRenderer.invoke('add-custom-clinical', 'diagnosis', name);
       if (result.success) {
         setNewDiagnosisName('');
         setIsAddingDiagnosis(false);
@@ -196,7 +205,7 @@ const TreatmentSettings = () => {
       confirmText: 'Delete',
       onConfirm: async () => {
         try {
-          const result = await ipcRenderer.invoke('delete-diagnosis-preset', id);
+          const result = await ipcRenderer.invoke('delete-clinical-preset', id);
           if (result.success) {
             await loadDiagnosisPresets();
             showToast('success', 'Diagnosis preset deleted');
@@ -210,11 +219,69 @@ const TreatmentSettings = () => {
     });
   };
 
+  // ─── Exercise Presets ───────────────────────────────────────
+
+  const loadExercisePresets = async () => {
+    try {
+      const result = await ipcRenderer.invoke('load-clinical-presets', 'exercise');
+      if (result.success) {
+        setExercisePresets(result.presets || []);
+      }
+    } catch (error) {
+      log.error('settings', 'Error loading exercise presets', { error: error instanceof Error ? error.message : String(error) });
+      handleFrontendError(error, showToast, 'Error loading exercise presets');
+    }
+  };
+
+  const handleAddExercise = async () => {
+    const name = newExerciseName.trim();
+    if (!name) {
+      showToast('warning', 'Please enter an exercise name');
+      return;
+    }
+    try {
+      const result = await ipcRenderer.invoke('add-custom-clinical', 'exercise', name);
+      if (result.success) {
+        setNewExerciseName('');
+        setIsAddingExercise(false);
+        await loadExercisePresets();
+        showToast('success', 'Exercise preset added');
+      } else {
+        showToast('error', 'Error adding exercise: ' + result.error);
+      }
+    } catch (error: any) {
+      handleFrontendError(error, showToast, 'Failed to add exercise');
+    }
+  };
+
+  const handleDeleteExercise = async (id: number, name: string) => {
+    showModal({
+      title: 'Delete Exercise Preset',
+      message: `Are you sure you want to delete "${name}"?`,
+      type: 'danger',
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        try {
+          const result = await ipcRenderer.invoke('delete-clinical-preset', id);
+          if (result.success) {
+            await loadExercisePresets();
+            showToast('success', 'Exercise preset deleted');
+          } else {
+            showToast('error', 'Error deleting exercise: ' + result.error);
+          }
+        } catch (error: any) {
+          handleFrontendError(error, showToast, 'Failed to delete exercise');
+        }
+      }
+    });
+  };
+
   // ─── Render ──────────────────────────────────────────────────
 
   const categories = [
     { id: 'treatment', label: 'Treatment Presets', icon: <SettingsIcon />, color: 'text-teal-600', bg: 'bg-teal-50' },
     { id: 'diagnosis', label: 'Diagnosis Presets', icon: <ClipboardListIcon />, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { id: 'exercise', label: 'Exercise Presets', icon: <SettingsIcon />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
   ] as const;
 
   return (
@@ -275,6 +342,7 @@ const TreatmentSettings = () => {
             <p className="text-sm text-slate-500 mt-1">
               {activeTab === 'treatment' && "Manage your standard treatment plans, session counts, and pricing."}
               {activeTab === 'diagnosis' && "Manage diagnosis shortcuts and frequently used diagnoses."}
+              {activeTab === 'exercise' && "Manage exercise presets for session logging."}
             </p>
           </div>
 
@@ -487,6 +555,109 @@ const TreatmentSettings = () => {
                                   <td className="px-6 py-4 text-right">
                                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <button onClick={() => handleDeleteDiagnosis(dp.id, dp.name)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete" aria-label="Delete diagnosis preset"><TrashIcon /></button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ════════════════ EXERCISE TAB ════════════════ */}
+              {activeTab === 'exercise' && (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  {/* Action buttons */}
+                  <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                    <div className="flex gap-3 w-full sm:w-auto">
+                      {!isAddingExercise && (
+                        <button
+                          onClick={() => setIsAddingExercise(true)}
+                          className="flex items-center gap-2 px-6 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-colors shadow-sm font-medium text-sm"
+                        >
+                          <PlusIcon />
+                          Add Exercise
+                        </button>
+                      )}
+                    </div>
+                    <div className="w-full sm:w-64">
+                      <input
+                        type="text"
+                        value={exerciseSearch}
+                        onChange={(e) => setExerciseSearch(e.target.value)}
+                        placeholder="Search exercises..."
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-inner text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Add Exercise Form */}
+                  {isAddingExercise && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-8">
+                      <div className="flex items-center justify-between mb-6 border-b border-slate-50 pb-4">
+                        <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2"><span className="text-emerald-600"><PlusIcon /></span> Add New Exercise Preset</h2>
+                        <button onClick={() => { setIsAddingExercise(false); setNewExerciseName(''); }} className="text-slate-400 hover:text-slate-600 transition-colors bg-slate-50 p-2 rounded-full hover:bg-slate-100"><XIcon /></button>
+                      </div>
+                      <div className="max-w-md space-y-2">
+                        <label className="block text-sm font-medium text-slate-700">Exercise Name <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          value={newExerciseName}
+                          onChange={(e) => setNewExerciseName(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleAddExercise(); }}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-inner"
+                          placeholder="e.g., Quadriceps sets"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-slate-50">
+                        <button onClick={() => { setIsAddingExercise(false); setNewExerciseName(''); }} className="px-5 py-2.5 text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 font-medium transition-colors shadow-sm">Cancel</button>
+                        <button onClick={handleAddExercise} className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-medium shadow-sm transition-all transform active:scale-95"><SaveIcon /> Save Exercise</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Exercise Presets List */}
+                  <div className="bg-white rounded-2xl shadow-xs border border-slate-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100">
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Exercise Name</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Times Used</th>
+                            <th className="px-6 py-4 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {exercisePresets.length === 0 ? (
+                            <tr>
+                              <td colSpan={3} className="px-6 py-16 text-center">
+                                <div className="flex flex-col items-center justify-center text-slate-400">
+                                  <div className="p-5 bg-slate-50 rounded-full mb-4 shadow-inner"><SettingsIcon /></div>
+                                  <p className="text-lg font-semibold text-slate-600 mb-1">No exercise presets found</p>
+                                  <p className="text-sm font-medium">Add your first exercise preset to get started.</p>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            exercisePresets
+                              .filter((ep) =>
+                                ep.name.toLowerCase().includes(exerciseSearch.toLowerCase())
+                              )
+                              .map((ep) => (
+                                <tr key={ep.id} className="hover:bg-slate-50/50 transition-colors group">
+                                  <td className="px-6 py-4"><div className="font-medium text-slate-800">{ep.name}</div></td>
+                                  <td className="px-6 py-4">
+                                    <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                      {ep.frequency} time{ep.frequency !== 1 ? 's' : ''}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button onClick={() => handleDeleteExercise(ep.id!, ep.name)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete" aria-label="Delete exercise preset"><TrashIcon /></button>
                                     </div>
                                   </td>
                                 </tr>

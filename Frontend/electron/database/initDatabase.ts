@@ -2,7 +2,7 @@ import { app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { loadBetterSqlite3 } from '../lib/nativeLoader';
-import { seedDiagnosisData } from './seedDiagnosisPresets';
+import { seedClinicalData } from './seedClinicalPresets';
 import { logger } from '../utils/logger';
 
 /**
@@ -134,26 +134,57 @@ export async function initializeDatabase(): Promise<void> {
                     }
                 }
 
-                // Lightweight migration: add diagnosis_presets table if missing.
+                // Lightweight migration: add clinical_presets table if missing.
                 const existingTables: Array<{ name: string }> = db.prepare(
                     "SELECT name FROM sqlite_master WHERE type='table'"
                 ).all() as any;
-                const hasDiagnosisPresets = existingTables.some(t => t.name === 'diagnosis_presets');
-                if (!hasDiagnosisPresets) {
-                    logger.info('db', 'Migrating local DB: adding diagnosis_presets table');
+                const hasClinicalPresets = existingTables.some(t => t.name === 'clinical_presets');
+                if (!hasClinicalPresets) {
+                    logger.info('db', 'Migrating local DB: adding clinical_presets table');
                     db.exec(`
-                CREATE TABLE IF NOT EXISTS diagnosis_presets (
+                CREATE TABLE IF NOT EXISTS clinical_presets (
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  name TEXT NOT NULL UNIQUE,
+                  name TEXT NOT NULL,
+                  category TEXT NOT NULL,
                   frequency INTEGER NOT NULL DEFAULT 0,
                   cloud_id INTEGER,
                   sync_status TEXT NOT NULL DEFAULT 'PENDING',
                   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                  last_sync_at TEXT
+                  last_sync_at TEXT,
+                  UNIQUE(name, category)
                 );
+                CREATE INDEX IF NOT EXISTS clinical_presets_category_idx ON clinical_presets(category);
               `);
-                    logger.info('db', 'diagnosis_presets table added');
+                    logger.info('db', 'clinical_presets table added');
+
+                    // Migrate data from old diagnosis_presets and exercise_presets tables
+                    const hasOldDiagnosisPresets = existingTables.some(t => t.name === 'diagnosis_presets');
+                    if (hasOldDiagnosisPresets) {
+                        try {
+                            db.exec(`
+                                INSERT OR IGNORE INTO clinical_presets (name, category, frequency, cloud_id, sync_status, created_at, updated_at, last_sync_at)
+                                SELECT name, 'diagnosis', frequency, cloud_id, sync_status, created_at, updated_at, last_sync_at
+                                FROM diagnosis_presets;
+                            `);
+                            logger.info('db', 'Migrated data from diagnosis_presets to clinical_presets');
+                        } catch (e) {
+                            logger.error('db', 'Failed to migrate diagnosis_presets data', { error: e instanceof Error ? e.message : String(e) });
+                        }
+                    }
+                    const hasOldExercisePresets = existingTables.some(t => t.name === 'exercise_presets');
+                    if (hasOldExercisePresets) {
+                        try {
+                            db.exec(`
+                                INSERT OR IGNORE INTO clinical_presets (name, category, frequency, cloud_id, sync_status, created_at, updated_at, last_sync_at)
+                                SELECT name, 'exercise', frequency, cloud_id, sync_status, created_at, updated_at, last_sync_at
+                                FROM exercise_presets;
+                            `);
+                            logger.info('db', 'Migrated data from exercise_presets to clinical_presets');
+                        } catch (e) {
+                            logger.error('db', 'Failed to migrate exercise_presets data', { error: e instanceof Error ? e.message : String(e) });
+                        }
+                    }
                 }
                 const hasDiagnosisShortcuts = existingTables.some(t => t.name === 'diagnosis_shortcuts');
                 if (!hasDiagnosisShortcuts) {
@@ -281,7 +312,7 @@ export async function initializeDatabase(): Promise<void> {
                 logger.info('db', 'Database already initialized');
                 db.close();
 
-                seedDiagnosisData();
+                seedClinicalData();
                 return;
             }
         } catch (error) {
@@ -365,17 +396,19 @@ export async function initializeDatabase(): Promise<void> {
 
         db.exec('CREATE INDEX IF NOT EXISTS treatments_invoice_id_idx ON treatments(invoice_id);');
 
-        // Create diagnosis_presets table
+        // Create clinical_presets table (unified for diagnoses + exercises)
         db.exec(`
-      CREATE TABLE IF NOT EXISTS diagnosis_presets (
+      CREATE TABLE IF NOT EXISTS clinical_presets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
         frequency INTEGER NOT NULL DEFAULT 0,
         cloud_id INTEGER,
         sync_status TEXT NOT NULL DEFAULT 'PENDING',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        last_sync_at TEXT
+        last_sync_at TEXT,
+        UNIQUE(name, category)
       );
     `);
 
@@ -416,7 +449,7 @@ export async function initializeDatabase(): Promise<void> {
 
         db.exec('CREATE INDEX IF NOT EXISTS sync_logs_table_name_record_id_idx ON sync_logs(table_name, record_id);');
 
-        db.exec('CREATE INDEX IF NOT EXISTS diagnosis_presets_name_idx ON diagnosis_presets(name);');
+        db.exec('CREATE INDEX IF NOT EXISTS clinical_presets_category_idx ON clinical_presets(category);');
 
         // Create inventory_items table
         db.exec(`
@@ -510,7 +543,7 @@ export async function initializeDatabase(): Promise<void> {
 
         logger.info('db', 'Database tables created successfully');
 
-        seedDiagnosisData();
+        seedClinicalData();
 
     } catch (error) {
         logger.error('db', 'Failed to create database tables', { error: error instanceof Error ? error.message : String(error) });

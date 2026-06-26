@@ -78,7 +78,8 @@ export class PrismaSyncEngine {
         this.prisma.invoice.count({ where: { syncStatus: 'PENDING' } }),
         this.prisma.treatment.count({ where: { syncStatus: 'PENDING' } }),
         this.prisma.inventoryItem.count({ where: { syncStatus: 'PENDING' } }),
-        this.prisma.inventoryTransaction.count({ where: { syncStatus: 'PENDING' } })
+        this.prisma.inventoryTransaction.count({ where: { syncStatus: 'PENDING' } }),
+        this.prisma.treatmentSession.count({ where: { syncStatus: 'PENDING' } })
       ]);
       const hasLocalChanges = pendingCount.some(count => count > 0);
 
@@ -231,6 +232,10 @@ export class PrismaSyncEngine {
         where: { syncStatus: 'PENDING' },
         include: { item: true }
       });
+      const pendingTreatmentSessions = await this.prisma.treatmentSession.findMany({
+        where: { syncStatus: 'PENDING' },
+        include: { treatment: true }
+      });
 
       logger.debug('sync', 'Pending items to upload', {
         patients: pendingPatients.length,
@@ -238,6 +243,7 @@ export class PrismaSyncEngine {
         treatments: pendingTreatments.length,
         inventoryItems: pendingInventoryItems.length,
         inventoryTransactions: pendingInventoryTxns.length,
+        treatmentSessions: pendingTreatmentSessions.length,
       });
       const [totalPatients, totalInvoices, totalTreatments, totalInvItems, totalInvTxns] = await this.prisma.$transaction([
         this.prisma.patient.count(),
@@ -355,10 +361,27 @@ export class PrismaSyncEngine {
           date: tx.date instanceof Date ? tx.date.toISOString() : String(tx.date),
           notes: tx.notes,
           updatedAt: tx.updatedAt.toISOString()
+        })),
+        treatmentSessions: pendingTreatmentSessions.map(ts => ({
+          id: ts.id,
+          cloudId: ts.cloudId,
+          treatmentCloudId: ts.treatment.cloudId,
+          treatmentId: ts.treatmentId,
+          sessionNumber: ts.sessionNumber,
+          date: ts.date ? ts.date.toISOString().split('T')[0] : null,
+          attended: ts.attended,
+          painBefore: ts.painBefore,
+          painAfter: ts.painAfter,
+          notes: ts.notes,
+          exercisesPerformed: ts.exercisesPerformed,
+          progress: ts.progress,
+          cancelled: ts.cancelled,
+          rescheduledDate: ts.rescheduledDate ? ts.rescheduledDate.toISOString().split('T')[0] : null,
+          updatedAt: ts.updatedAt.toISOString()
         }))
       };
 
-      const totalItems = pendingPatients.length + pendingInvoices.length + pendingTreatments.length + pendingInventoryItems.length + pendingInventoryTxns.length;
+      const totalItems = pendingPatients.length + pendingInvoices.length + pendingTreatments.length + pendingInventoryItems.length + pendingInventoryTxns.length + pendingTreatmentSessions.length;
       // Calculate dynamic timeout: 30 seconds base + 500ms per item being synced. Max 5 minutes.
       const dynamicTimeout = Math.min(300000, Math.max(30000, 10000 + (totalItems * 500)));
 
@@ -734,6 +757,22 @@ export class PrismaSyncEngine {
         }
       }
 
+      // Update treatment sessions with cloud IDs
+      if (synced.treatmentSessions) {
+        for (const ts of synced.treatmentSessions) {
+          if (ts.localId && ts.cloudId) {
+            await this.prisma.treatmentSession.update({
+              where: { id: ts.localId },
+              data: {
+                cloudId: ts.cloudId,
+                syncStatus: 'SYNCED',
+                lastSyncAt: new Date()
+              }
+            });
+          }
+        }
+      }
+
       // === APPLY CLOUD INVENTORY UPDATES ===
       // Apply inventory item updates from cloud
       if (updates.inventoryItems) {
@@ -812,6 +851,60 @@ export class PrismaSyncEngine {
         }
       }
 
+      // Apply treatment session updates from cloud
+      if (updates.treatmentSessions) {
+        for (const cloudSession of updates.treatmentSessions) {
+          const localTreatment = await this.prisma.treatment.findFirst({
+            where: { cloudId: cloudSession.treatmentId }
+          });
+
+          if (!localTreatment) {
+            logger.warn('sync', 'Treatment with cloud ID not found locally, skipping treatment session', { treatmentCloudId: cloudSession.treatmentId });
+            continue;
+          }
+
+          let localSession = await this.prisma.treatmentSession.findFirst({
+            where: { cloudId: cloudSession.id }
+          });
+
+          if (!localSession) {
+            localSession = await this.prisma.treatmentSession.findFirst({
+              where: {
+                cloudId: null,
+                treatmentId: localTreatment.id,
+                sessionNumber: cloudSession.sessionNumber
+              }
+            });
+          }
+
+          const sessionPayload = {
+            cloudId: cloudSession.id,
+            treatmentId: localTreatment.id,
+            sessionNumber: cloudSession.sessionNumber,
+            date: cloudSession.date ? new Date(cloudSession.date) : null,
+            attended: cloudSession.attended ?? 0,
+            painBefore: cloudSession.painBefore ?? null,
+            painAfter: cloudSession.painAfter ?? null,
+            notes: cloudSession.notes ?? '',
+            exercisesPerformed: cloudSession.exercisesPerformed ?? '',
+            progress: cloudSession.progress ?? null,
+            cancelled: cloudSession.cancelled ?? 0,
+            rescheduledDate: cloudSession.rescheduledDate ? new Date(cloudSession.rescheduledDate) : null,
+            syncStatus: 'SYNCED',
+            lastSyncAt: new Date()
+          };
+
+          if (localSession) {
+            await this.prisma.treatmentSession.update({
+              where: { id: localSession.id },
+              data: sessionPayload
+            });
+          } else {
+            await this.prisma.treatmentSession.create({ data: sessionPayload });
+          }
+        }
+      }
+
       // === CLEANUP: Remove local records not in cloud (cloud is source of truth) ===
       // ONLY cleanup if we successfully uploaded all pending changes
       // This prevents deleting local data that hasn't been synced yet
@@ -820,7 +913,8 @@ export class PrismaSyncEngine {
         this.prisma.invoice.count({ where: { syncStatus: 'PENDING' } }),
         this.prisma.treatment.count({ where: { syncStatus: 'PENDING' } }),
         this.prisma.inventoryItem.count({ where: { syncStatus: 'PENDING' } }),
-        this.prisma.inventoryTransaction.count({ where: { syncStatus: 'PENDING' } })
+        this.prisma.inventoryTransaction.count({ where: { syncStatus: 'PENDING' } }),
+        this.prisma.treatmentSession.count({ where: { syncStatus: 'PENDING' } })
       ]);
       const hasPendingData = remainingPending.some(count => count > 0);
 
@@ -832,6 +926,7 @@ export class PrismaSyncEngine {
             treatments: remainingPending[2],
             inventoryItems: remainingPending[3],
             inventoryTransactions: remainingPending[4],
+            treatmentSessions: remainingPending[5],
           },
         });
       } else if (!lastSyncTime) {
@@ -897,6 +992,16 @@ export class PrismaSyncEngine {
           });
           if (deletedTxns.count > 0) {
             logger.debug('sync', 'Removed inventory transactions that no longer exist in cloud', { count: deletedTxns.count });
+          }
+        }
+
+        const cloudSessionIds = (updates.treatmentSessions || []).map((s: any) => s.id);
+        if (cloudSessionIds.length > 0) {
+          const deletedSessions = await this.prisma.treatmentSession.deleteMany({
+            where: { cloudId: { not: null, notIn: cloudSessionIds }, syncStatus: 'SYNCED' }
+          });
+          if (deletedSessions.count > 0) {
+            logger.debug('sync', 'Removed treatment sessions that no longer exist in cloud', { count: deletedSessions.count });
           }
         }
       } else {
@@ -969,14 +1074,14 @@ export class PrismaSyncEngine {
 
       const syncTime = new Date().toISOString();
       const totalDownloaded = (updates.patients?.length || 0) + (updates.invoices?.length || 0) + (updates.treatments?.length || 0)
-        + (updates.inventoryItems?.length || 0) + (updates.inventoryTransactions?.length || 0);
+        + (updates.inventoryItems?.length || 0) + (updates.inventoryTransactions?.length || 0) + (updates.treatmentSessions?.length || 0);
       const totalUploaded = synced.patients.length + synced.invoices.length + synced.treatments.length
-        + (synced.inventoryItems?.length || 0) + (synced.inventoryTransactions?.length || 0);
+        + (synced.inventoryItems?.length || 0) + (synced.inventoryTransactions?.length || 0) + (synced.treatmentSessions?.length || 0);
 
       clearAllCache();
       logger.info('sync', 'Sync completed', {
-        uploaded: { total: totalUploaded, patients: synced.patients.length, invoices: synced.invoices.length, treatments: synced.treatments.length, inventoryItems: synced.inventoryItems?.length || 0, inventoryTransactions: synced.inventoryTransactions?.length || 0 },
-        downloaded: { total: totalDownloaded, patients: updates.patients?.length || 0, invoices: updates.invoices?.length || 0, treatments: updates.treatments?.length || 0, inventoryItems: updates.inventoryItems?.length || 0, inventoryTransactions: updates.inventoryTransactions?.length || 0 },
+        uploaded: { total: totalUploaded, patients: synced.patients.length, invoices: synced.invoices.length, treatments: synced.treatments.length, inventoryItems: synced.inventoryItems?.length || 0, inventoryTransactions: synced.inventoryTransactions?.length || 0, treatmentSessions: synced.treatmentSessions?.length || 0 },
+        downloaded: { total: totalDownloaded, patients: updates.patients?.length || 0, invoices: updates.invoices?.length || 0, treatments: updates.treatments?.length || 0, inventoryItems: updates.inventoryItems?.length || 0, inventoryTransactions: updates.inventoryTransactions?.length || 0, treatmentSessions: updates.treatmentSessions?.length || 0 },
       });
 
       // Notify renderer process about sync completion
@@ -988,6 +1093,7 @@ export class PrismaSyncEngine {
           treatments: synced.treatments.length,
           inventoryItems: synced.inventoryItems?.length || 0,
           inventoryTransactions: synced.inventoryTransactions?.length || 0,
+          treatmentSessions: synced.treatmentSessions?.length || 0,
           presets: presetStats
         },
         conflicts: response.data.conflicts || []
@@ -1060,7 +1166,8 @@ export class PrismaSyncEngine {
       this.prisma.invoice.count({ where: { syncStatus: 'PENDING' } }),
       this.prisma.treatment.count({ where: { syncStatus: 'PENDING' } }),
       this.prisma.inventoryItem.count({ where: { syncStatus: 'PENDING' } }),
-      this.prisma.inventoryTransaction.count({ where: { syncStatus: 'PENDING' } })
+      this.prisma.inventoryTransaction.count({ where: { syncStatus: 'PENDING' } }),
+      this.prisma.treatmentSession.count({ where: { syncStatus: 'PENDING' } })
     ]);
 
     const lastSync = await this.prisma.syncLog.findFirst({
@@ -1075,6 +1182,7 @@ export class PrismaSyncEngine {
       treatments: pendingCount[2],
       inventoryItems: pendingCount[3],
       inventoryTransactions: pendingCount[4],
+      treatmentSessions: pendingCount[5],
       lastSync: lastSync?.createdAt || null,
       lastSyncStatus: lastSync?.status || 'never',
       isSyncing: this.isSyncing

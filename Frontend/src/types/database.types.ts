@@ -14,12 +14,51 @@ export interface Patient {
 }
 
 export interface Treatment {
+  id?: number;
   name: string;
   duration?: string;
   sessions: number;
   startDate: string;
   endDate: string;
   amount: number;
+}
+
+export interface TreatmentSession {
+  id: number;
+  treatmentId: number;
+  sessionNumber: number;
+  date: string | null;
+  attended: number;
+  painBefore: number | null;
+  painAfter: number | null;
+  notes: string;
+  exercisesPerformed: string;
+  progress: string | null;
+  cancelled: number;
+  rescheduledDate: string | null;
+  syncStatus?: string;
+  cloudId?: number | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TreatmentSessionSummary {
+  treatmentId: number;
+  treatmentName: string;
+  invoiceNumber: string;
+  totalSessions: number;
+  attendedCount: number;
+  cancelledCount: number;
+  pendingCount: number;
+  sessions: TreatmentSession[];
+}
+
+export interface PainTrendPoint {
+  sessionNumber: number;
+  date: string | null;
+  painBefore: number;
+  painAfter: number;
+  painDelta: number;
 }
 
 export interface DatabaseInvoice {

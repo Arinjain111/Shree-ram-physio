@@ -4,7 +4,7 @@ import {
   getAllShortcuts,
   syncPresets,
   incrementFrequency,
-} from '../controllers/diagnosisController';
+} from '../controllers/clinicalController';
 import { asyncHandler } from '../middleware/errorHandler';
 
 const router = Router();
